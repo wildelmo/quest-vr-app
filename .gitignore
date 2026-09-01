@@ -1,0 +1,28 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Build output / dependencies (adjust once the stack is chosen)
+node_modules/
+dist/
+build/
+*.apk
+*.aab
+
+# Unity (if used)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+*.csproj
+*.sln
+
+# Secrets
+.env
+.env.*
