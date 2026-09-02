@@ -123,6 +123,7 @@ export const hints = {
         want = h; break;
       }
     }
+    if (want === LEAVE && st.current !== LEAVE) st.current = null;   // leaving preempts whatever is showing
     if (st.current && !st.current.repeat) {
       const h = st.current;
       if (h.done(ctx, s)) { learned[h.id] = Date.now(); if (!ctx.harness) saveLearned(learned); st.current = null; st.cooldownUntil = t + 20; }

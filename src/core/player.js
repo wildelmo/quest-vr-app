@@ -41,7 +41,9 @@ export function createPlayer(ctx) {
   // opens, the palm does not). One hand → its palm; both hands → their midpoint, and the line between them turns.
   const pulls = { left: makePull(), right: makePull() };
   function makePull() { return { active: false, time: 0, start: new THREE.Vector3(), local: new THREE.Vector3() }; }
-  const hold = { mode: 0, engaged: false, turning: false, time: 0, accum: 0, start: new THREE.Vector3(), prev: new THREE.Vector3(), cur: new THREE.Vector3(), line: new THREE.Vector2(), moveVel: new THREE.Vector3() };
+  const hold = { mode: 0, anchor: null, engaged: false, turning: false, time: 0, accum: 0, start: new THREE.Vector3(), prev: new THREE.Vector3(), cur: new THREE.Vector3(), line: new THREE.Vector2(), moveVel: new THREE.Vector3() };
+  const rigVel = new THREE.Vector3();   // the rig's actual world velocity (pull, turn and glide), for the wave sim and drips
+  const prevRig = new THREE.Vector3();
   const rigInv = new THREE.Matrix4();
   const pullDelta = new THREE.Vector3();
   const _l2 = new THREE.Vector2();
@@ -160,10 +162,12 @@ export function createPlayer(ctx) {
     const mode = nActive === 2 ? 2 : nActive === 1 ? 1 : 0;
     turnRate = 0;
     pullDelta.set(0, 0, 0);
-    if (mode !== hold.mode) {
+    // a hand-over-hand swap on one frame keeps mode 1 but changes the anchoring palm: treat it as a change of grip
+    const anchor = mode === 1 ? (L.active ? L : R) : null;
+    if (mode !== hold.mode || anchor !== hold.anchor) {
       // letting go (or changing grip) carries the momentum of the last engaged pull into a glide
       if (hold.engaged) vel.add(hold.moveVel);
-      hold.mode = mode; hold.engaged = false; hold.turning = false; hold.accum = 0; hold.time = 0; hold.moveVel.set(0, 0, 0);
+      hold.mode = mode; hold.anchor = anchor; hold.engaged = false; hold.turning = false; hold.accum = 0; hold.time = 0; hold.moveVel.set(0, 0, 0);
       if (mode === 1) hold.cur.copy(L.active ? L.local : R.local);
       else if (mode === 2) { hold.cur.addVectors(L.local, R.local).multiplyScalar(0.5); hold.line.set(R.local.x - L.local.x, R.local.z - L.local.z); }
       hold.start.copy(hold.cur); hold.prev.copy(hold.cur);
@@ -192,9 +196,13 @@ export function createPlayer(ctx) {
       _l2.set(R.local.x - L.local.x, R.local.z - L.local.z);
       const dot = hold.line.x * _l2.x + hold.line.y * _l2.y;
       const crossY = hold.line.y * _l2.x - hold.line.x * _l2.y;
-      const d = THREE.MathUtils.clamp(Math.atan2(crossY, dot), -0.2, 0.2);
+      // hands close together turn tracking jitter into yaw: the turn fades out below 25 cm of separation, and
+      // sub-0.1° wobbles are ignored
+      const sep = THREE.MathUtils.clamp(_l2.length() / 0.25, 0, 1);
+      let d = THREE.MathUtils.clamp(Math.atan2(crossY, dot), -0.2, 0.2) * sep;
+      if (Math.abs(d) < 0.0017) d = 0;
       hold.line.copy(_l2);
-      if (!hold.turning) { hold.accum += d; if (Math.abs(hold.accum) >= THREE.MathUtils.degToRad(P.turnDeadZoneDeg)) hold.turning = true; }
+      if (!hold.turning) { hold.accum += d; if (hold.time >= P.pullHoldTime && Math.abs(hold.accum) >= THREE.MathUtils.degToRad(P.turnDeadZoneDeg)) hold.turning = true; }
       else if (Math.abs(d) > 1e-6) {
         // turn about the point the hands hold (their midpoint), so the world stays under the hands
         player.updateMatrixWorld(true);
@@ -257,6 +265,10 @@ export function createPlayer(ctx) {
       if (r > P.radiusLimit) { const k = P.radiusLimit / r; player.position.x *= k; player.position.z *= k; vel.multiplyScalar(0.5); }
     }
     player.updateMatrixWorld(true);
+    // the rig's real world velocity this frame (a pull moves the rig without touching vel)
+    if (ctx.time.frame > 1) rigVel.subVectors(player.position, prevRig).divideScalar(Math.max(dt, 1e-3)); else rigVel.set(0, 0, 0);
+    prevRig.copy(player.position);
+    if (rigVel.length() > 6) rigVel.setLength(6);
     // head velocity in world (for the wave sim / audio / calm)
     camera.getWorldPosition(headWorld);
     if (ctx.time.frame > 1) headVel.subVectors(headWorld, prevHead).divideScalar(Math.max(dt, 1e-3));
@@ -301,6 +313,6 @@ export function createPlayer(ctx) {
 
   function setLeave(v) { leaveFade = THREE.MathUtils.clamp(v || 0, 0, 1); }
 
-  const state = { speed: 0, headWorld, headVelocity: headVel, calibrated: false, velocity: vel, seated: false, eyeHeight, holding: false, pulling: false, turning: false, turnRate: 0, pullSpeed: 0 };
-  return { update, enableDesktop, look, setLeave, state, get velocity() { return vel; }, get calm() { return calm; } };
+  const state = { speed: 0, headWorld, headVelocity: headVel, calibrated: false, velocity: rigVel, seated: false, eyeHeight, holding: false, pulling: false, turning: false, turnRate: 0, pullSpeed: 0 };
+  return { update, enableDesktop, look, setLeave, state, get velocity() { return rigVel; }, get calm() { return calm; } };
 }

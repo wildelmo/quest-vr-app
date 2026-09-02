@@ -35,9 +35,10 @@ export const leave = {
         pose = fa > 0.45 && fb < -0.45 && a.palm.normal.dot(b.palm.normal) < -0.5;
       }
     }
+    const bothTracked = !!(a && b && a.tracked && b.tracked);
     if (pose) { s.hold += dt; s.grace = 0.5; }
-    else if (s.grace > 0) s.grace -= dt;                     // one hand briefly lost while they touch
-    else s.hold = Math.max(0, s.hold - dt * 3);              // let go: it undoes itself quickly
+    else if (s.grace > 0 && !bothTracked) s.grace -= dt;     // one hand briefly lost while they touch: keep the hold
+    else { s.grace = 0; s.hold = Math.max(0, s.hold - dt * 3); }  // let go: it undoes itself quickly
     const T = CONFIG.player.leaveHoldTime;
     const p = THREE.MathUtils.clamp(s.hold / T, 0, 1);
     ctx.leave.progress = p;

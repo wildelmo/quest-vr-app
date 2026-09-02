@@ -25,7 +25,7 @@ const LO = 38, HI = 74, UPPER_LO = 72, UPPER_HI = 84;
 const VOICE_LEVEL = 0.05, UPPER_LEVEL = 0.03;
 const STEAL_FADE = 1.5;  // longest forced fade when a new note has to take a still-releasing voice (the note waits for it)
 const SWELL_ATTACK = 2.5, SWELL_RELEASE = 3.0; // envelope around a real pad swell so it never enters or leaves abruptly
-const SWELL_MIN_FIT = 0.55; // below this share of a pad's pitch-class energy on consonant classes the swell is skipped
+const SWELL_MIN_FIT = 0.5; // below this share of a pad's pitch-class energy on consonant classes the swell is skipped
 const SESSION_ARC = 1200; // seconds over which the session slowly settles
 
 // pitch classes relative to the root; each chord's tones are consonant with the minor pentatonic

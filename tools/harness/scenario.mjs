@@ -178,6 +178,29 @@ try {
     step('two-hand-turn', Math.abs(Math.abs(turnedDeg) - 31) < 8 && drift < 0.08, { turnedDeg: +turnedDeg.toFixed(1), palmDrift: +drift.toFixed(3) });
   }
 
+  // ---- hand-over-hand: swapping the pulling hand on one frame must not jolt the rig (a grip change, not a jump)
+  {
+    await local('left', [-0.15, 1.25, -0.55], 0); await local('right', [0.15, 1.25, -0.55], 0);
+    await frames(8);
+    await local('left', [-0.15, 1.25, -0.55], 1);
+    await frames(6);
+    const zs = [];
+    const rigZ = async () => (await world()).rig.z;
+    for (let i = 1; i <= 15; i++) { await local('left', [-0.15, 1.25, -0.55 + 0.25 * i / 15], 1); await frame(); zs.push(await rigZ()); }
+    // release the left (its pinch opens over the next frames) and close the right two frames later
+    await local('left', [-0.15, 1.25, -0.30], 0);
+    for (let i = 0; i < 12; i++) {
+      if (i === 2) await local('right', [0.15, 1.25, -0.55], 1);
+      if (i > 2) await local('right', [0.15, 1.25, -0.55 + 0.02 * (i - 2)], 1);
+      await frame(); zs.push(await rigZ());
+    }
+    await local('right', [0.15, 1.25, -0.37], 0);
+    await frames(6);
+    let maxStep = 0;
+    for (let i = 1; i < zs.length; i++) maxStep = Math.max(maxStep, Math.abs(zs[i] - zs[i - 1]));
+    step('hand-swap-no-jolt', maxStep < 0.03, { maxStepPerFrame: +maxStep.toFixed(4) });
+  }
+
   // ---- leaving: both palms pressed together for a few seconds ends the session
   {
     await local('left', [-0.035, 1.2, -0.4], 0, { pitchDeg: 0, rollDeg: 90 });   // palm facing +x

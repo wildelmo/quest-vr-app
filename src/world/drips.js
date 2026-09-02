@@ -173,7 +173,7 @@ export const drips = {
       let n = 0;
       for (let k = 0; k < NJ; k++) {
         const j = h.joints[DRIP_JOINTS[k]];
-        if (j.valid && S.wetUntil[wb + k] > t && j.position.y > level + 0.01) elig[n++] = k;
+        if (j.valid && S.wetUntil[wb + k] > t && j.position.y - (j.radius || 0.008) * 0.8 > level + 0.006) elig[n++] = k;
       }
       if (n === 0) continue;
       let want = Math.min(S.burstLeft[hi], P.burstPerFrame);
@@ -196,7 +196,7 @@ export const drips = {
         vel[i3] = vx; vel[i3 + 1] = vy; vel[i3 + 2] = vz;
         const x = pos[i3] + vx * dt, y = pos[i3 + 1] + vy * dt, z = pos[i3 + 2] + vz * dt;
         const a = (age[i] += dt);
-        const surf = level + (swell ? swell(x, z, t) : 0);
+        const surf = level;   // the drawn surface is flat (the analytic swell only moves floating things)
         if (y <= surf) {
           // landed: a tiny ring, a quiet event (rate-limited; the audio listens), and the drop is gone
           if (disturb && disturbs < P.disturbPerFrame) { disturbs++; disturb(x, z, P.ringRadius, P.ringStrength * (0.6 + 0.4 * base[i])); }
