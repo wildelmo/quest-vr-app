@@ -26,6 +26,11 @@ export const wavesim = {
     let cur = rtA, next = rtB;
 
     const disturb = new Float32Array(MAX_DISTURB * 4);
+    // the hush circles (src/world/hush.js): two vec4 of uv centre, uv radius, strength — the sim damps waves
+    // inside them. Allocated here so wavesim/water never depend on the hush module running, or existing.
+    const hush = { data: new Float32Array(8), strength: 0 };
+    ctx.water.hush = hush;
+    ctx.water.hushWorld = new Float32Array(8); // world x, z, radius, strength — filled by hush.js for the surface shader
     const uniforms = {
       uPrev: { value: null },
       uTexel: { value: 1 / size },
@@ -34,6 +39,7 @@ export const wavesim = {
       uGlowDecay: { value: 0.975 },
       uDisturb: { value: disturb },
       uCount: { value: 0 },
+      uHush: { value: hush.data },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms,
@@ -41,6 +47,7 @@ export const wavesim = {
       fragmentShader: /* glsl */`
         precision highp float;
         uniform sampler2D uPrev; uniform float uTexel, uDamping, uSpeed, uGlowDecay; uniform vec4 uDisturb[${MAX_DISTURB}]; uniform int uCount;
+        uniform vec4 uHush[2];
         varying vec2 vUv;
         void main() {
           vec4 c = texture2D(uPrev, vUv);
@@ -51,6 +58,15 @@ export const wavesim = {
           float u = texture2D(uPrev, vUv + vec2(0.0,  uTexel)).r;
           float lap = (l + r + u + d) * 0.25 - h;
           float vel = (h - hp) * uDamping;
+          // hush: inside a resting hand's circle the water loses its momentum within a few steps, so waves
+          // entering it die at the edge instead of crossing it
+          float hf = 0.0;
+          for (int i = 0; i < 2; i++) {
+            vec2 dv = vUv - uHush[i].xy; dv -= floor(dv + 0.5);
+            float hr = max(uHush[i].z, 1e-4);
+            hf = max(hf, uHush[i].w * (1.0 - smoothstep(0.6 * hr, hr, length(dv))));
+          }
+          vel *= 1.0 - 0.7 * hf;
           float hn = h + vel + lap * uSpeed;
           float inj = 0.0; // how hard something is pushing the water here this step
           for (int i = 0; i < ${MAX_DISTURB}; i++) {
@@ -64,6 +80,7 @@ export const wavesim = {
             hn += uDisturb[i].w * g * (1.0 - q);
             inj += abs(uDisturb[i].w) * g;
           }
+          hn *= 1.0 - 0.15 * hf; // and the height itself relaxes flat
           hn = clamp(hn, -0.6, 0.6);
           hn *= 0.999; // tiny leak so the tile settles to flat
           // Plankton flash under shear, so the light is where the water is being pushed: brightest in the
@@ -179,7 +196,8 @@ export const wavesim = {
     for (const q of s.queue) push(q.x, q.z, q.radius, q.strength);
     s.queue.length = 0;
 
-    const calm = ctx.water.calm || 0;
+    // a full hush counts as 0.6 calm (HUSH.calmGain) for the damping, whoever is stiller
+    const calm = Math.max(ctx.water.calm || 0, 0.6 * (ctx.water.hush.strength || 0));
     s.mat.uniforms.uDamping.value = 0.98 - calm * 0.02;
     s.mat.uniforms.uPrev.value = s.cur.texture;
 

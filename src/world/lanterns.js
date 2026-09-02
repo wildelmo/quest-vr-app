@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG } from '../config.js';
+import { TIP_NAMES } from '../core/hands.js';
 import {
   LANTERN_BODY_VERT, LANTERN_BODY_FRAG,
   LANTERN_GLOW_VERT, LANTERN_MIRROR_VERT, LANTERN_GLOW_FRAG,
@@ -17,7 +18,11 @@ import {
  * States: 'floating' | 'held' | 'rising'.
  *  - floating: sits on the swell, drifts with a per-lantern wind + random walk; arrivals home in from
  *    ~45 m (fog) and loiter at 5-8 m while 6 lanterns are already within reach; a gentle pull toward an
- *    open hand turns near-misses into grabs.
+ *    open hand turns near-misses into grabs. Lily pads hold a hull that drifts among them (wind and walk
+ *    damped to a quarter), so a lantern set down at a lotus cluster stays there a while; lotus.js reads
+ *    `touched` (has been in a hand) to let such a lantern warm the bud open. An open hand meets the paper
+ *    flank instead of passing through it: a slow hand rests it against the fingers, a brisk brush sends it
+ *    gliding off with a slow spin, the flame flaring and guttering ('lanterntouch', see nudgeContact).
  *  - held: a point mass on an 8 cm string under the pinch point (position-based pendulum, unilateral
  *    so it can go slack and float when pushed under water); the body tilts along the string.
  *  - rising: the string's anchor becomes a virtual balloon: 0.4 s buoyancy ramp, 0.25 -> 0.5 m/s,
@@ -26,9 +31,12 @@ import {
  * Grab protocol (src/core/hands.js): each lantern keeps an entry in ctx.grabbables
  * { position, radius, active, held, warm, onGrab(hand), onRelease(hand, velocity, { lost }) }.
  *
- * Public surface: ctx.lanterns = { list, count, MAX }; list entries expose { position (centre, Vector3),
- * top (Vector3), state, bright, seed, held, attracted }.
- * Events: 'lanterngrab' {pos, hand}, 'lanternrelease' {pos, hand}, 'lanternsplash' {pos}, 'lanternstar' {dir, pos}.
+ * Public surface: ctx.lanterns = { list, count, MAX, touches }; list entries expose { position (centre, Vector3),
+ * top (Vector3), state, bright, seed, held, attracted, touched, amongPads, push, spinKick, inContact, escorts, spilled }.
+ * Cross-module fields written by fireflies.js: `escorts` (fireflies orbiting a rising lantern this frame; the flame flares
+ * with them) and `spilled` (that escort has already spilled); both are reset here on grab and respawn.
+ * Events: 'lanterngrab' {pos, hand}, 'lanternrelease' {pos, hand}, 'lanternsplash' {pos}, 'lanternstar' {dir, pos},
+ * 'lanterntouch' {pos, hand, lantern, speed}.
  */
 const MAX = 24;
 const H = 0.26;               // lantern height (m); geometry origin is at the top (hanging point)
@@ -51,6 +59,19 @@ const SWAY_AMP = 0.3, SWAY_PERIOD = 6;
 const BRIGHT_FLOAT = 0.55;
 const GRAVITY = 9.81;
 const ATTRACT_RADIUS = 0.35, ATTRACT_K = 2.5, ATTRACT_VMAX = 0.25;
+const PADS = { hold: 0.40 };  // within this of a lotus cluster the pads hold the hull (drift damped to a quarter)
+// touch and nudge: an open hand's knuckles, tips and wrist are discs against the hull's widest radius
+const NUDGE = {
+  reach: 0.45,                // palm within this of the centre before any joint is tested
+  skin: 0.008, body: 0.075,   // joint radius padding; contact radius of the paper flank
+  pushMax: 0.7, pushK: 0.9,   // glide velocity cap and how much of the palm's normal speed the hull takes
+  spinK: 2.5, spinMax: 2.5,   // yaw kick from the sideways sweep (rad/s)
+  pushDecay: 1.5, spinDecay: 0.9,
+  gutterSpeed: 0.35,          // a brush faster than this makes the flame gutter
+  eventGap: 0.25,             // 'lanterntouch' at most this often per lantern
+  attEaseNear: 0.095, attEaseFar: 0.175, // the hand pull eases out as the pinch point closes on the hull
+};
+const CONTACT_JOINTS = ['wrist', 'middle-finger-metacarpal', 'index-finger-phalanx-proximal', 'middle-finger-phalanx-proximal', 'ring-finger-phalanx-proximal', 'pinky-finger-phalanx-proximal', ...TIP_NAMES];
 
 // mulberry32: small seeded PRNG so placement is deterministic (and testable)
 function makeRng(seed) {
@@ -171,7 +192,7 @@ export const lanterns = {
 
     // ---- lantern records
     const list = [];
-    ctx.lanterns = { list, count: 0, MAX, nearestDistance: Infinity };
+    ctx.lanterns = { list, count: 0, MAX, nearestDistance: Infinity, touches: 0 };
     const s = this._ = {
       ctx, rng, list, bodies, bodyMat, glowMat, mirrorMat, flameMat, instGeos, setInstanceCount, markInstDirty, pPos, pBright, pFlame, pSeed, seedArr, brightArr, heldArr, aSeed, aBright, aHeld,
       spawnTimer: SPAWN_INTERVAL * 0.5, lastNearT: 0,
@@ -188,6 +209,8 @@ export const lanterns = {
       const seed = rng();
       const L = {
         i, seed, state: 'floating', held: null, incoming, attracted: false, dropping: false,
+        touched: false,                    // has been carried by a hand (only such a lantern warms a lotus bud)
+        amongPads: false,                  // held by a lotus cluster's pads this frame
         position: new THREE.Vector3(x, floatCentreY(x, z, ctx.time.t, seed), z), // centre of the body (grab point)
         top: new THREE.Vector3(),          // hanging point (the pendulum bob while held/rising)
         anchor: new THREE.Vector3(),       // the other end of the string: pinch point, then the virtual balloon
@@ -198,6 +221,8 @@ export const lanterns = {
         bright: incoming ? 0 : BRIGHT_FLOAT, flame: 1,
         yaw: rng() * Math.PI * 2, spin: (rng() - 0.5) * 0.3,
         lean: new THREE.Vector2(), leanT: new THREE.Vector2(),
+        push: new THREE.Vector2(), spinKick: 0, touchT: -1e9, inContact: false, // a hand's nudge: glide, yaw kick, last touch
+        escorts: 0, spilled: false,        // the firefly escort of a rising lantern (fireflies.js)
         wind: WIND_DIR.clone().rotateAround(new THREE.Vector2(), THREE.MathUtils.degToRad((rng() - 0.5) * 40)).multiplyScalar(WIND_SPEED),
         walk: new THREE.Vector2(), walkT: new THREE.Vector2(), walkTimer: rng() * 3,
         loiterR: 5 + rng() * 3,
@@ -232,7 +257,10 @@ export const lanterns = {
       L.top.copy(L.position).y += H * 0.5;
       L.vel.set(0, 0, 0); L.bobVel.set(0, 0, 0); L.att.set(0, 0); L.up.set(0, 1, 0);
       L.lean.set(0, 0); L.leanT.set(0, 0);
+      L.push.set(0, 0); L.spinKick = 0; L.inContact = false;
       L.state = 'floating'; L.incoming = true; L.bright = 0; L.held = null; L.dropping = false; L.attracted = false;
+      L.touched = false; L.amongPads = false;
+      L.escorts = 0; L.spilled = false;
       L.loiterR = 5 + rng() * 3;
       L.grab.active = true; L.grab.held = null;
     }
@@ -254,10 +282,11 @@ export const lanterns = {
 
     function onGrab(L, hand) {
       const wasRising = L.state === 'rising';
-      L.state = 'held'; L.held = hand; L.incoming = false; L.attracted = false; L.dropping = false;
+      L.state = 'held'; L.held = hand; L.incoming = false; L.attracted = false; L.dropping = false; L.touched = true;
       L.anchor.copy(hand.pinch.point);
       if (!wasRising) { L.top.copy(L.position).addScaledVector(L.up, H * 0.5); L.bobVel.copy(L.vel); }
-      L.att.set(0, 0);
+      L.att.set(0, 0); L.push.set(0, 0); L.spinKick = 0; L.inContact = false;
+      L.escorts = 0; L.spilled = false;
       // ease the string from its current length to STRING over ~120 ms (with a little overshoot)
       L.grabT = 0; L.grabLen = Math.max(0.01, L.top.distanceTo(L.anchor));
       ctx.events.emit('lanterngrab', { pos: L.position.clone(), hand, lantern: L });
@@ -397,7 +426,9 @@ export const lanterns = {
         const lh = Math.hypot(L.up.x, L.up.z);
         if (lh > 1e-5) L.leanT.set(L.up.x / lh * la, L.up.z / lh * la); else L.leanT.set(0, 0);
         L.lean.lerp(L.leanT, Math.min(1, dt * 14));
-        L.flame += (1 - L.flame) * Math.min(1, dt * 3);
+        // a rising lantern's flame flares with the fireflies spiralling round it (up to +30% at four)
+        const flameT = L.state === 'rising' ? 1 + 0.3 * Math.min(1, (L.escorts || 0) / 4) : 1;
+        L.flame += (flameT - L.flame) * Math.min(1, dt * 3);
       } else { // floating
         // drift: wind (per-lantern direction) + slow random walk (+ homing while drifting in from far away)
         L.walkTimer -= dt;
@@ -421,7 +452,17 @@ export const lanterns = {
           const ease = THREE.MathUtils.smoothstep(dp, 0.7, 1.1);
           vx += dxp / dp * sp * ease; vz += dzp / dp * sp * ease;
         }
-        // near-miss help: a gentle pull toward an open, visible hand above the water
+        // lily pads hold the hull: among a lotus cluster the wind and walk (and the homing) drop to a quarter,
+        // so a lantern set down there stays a while; the hand terms below are untouched, so it can be coaxed out
+        L.amongPads = false;
+        const clusters = ctx.lotus ? ctx.lotus.clusters : null;
+        if (clusters) {
+          let cd = Infinity;
+          for (let c = 0; c < clusters.length; c++) { const d = Math.hypot(clusters[c].x - P.x, clusters[c].z - P.z); if (d < cd) cd = d; }
+          if (cd < PADS.hold) { vx *= 0.25; vz *= 0.25; L.amongPads = true; }
+        }
+        // near-miss help: a gentle pull toward an open, visible hand above the water; it eases out as the pinch
+        // point closes on the hull, so a lantern resting against the fingers is not tugged into them
         let attracted = false;
         for (const h of hands) {
           if (!h || !h.visible || h.active === false || !h.open || h.submerged || h.pinch.active) continue;
@@ -429,14 +470,25 @@ export const lanterns = {
           const ax = hp.x - P.x, az = hp.z - P.z;
           const ad = Math.hypot(ax, az);
           if (ad > ATTRACT_RADIUS || ad < 1e-4 || Math.abs(hp.y - P.y) > 0.6) continue;
+          const ease = THREE.MathUtils.smoothstep(ad, NUDGE.attEaseNear, NUDGE.attEaseFar);
+          if (ease <= 0) continue;
           attracted = true;
-          L.att.x += ax * ATTRACT_K * dt; L.att.y += az * ATTRACT_K * dt;
+          L.att.x += ax * ATTRACT_K * dt * ease; L.att.y += az * ATTRACT_K * dt * ease;
         }
         if (attracted) { if (L.att.length() > ATTRACT_VMAX) L.att.setLength(ATTRACT_VMAX); }
         else L.att.multiplyScalar(Math.max(0, 1 - 4 * dt));
         L.attracted = attracted;
         vx += L.att.x; vz += L.att.y;
-        L.flame += ((attracted ? 1.3 : 1) - L.flame) * Math.min(1, dt * 4);
+        // touch and nudge: the hull is moved out of an open hand's way and takes a decaying glide and yaw kick
+        // from it (applied after the pads' damping, so a lantern among the pads can still be nudged out)
+        L.push.multiplyScalar(Math.max(0, 1 - NUDGE.pushDecay * dt));
+        L.spinKick *= Math.max(0, 1 - NUDGE.spinDecay * dt);
+        if (!L.dropping) nudgeContact(L, hands, ctx, t, dt); else L.inContact = false;
+        vx += L.push.x; vz += L.push.y;
+        const pushLen = L.push.length();
+        let flameT = attracted ? 1.3 : 1;
+        if (pushLen > 0.05) flameT = Math.max(flameT, 1 + Math.min(0.7, pushLen * 1.2)); // the flame flares as it glides
+        L.flame += (flameT - L.flame) * Math.min(1, dt * 4);
         // don't drift into the player's body
         const dxh = P.x - head.x, dzh = P.z - head.z;
         const dh = Math.hypot(dxh, dzh);
@@ -475,6 +527,7 @@ export const lanterns = {
         const sx = (swell(P.x + e, P.z, t) - swell(P.x - e, P.z, t)) / (2 * e);
         const sz = (swell(P.x, P.z + e, t) - swell(P.x, P.z - e, t)) / (2 * e);
         L.leanT.set(-sx * 2.5 + 0.04 * Math.sin(t * 0.9 + L.seed * 20), -sz * 2.5 + 0.04 * Math.cos(t * 0.7 + L.seed * 31));
+        L.leanT.x += L.push.x * 0.5; L.leanT.y += L.push.y * 0.5; // heels away from the hand that pushed it
         L.lean.lerp(L.leanT, Math.min(1, dt * 4));
         L.up.set(0, 1, 0);
         L.top.copy(P).y += H * 0.5;
@@ -489,8 +542,8 @@ export const lanterns = {
         if (!L.incoming && dp > KEEP_RADIUS) s.respawnFar(L);
       }
 
-      // spin
-      L.yaw += L.spin * dt * (L.state === 'floating' ? 1 : 0.4);
+      // spin (+ the kick from a sideways brush while floating)
+      L.yaw += (L.state === 'floating' ? L.spin + L.spinKick : L.spin * 0.4) * dt;
 
       // instance matrix: rotate about the top (hanging point)
       const lx = L.lean.x, lz = L.lean.y;
@@ -515,6 +568,56 @@ export const lanterns = {
     s.flameMat.uniforms.uTime.value = t;
   },
 };
+
+/**
+ * An open, non-pinching hand meets a floating lantern's paper flank. Each contact joint (knuckles, tips,
+ * wrist) is a disc against the hull's widest radius, tested only on the flank (a joint above the rim or
+ * below the waterline never pushes): the hull is moved out of the way (positional, never vertical), the
+ * palm's velocity along the contact normal goes into L.push (a decaying glide) and its sideways component
+ * into L.spinKick. A fresh contact after a quiet gap is a 'lanterntouch': a ring from the hull, a gutter of
+ * the flame when the brush was brisk, and a paper tap in sfx.js. Held and rising lanterns never get here.
+ */
+function nudgeContact(L, hands, ctx, t, dt) {
+  const P = L.position, push = L.push;
+  const yLo = P.y - 0.11, yHi = L.top.y - 0.02;
+  let contact = false, vnMax = 0, touchHand = null;
+  for (let hi = 0; hi < hands.length; hi++) {
+    const h = hands[hi];
+    if (!h || !h.visible || !h.active || h.pinch.active || h.grasp || h.grabbed) continue; // a grasp/pinch is a grab or a pull
+    if (h.palm.position.distanceToSquared(P) > NUDGE.reach * NUDGE.reach) continue;
+    const v = h.palm.velocity; // world, so a pulled rig counts as the hand moving
+    for (let k = 0; k < CONTACT_JOINTS.length; k++) {
+      const j = h.joints[CONTACT_JOINTS[k]];
+      if (!j.valid) continue;
+      const jp = j.position;
+      if (jp.y <= yLo || jp.y >= yHi) continue;
+      const jr = j.radius + NUDGE.skin;
+      const dx = P.x - jp.x, dz = P.z - jp.z;
+      const d = Math.hypot(dx, dz);
+      if (d >= NUDGE.body + jr || d <= 1e-4) continue;
+      const nx = dx / d, nz = dz / d, pen = NUDGE.body + jr - d;
+      P.x += nx * pen; P.z += nz * pen;
+      const vn = Math.max(0, v.x * nx + v.z * nz);
+      const pn = push.x * nx + push.y * nz;
+      if (vn * NUDGE.pushK > pn) { const add = vn * NUDGE.pushK - pn; push.x += nx * add; push.y += nz * add; }
+      const vtx = v.x - nx * vn, vtz = v.z - nz * vn;
+      L.spinKick = THREE.MathUtils.clamp(L.spinKick + (nx * vtz - nz * vtx) * NUDGE.spinK * dt * 30, -NUDGE.spinMax, NUDGE.spinMax);
+      contact = true;
+      if (vn >= vnMax) { vnMax = vn; touchHand = h; }
+    }
+  }
+  if (contact) {
+    if (push.lengthSq() > NUDGE.pushMax * NUDGE.pushMax) push.setLength(NUDGE.pushMax);
+    if (!L.inContact && t - L.touchT > NUDGE.eventGap) {
+      L.touchT = t;
+      if (vnMax > NUDGE.gutterSpeed) L.bright = Math.max(0.3, L.bright - 0.2); // the flame gutters; the float easing restores it
+      ctx.water.disturb?.(P.x, P.z, 0.1, 0.05 + 0.2 * Math.min(1, vnMax));
+      ctx.lanterns.touches++;
+      ctx.events.emit('lanterntouch', { pos: P.clone(), hand: touchHand, lantern: L, speed: vnMax });
+    }
+  }
+  L.inContact = contact;
+}
 
 /**
  * Position-based pendulum step for the lantern's top (the bob) on a string whose anchor moved from

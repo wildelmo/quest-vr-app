@@ -17,6 +17,10 @@ const HINTS = [
   { id: 'still', text: 'hold a hand open and still', after: 95, done: (ctx, s) => s.fireflyLanded, ready: (ctx, s) => s.touchedWater },
   { id: 'wade', text: 'pinch the water and pull it toward you', after: 60, done: (ctx, s) => s.moved, ready: (ctx, s) => s.touchedWater && (nearestLantern(ctx) > REACH + 0.2 || nearestLotus(ctx) > REACH + 0.2) },
   { id: 'turn', text: 'pinch with both hands and turn them to look around', after: 150, done: (ctx, s) => s.turned, ready: (ctx, s) => s.moved && ctx.playerCtl.state.seated },
+  { id: 'lanternlotus', text: 'leave a lantern among the lily pads', after: 130, done: (ctx, s) => s.lanternBloomed, ready: (ctx, s) => s.grabbed && s.bloomed && nearestLotus(ctx) < REACH + 0.15 && nearestLantern(ctx) < REACH + 0.15 },
+  { id: 'hush', text: 'rest a hand flat on the water and be still', after: 140, done: (ctx, s) => s.hushed, ready: (ctx, s) => s.touchedWater },
+  { id: 'ribbon', text: 'move an open hand slowly and they follow', after: 130, done: (ctx, s) => s.followed, ready: (ctx, s) => s.touchedWater },
+  { id: 'escort', text: 'let a lantern go with fireflies on your hand', after: 200, done: (ctx, s) => s.escorted, ready: (ctx, s) => s.fireflyLanded && s.released && nearestLantern(ctx) < REACH + 0.15 },
 ];
 const LEAVE = { id: 'leave', text: 'keep your palms together to leave', repeat: true };
 const SHOW_HANDS = { id: 'hands', text: 'show your hands to the headset', repeat: true };
@@ -63,11 +67,15 @@ export const hints = {
     mesh.renderOrder = 1; mesh.frustumCulled = false; mesh.visible = false; mesh.name = 'hint';
     ctx.scene.add(mesh);
 
-    const s = { handsSeen: false, touchedWater: false, grabbed: false, fireflyLanded: false, moved: false, turned: false, bloomed: false, sessionStart: -1, handsLostSince: -1, noTracking: false, shows: {} };
+    const s = { handsSeen: false, touchedWater: false, grabbed: false, fireflyLanded: false, moved: false, turned: false, bloomed: false, lanternBloomed: false, hushStarted: false, hushed: false, followed: false, released: false, escorted: false, sessionStart: -1, handsLostSince: -1, noTracking: false, shows: {} };
     ctx.events.on('handenter', () => { s.touchedWater = true; });
     ctx.events.on('grab', () => { s.grabbed = true; });
     ctx.events.on('fireflyland', () => { s.fireflyLanded = true; });
-    ctx.events.on('lotusbloom', () => { s.bloomed = true; });
+    ctx.events.on('lotusbloom', (e) => { s.bloomed = true; if (e && e.cause === 'lantern') s.lanternBloomed = true; });
+    ctx.events.on('hush', () => { s.hushStarted = true; });
+    ctx.events.on('fireflyfollow', () => { s.followed = true; });
+    ctx.events.on('lanternrelease', () => { s.released = true; });
+    ctx.events.on('fireflyescort', (e) => { if (e && (e.count | 0) >= 3) s.escorted = true; });
     const startSession = (e) => { s.sessionStart = ctx.time.t; s.noTracking = !!(e && e.hasHands === false); s.handsSeen = false; s.handsLostSince = -1; s.shows = {}; st.current = null; st.cooldownUntil = 0; };
     ctx.events.on('xrstart', startSession);
     ctx.events.on('desktopstart', startSession);
@@ -104,6 +112,7 @@ export const hints = {
     if (!s.handsSeen && ctx.hands.list.some((h) => h.tracked)) s.handsSeen = true;
     if (!s.moved && (ctx.playerCtl.state.speed > 0.25 || (ctx.playerCtl.state.pullSpeed || 0) > 0.2)) s.moved = true;
     if (!s.turned && Math.abs(ctx.playerCtl.state.turnRate || 0) > 0.15) s.turned = true;
+    if (!s.hushed && s.hushStarted && (ctx.hush?.strength || 0) >= 0.8) s.hushed = true; // learned once the circle has fully taken
     const anyTracked = ctx.hands.list.some((h) => h.tracked);
     const presenting = ctx.renderer.xr.isPresenting;
     if (presenting && s.handsSeen) { if (!anyTracked) { if (s.handsLostSince < 0) s.handsLostSince = t; } else s.handsLostSince = -1; }

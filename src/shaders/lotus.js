@@ -11,15 +11,19 @@ import { GLSL_FOG } from './common.js';
  * The petal is lofted along a circular-arc spine whose base tilt and curvature are driven by aBloom:
  * closed = nearly vertical, curling inward over the bud; open = outer ring ~75° from vertical with
  * drooping tips, inner ring ~45°. Edges are cupped toward the axis (strongly when closed, so the
- * petals wrap the bud). A slow breathing motion rides on the base tilt.
+ * petals wrap the bud). A slow breathing motion rides on the base tilt. aLantern (xyz, weight) is the
+ * brightest lantern near this flower: its amber light lands on the side of the petals that faces it (vWarm),
+ * so a lantern set down among the pads reads amber on one side and moon-pale on the other.
  */
 export const LOTUS_FLOWER_VERT = /* glsl */`
 attribute vec3 aPetal;
 attribute float aBloom;
 attribute vec3 aColor;
 attribute float aPhase;
+attribute vec4 aLantern;
 uniform float uTime;
 varying vec3 vColor; varying vec3 vNormalW; varying vec3 vWorldPos; varying vec2 vUv; varying float vBloom; varying float vPart;
+varying float vWarm;
 void main() {
   float phi = aPetal.x, part = aPetal.y, L = aPetal.z;
   float b = aBloom;
@@ -58,6 +62,10 @@ void main() {
   wp = modelMatrix * wp;
   vWorldPos = wp.xyz;
   vNormalW = normalize(mat3(modelMatrix) * nW);
+  // lantern light: lambert toward the lantern, falling off with distance (a small amber lamp, not the moon)
+  vec3 toL = aLantern.xyz - wp.xyz;
+  float d2 = dot(toL, toL);
+  vWarm = aLantern.w * max(dot(vNormalW, normalize(toL + vec3(1e-4))), 0.0) / (1.0 + 12.0 * d2);
   vColor = aColor;
   vUv = uv;
   vBloom = b;
@@ -75,6 +83,7 @@ precision highp float;
 uniform vec3 uMoonDir; uniform vec3 uMoonColor; uniform vec3 uFogColor;
 uniform float uFogDensity; uniform float uSurge;
 varying vec3 vColor; varying vec3 vNormalW; varying vec3 vWorldPos; varying vec2 vUv; varying float vBloom; varying float vPart;
+varying float vWarm;
 ${GLSL_FOG}
 void main() {
   vec3 N = normalize(vNormalW);
@@ -91,6 +100,7 @@ void main() {
     // bud / seed pod: warm centre, lights up as the flower opens
     vec3 pod = mix(vColor, vec3(1.0, 0.86, 0.45), 0.6);
     col = pod * (0.05 + 0.30 * hl) + pod * (0.06 + 0.75 * b) * (1.0 + 1.2 * uSurge);
+    col += vWarm * vec3(1.0, 0.70, 0.34) * 0.9;
   } else {
     float t = vUv.y, xn = vUv.x;
     vec3 base = vColor * mix(0.18, 0.75, t);
@@ -102,6 +112,7 @@ void main() {
     float back = max(dot(-N, uMoonDir), 0.0);
     vec3 trans = vColor * (0.12 * rim + 0.10 * back) * (0.4 + 0.6 * b);
     col = lit + glow * 0.6 * (1.0 + 1.2 * uSurge) + trans;
+    col += vWarm * vec3(1.0, 0.70, 0.34) * 0.9; // a lantern's amber on the side that faces it
   }
   float fog = fogExp2(length(cameraPosition - vWorldPos), uFogDensity);
   col = mix(col, uFogColor, fog);

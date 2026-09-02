@@ -95,6 +95,7 @@ export const music = {
       nextChordAt: now + 0.05, breathing: false, breathUntil: 0, breathAt: now + 180 + 120 * rng(),
       nextDrop: now + 8 + 6 * rng(), dropArmed: true, drops: [], dropKind: 0,
       lastSwell: -100, swellQueue: null, swellEnds: [], swellToggle: false,
+      hushing: false, // a hand rests on the water (hush.js): raindrops fall even though that hand is submerged
     };
     this._s = S;
     S.arc = () => clamp((c.currentTime - S.t0) / SESSION_ARC, 0, 1);
@@ -149,6 +150,8 @@ export const music = {
 
     S.offs.push(ctx.events.on('lanternrelease', () => { S.swellToggle = !S.swellToggle; requestSwell(S, S.swellToggle ? 'pad_northern_brilliant' : 'pad_northern_swell', 0.35); }));
     S.offs.push(ctx.events.on('lotuschord', () => requestSwell(S, 'pad_bioluminescence', 0.45)));
+    S.offs.push(ctx.events.on('hush', () => { S.hushing = true; }));
+    S.offs.push(ctx.events.on('hushend', () => { S.hushing = (ctx.hush?.strength || 0) > 0.02; })); // the other hand may still rest
   },
 
   update(api, ctx, dt) {
@@ -182,13 +185,15 @@ export const music = {
     }
 
     // ---- raindrop notes when the world is calm
+    // (a hush overrides the submerged-hand rule — the resting hand is in the water — and the drops come closer together)
     const anySub = !!ctx.hands?.list?.some((h) => h.visible && h.submerged);
-    const calmWorld = energy < 0.15 && !anySub;
+    const calmWorld = (energy < 0.15 && !anySub) || S.hushing;
+    const gap = () => (S.hushing ? 3 + 4 * S.rng() : 6 + 8 * S.rng());
     if (!calmWorld) S.dropArmed = false;
-    else if (!S.dropArmed) { S.dropArmed = true; S.nextDrop = now + 6 + 8 * S.rng(); }
+    else if (!S.dropArmed) { S.dropArmed = true; S.nextDrop = now + gap(); }
     if (calmWorld && now + LOOKAHEAD >= S.nextDrop) {
       raindrop(S, Math.max(S.nextDrop, now + 0.01));
-      S.nextDrop = Math.max(S.nextDrop, now) + 6 + 8 * S.rng();
+      S.nextDrop = Math.max(S.nextDrop, now) + gap();
     }
 
     // ---- queued swell
