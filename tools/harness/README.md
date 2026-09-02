@@ -226,3 +226,12 @@ Inside a Playwright test you can also drive it directly:
 hand through the water for N rendered frames, and writes `sim.png` (R = height, G = afterglow,
 B = energy of the sim tile) plus `view.png` and prints tile statistics. Useful when tuning
 `src/world/wavesim.js` — the numbers tell you whether glow is local to the hand or spreading.
+
+## Interaction scenario
+
+`npm run scenario` (`node tools/harness/scenario.mjs`) drives the fake device through the hero
+interactions with the real app: calibration, grabbing the nearest lantern, lifting and releasing it
+(it must rise and become a star, raising the aurora energy), touching the nearest lotus bud (it must
+bloom), holding a hand open and still (a firefly must land) and a palm stroke under water (the rig
+must glide). It prints PASS/FAIL per step, writes screenshots + `report.json` to
+`tools/harness/out/scenario/`, and exits non-zero on any failure.

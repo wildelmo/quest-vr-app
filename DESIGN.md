@@ -59,20 +59,25 @@ public-domain recording or synthesized live in Web Audio in response to what you
 
 ## 3. Interaction model (hand tracking)
 
+The water sits inside the headset's hand-tracking cone: after a 1 s calibration the rig is offset so
+the surface is 0.60 m below the eyes standing (0.45 m seated, detected from eye height < 1.35 m). If the
+player sits down or stands up later the rig re-baselines over 15 s so the water never visibly moves.
+
 | Gesture | Detection | Response |
 |---|---|---|
-| Hand in water | any tracked joint below water level | plankton glow + ripples, cyan tint on the submerged part of the hand, water swish (volume ∝ speed) |
-| Sweep (wading) | palm submerged and moving > 0.35 m/s horizontally | player rig accelerates opposite to hand velocity (×0.35), drag 2/s, max 1.2 m/s, soft vignette while moving. Radius clamped to 50 m. |
-| Pinch | index-tip ↔ thumb-tip < 2.0 cm (release at > 3.5 cm, hysteresis) | grab nearest grabbable within 12 cm of the pinch point |
-| Release lantern | pinch ends while lantern is above water | lantern ascends (buoyancy + wind), aurora energy += 1, chime swell; on reaching the sky it becomes a star |
-| Release lantern in water | pinch ends while below water | lantern floats again |
-| Open still hand | palm up or forward, joint speeds < 0.15 m/s for 1.5 s, above water | fireflies approach and land on fingertips; "tink" per landing |
-| Touch lotus bud | any fingertip within 8 cm of a bud | bloom + note + glow |
-| Two hands submerged, still | both palms below water, still for 2 s | "calm": ripples damp faster and the plankton show a slow breathing glow around you (a reward for stillness) |
+| Hand in water | any tracked joint below water level (1 cm hysteresis) | plankton glow + ripples that trail the hand, cyan tint and a meniscus line on the hand, water swish (volume ∝ speed), a "plip" on entry |
+| Paddle stroke (wading) | palm submerged > 3 cm, moving > 0.35 m/s, palm normal aligned with the motion (dot > 0.5), no pinch/grasp, hand in front of the body; after 15 cm / 0.2 s of stroke | rig glides opposite to the stroke (gain 2/s), drag 2/s, max 0.8 m/s, the drag rises to a cushion near the 48 m boundary, vignette ∝ speed, foveation 1.0 while gliding. Seated users get yaw from lateral strokes (≤ 30°/s) instead of strafing. |
+| Pinch / grasp | Meta's pinch event OR index↔thumb < 2 cm for 2 frames (release: > 3.5 cm for 3 frames and no OS pinch), OR a whole-hand grasp (mean finger curl > 0.55) | grab nearest grabbable within 13 cm; a pinch with nothing in reach still answers with a spark and a soft tick |
+| Release lantern | pinch ends while the lantern is above water | it hangs on an 8 cm string while held; released it rises (0.25→0.5 m/s), the aurora brightens once it is ~3 m up, a swell plays; ~25 s later it fades into fog and becomes a permanent star (persisted in localStorage) |
+| Release lantern in water / tracking lost while holding | pinch ends below water, or the hand is lost for > 1 s | it floats again (never rises) |
+| Open still hand | every finger curl < 0.35, filtered palm displacement < 3 cm over 0.5 s, above water; fireflies start turning toward it after 0.3 s and land after 1 s | fireflies land on the fingertips with a bell each; they scatter when the hand moves > 0.35 m/s |
+| Touch lotus bud | any fingertip within reach of a closed bud | bloom over 1.6 s + a pentatonic note made consonant with the current chord + glow + a ring on the water; all six open → a chord swell |
+| Calm | head and hands still, not wading (ctx.calm rises 0.25/s); both palms submerged and still is a bonus | ripples damp faster, the plankton breathe softly around you, a low drone fades in |
+| Tracking loss | wrist or index tip pose missing | hands dissolve over 350 ms instead of freezing; velocities are zeroed for 3 frames on reacquire; the Quest system menu (visible-blurred) freezes gestures and fades the audio |
 
 Desktop fallback (also used by the headless test harness): mouse-look + WASD,
-a virtual right hand on a plane 0.5 m in front of the camera that follows the
-mouse; left button = pinch; hold `Shift` to lower the hand into the water.
+a virtual right hand on a plane 0.55 m in front of the camera that follows the
+mouse; left button = pinch; hold `Shift` to dip the hand into the water.
 
 ## 4. Visual design
 
@@ -87,7 +92,15 @@ lantern amber (#ffb257 → #ff7a1a), aurora green→teal→magenta (#42ff9c, #35
   about a pole tilted for latitude ≈ −30° (the photo was made from Chile/La Silla).
   Galactic centre starts ~35° above the horizon in front of the player.
 - **Moon**: waxing crescent (real NASA-derived moon texture from three.js
-  examples), 12° altitude to the left; halo sprite; a dim directional light.
+  examples), lit as a sphere with earthshine, 21° up to the right (west); it sets a
+  few minutes in — the lake goes darker, the plankton read brighter, and a meteor
+  shower follows for a minute and a half. Halo sprites; a dim directional light while up.
+- **Sky alignment**: the ESO mosaic is rotated ~3.8° relative to true J2000 galactic
+  coordinates; the asset pipeline measured it on 92 bright stars and the correction
+  matrix (`assets/sky/sky.json`) is applied in the dome and reflection shaders so every
+  catalog sprite sits on its photographic star.
+- **Meteors**: a pool of additive line streaks along great circles, one every 2–3
+  minutes at rest, more when the sky is active.
 - **Water**: single large plane, custom shader. Normal = two scrolling samples of
   a real water normal map (1 m and 4 m tiles) + gradient of the wave simulation.
   Reflection samples the sky panorama equirectangularly along the reflected view
@@ -118,15 +131,25 @@ lantern amber (#ffb257 → #ff7a1a), aurora green→teal→magenta (#42ff9c, #35
   additive sprites drifting at water level.
 
 Performance budget (Quest 2): ≤ 60 draw calls, ≤ 250 k triangles, no
-post-processing, no shadows, one 512² compute pass, textures ≤ 40 MB GPU,
-`renderer.xr.setFoveation(1)`, framebuffer scale 1.0.
+post-processing, no shadows, one 384²/512² compute pass, textures ≤ 40 MB GPU,
+foveation 0.5 at rest / 1.0 while gliding, framebuffer scale 1.0. Measured in the
+harness with everything on: 58 draw calls, ~115 k triangles, ~28 k points.
+Tone mapping is Neutral (ACES pushed the cyan/amber glows to white); every custom
+shader ends with the tone-mapping/colour-space chunks and the sky/water dither.
 
 ## 5. Sound design
 
-All audio runs through one `AudioContext` created on the first user gesture
-(the Enter VR click), with a master bus → procedural convolution reverb (4 s
-decaying noise IR) → compressor → destination. Spatial sounds use Three.js
-`AudioListener`/`PositionalAudio` (PannerNode) so anything can be positioned.
+All audio runs through one `AudioContext` created *synchronously* in the Enter VR
+click (so the transient activation is still valid for `requestSession`); samples
+decode after the session starts and the subsystems begin with a 6 s master fade.
+Graph: bed / world / music / chimes buses → master → compressor → tanh soft
+limiter → output, with a parallel convolution reverb (procedural 4.5 s IR that
+darkens over its tail, pre-delay 30 ms) fed by per-bus sends. Spatial sounds use
+Three.js `AudioListener`/`PositionalAudio` (PannerNode), equal-power except the
+two hands (HRTF). Music lives in D Dorian and only uses chords the D minor
+pentatonic is always consonant with; lotus and firefly notes are checked against
+the current chord. The Quest system menu blurs the session: audio fades out and
+back.
 
 - **Bed**: real CC0 wind recording (felix.blume) with slow gain LFO; synthesized
   crickets (several "individuals": band-passed noise bursts ≈4.2 kHz at slightly

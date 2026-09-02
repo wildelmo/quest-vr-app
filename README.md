@@ -71,6 +71,10 @@ tools/harness/        Playwright harness + fake WebXR device
 
 ## Performance notes (Quest 2)
 
-One 384²/512² wave-sim pass, ~35 draw calls, ~80k triangles, no post-processing, no shadows, foveation
-0.5 at rest and 1.0 while gliding, 72 Hz target. Quest 2 gets the 2k panorama and fewer particles; Quest 3
-and desktop get the 4k panorama.
+One 384²/512² wave-sim pass, 58 draw calls, ~115k triangles and ~28k points with everything on
+(measured in the harness), no post-processing, no shadows, foveation 0.5 at rest and 1.0 while gliding,
+72 Hz target. Quest 2 gets the 2k panorama and fewer particles; Quest 3 and desktop get the 4k panorama.
+
+`npm run scenario` drives the fake headset through the whole interaction loop (grab a lantern, let it go,
+watch it become a star; touch a lotus; hold still for a firefly; paddle) and fails if any step does not
+happen.

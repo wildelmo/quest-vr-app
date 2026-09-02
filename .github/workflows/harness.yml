@@ -1,0 +1,32 @@
+# Runs the headless harness (desktop + fake WebXR device) and the interaction scenario on every push.
+# SwiftShader is slow on the runners, so the frame counts are modest; the point is "no console errors,
+# no shader failures, the hero interactions still happen".
+name: Harness
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Desktop + fake XR smoke run
+        run: node tools/harness/run.mjs --frames 60 --timeout 180000
+      - name: Interaction scenario
+        run: node tools/harness/scenario.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: harness-output
+          path: tools/harness/out
+          if-no-files-found: ignore
