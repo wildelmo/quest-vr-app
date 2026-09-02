@@ -11,6 +11,9 @@ import { GLSL_GAL_UV, GLSL_HASH, GLSL_DITHER, GLSL_FOG } from '../shaders/common
  *  - Schlick fresnel between the deep colour and the reflection, exp2 fog, 8-bit dithering
  * Render order 2: underwater things draw before it (1), things above the water after it (3+).
  */
+const MAX_LIGHTS = 4;
+const _sortTmp = [];
+
 export const water = {
   name: 'water',
   init(ctx) {
@@ -39,21 +42,33 @@ export const water = {
       uCalm: { value: 0 },
       uAurora: { value: new THREE.Color(0x000000) },
       uDebug: { value: 0 },
+      uHeightScale: { value: W.simHeightScale },
+      uPatchHalf: { value: W.nearPatch / 2 },
+      uLights: { value: new Float32Array(MAX_LIGHTS * 4) }, // nearest lanterns: xyz, brightness
+      uLightColor: { value: new THREE.Color(CONFIG.colors.lantern) },
     };
-    const mat = new THREE.ShaderMaterial({
-      uniforms,
-      vertexShader: /* glsl */`
+    // Two meshes share these uniforms: a flat far plane, and a near patch around the player whose vertices are
+    // displaced by the wave simulation so ripples from your fingers are real geometry, not just lighting.
+    const vertexShader = /* glsl */`
+        uniform sampler2D uSim; uniform float uTile, uHeightScale, uPatchHalf; uniform vec3 uPlayer;
         varying vec3 vWorld;
         void main() {
           vec4 wp = modelMatrix * vec4(position, 1.0);
+          #ifdef NEAR_PATCH
+            float h = texture2D(uSim, fract(wp.xz / uTile)).r;
+            float edge = max(abs(wp.x - uPlayer.x), abs(wp.z - uPlayer.z));
+            float rim = 1.0 - smoothstep(uPatchHalf - 1.0, uPatchHalf - 0.05, edge);
+            wp.y += h * uHeightScale * rim;
+          #endif
           vWorld = wp.xyz;
           gl_Position = projectionMatrix * viewMatrix * wp;
-        }`,
-      fragmentShader: /* glsl */`
+        }`;
+    const fragmentShader = /* glsl */`
         precision highp float;
         uniform sampler2D uNormals, uSim, uNoise, uSky;
-        uniform mat3 uSkyInv; uniform float uSkyExposure, uTime, uTile, uSimTexel, uAlpha, uMoonStrength, uFogDensity, uCalm, uDebug;
-        uniform vec3 uDeep, uPlankton, uPlankton2, uMoonDir, uMoonColor, uFogColor, uPlayer, uAurora;
+        uniform mat3 uSkyInv; uniform float uSkyExposure, uTime, uTile, uSimTexel, uAlpha, uMoonStrength, uFogDensity, uCalm, uDebug, uHeightScale, uPatchHalf;
+        uniform vec3 uDeep, uPlankton, uPlankton2, uMoonDir, uMoonColor, uFogColor, uPlayer, uAurora, uLightColor;
+        uniform vec4 uLights[${MAX_LIGHTS}];
         varying vec3 vWorld;
         ${GLSL_GAL_UV}
         ${GLSL_HASH}
@@ -61,9 +76,13 @@ export const water = {
         ${GLSL_FOG}
         vec3 mapNormal(vec2 uv) { return texture2D(uNormals, uv).xyz * 2.0 - 1.0; }
         void main() {
+          vec2 p = vWorld.xz;
+          #ifdef FAR_PLANE
+            // the near patch covers this square; leave it to the displaced mesh
+            if (max(abs(p.x - uPlayer.x), abs(p.y - uPlayer.z)) < uPatchHalf - 0.03) discard;
+          #endif
           vec3 V = cameraPosition - vWorld;
           float dist = length(V); V /= dist;
-          vec2 p = vWorld.xz;
           float t = uTime;
           // --- normals from the real water normal map (3 scales, scrolling) — fade out with distance
           float detail = 1.0 / (1.0 + dist * 0.045);
@@ -80,7 +99,8 @@ export const water = {
           float hr = texture2D(uSim, suv + vec2( uSimTexel, 0.0)).r;
           float hu = texture2D(uSim, suv + vec2(0.0,  uSimTexel)).r;
           vec2 grad = vec2(hr - sim.r, hu - sim.r) * (1.0 / (uSimTexel * uTile)); // dh/dx in (units/m)
-          nxy += -grad * 0.06 * simFade;
+          // slope of the displaced surface (uHeightScale metres per unit), exaggerated ×2.5 so rings read at night
+          nxy += -grad * uHeightScale * 2.5 * simFade;
           vec3 N = normalize(vec3(nxy.x, 1.0, nxy.y));
           // --- reflection of the real sky
           vec3 R = reflect(-V, N);
@@ -98,12 +118,28 @@ export const water = {
           float ndv = max(dot(N, V), 0.0);
           float F = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
           vec3 col = mix(uDeep, skyCol, F) + moon;
+          // --- the nearest lanterns: their light breaks up on the ripples, so rings from your fingers read
+          // as orange glints even where the sky reflection is too dim to show them
+          vec3 glints = vec3(0.0);
+          for (int i = 0; i < ${MAX_LIGHTS}; i++) {
+            vec4 Lp = uLights[i];
+            if (Lp.w <= 0.0) continue;
+            vec3 Ld = Lp.xyz - vWorld; float d2 = dot(Ld, Ld); Ld *= inversesqrt(d2);
+            vec3 Hh = normalize(Ld + V);
+            float nh = max(dot(N, Hh), 0.0);
+            float Fh = 0.02 + 0.98 * pow(1.0 - max(dot(V, Hh), 0.0), 5.0);
+            float sp = pow(nh, 260.0) * 1.0 + pow(nh, 28.0) * 0.05;
+            glints += sp * Fh * 8.0 * Lp.w / (0.15 + d2 * 2.0);
+          }
+          col += uLightColor * glints;
           // --- bioluminescence
           float dens = texture2D(uNoise, p * 0.35).r;
           float dens2 = texture2D(uNoise, p * 1.7 + vec2(t * 0.01)).g;
           float speck = dens * 0.6 + dens2 * 0.4;
           float bio = (sim.b * 0.5 + sim.a * 0.8) * (0.2 + 0.8 * speck) * simFade;
           bio = pow(bio, 1.6); // mid values stay dim: light concentrates where the water actually moves
+          float crest = clamp(length(grad) * uHeightScale * 6.0, 0.0, 1.0);
+          bio *= 0.7 + 0.6 * crest; // the plankton light gathers on the ripple slopes, so rings show inside the glow
           bio += uCalm * 0.05 * (0.5 + 0.5 * sin(t * 0.8 + dPlayer * 2.0)) * (1.0 - smoothstep(1.5, 4.5, dPlayer)) * speck;
           col += mix(uPlankton, uPlankton2, dens2) * bio * 0.7;
           // --- fog
@@ -112,23 +148,35 @@ export const water = {
           float alpha = mix(uAlpha, 1.0, max(F, fog));
           if (uDebug > 0.5) { col = vec3(sim.a, sim.b, simFade * 0.3); alpha = 1.0; }
           if (uDebug > 1.5) { col = vec3(bio, 0.0, 0.0); alpha = 1.0; }
+          if (uDebug > 2.5) { col = vec3(clamp(sim.r * 4.0 + 0.5, 0.0, 1.0)); alpha = 1.0; }
           gl_FragColor = vec4(col, alpha);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
           gl_FragColor.rgb = dither8(gl_FragColor.rgb, gl_FragCoord.xy);
-        }`,
-      transparent: true, depthWrite: true, depthTest: true, side: THREE.FrontSide, fog: false,
-    });
+        }`;
+    const common = { uniforms, vertexShader, fragmentShader, transparent: true, depthWrite: true, depthTest: true, side: THREE.FrontSide, fog: false };
+    const farMat = new THREE.ShaderMaterial({ ...common, defines: { FAR_PLANE: '' } });
+    const nearMat = new THREE.ShaderMaterial({ ...common, defines: { NEAR_PATCH: '' } });
     const geo = new THREE.PlaneGeometry(W.extent, W.extent, 1, 1);
     geo.rotateX(-Math.PI / 2);
-    const mesh = new THREE.Mesh(geo, mat);
+    const mesh = new THREE.Mesh(geo, farMat);
     mesh.position.y = ctx.water.level;
     mesh.renderOrder = 2;
     mesh.frustumCulled = false;
     mesh.name = 'water';
     ctx.scene.add(mesh);
-    this.mesh = mesh; this.uniforms = uniforms;
+    const seg = ctx.quality.tier === 'quest2' ? 128 : 160;
+    const nearGeo = new THREE.PlaneGeometry(W.nearPatch, W.nearPatch, seg, seg);
+    nearGeo.rotateX(-Math.PI / 2);
+    const near = new THREE.Mesh(nearGeo, nearMat);
+    near.position.y = ctx.water.level;
+    near.renderOrder = 2;
+    near.frustumCulled = false;
+    near.name = 'waterNear';
+    ctx.scene.add(near);
+    this.mesh = mesh; this.near = near; this.uniforms = uniforms;
     ctx.water.mesh = mesh;
+    ctx.water.nearMesh = near;
     ctx.water.uniforms = uniforms;
   },
   update(ctx) {
@@ -142,6 +190,28 @@ export const water = {
     this.mesh.position.x = Math.round(p.x / 8) * 8;
     this.mesh.position.z = Math.round(p.z / 8) * 8;
     this.mesh.position.y = ctx.water.level;
+    // the displaced patch follows the head exactly (its vertices sample the sim at their world xz)
+    this.near.position.set(p.x, ctx.water.level, p.z);
+    // the four brightest nearby lanterns light the ripples
+    const lights = u.uLights.value;
+    lights.fill(0);
+    const list = ctx.lanterns?.list;
+    if (list && list.length) {
+      _sortTmp.length = 0;
+      for (const L of list) {
+        if (L.bright <= 0.05 || L.state === 'rising') continue;
+        const dx = L.position.x - p.x, dz = L.position.z - p.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > 64) continue;
+        _sortTmp.push({ L, key: d2 / (0.2 + L.bright) });
+      }
+      _sortTmp.sort((a, b) => a.key - b.key);
+      for (let i = 0; i < Math.min(MAX_LIGHTS, _sortTmp.length); i++) {
+        const L = _sortTmp[i].L;
+        lights[i * 4] = L.position.x; lights[i * 4 + 1] = L.position.y; lights[i * 4 + 2] = L.position.z;
+        lights[i * 4 + 3] = L.bright * (L.flame || 1);
+      }
+    }
     if (ctx.sky) {
       u.uSkyInv.value.copy(ctx.sky.worldToPhoto);
       u.uMoonDir.value.copy(ctx.sky.moonDirWorld);

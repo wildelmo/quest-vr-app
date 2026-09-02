@@ -54,6 +54,9 @@ if (process.argv.includes('--debug-water')) {
   await page.evaluate(() => { window.__nocturneCtx.water.uniforms.uDebug.value = 2; });
   for (let i = 0; i < 2; i++) await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
   await page.screenshot({ path: path.join(outDir, 'debug_bio.png') });
+  await page.evaluate(() => { window.__nocturneCtx.water.uniforms.uDebug.value = 3; });
+  for (let i = 0; i < 2; i++) await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
+  await page.screenshot({ path: path.join(outDir, 'debug_height.png') });
   await page.evaluate(() => { window.__nocturneCtx.water.uniforms.uDebug.value = 0; });
 }
 const snap = await page.evaluate(() => window.__nocturne.simSnapshot());

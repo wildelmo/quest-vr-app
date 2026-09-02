@@ -119,6 +119,25 @@ try {
   const moved = Math.hypot(after.x - before.x, after.z - before.z);
   step('wading-moves-rig', moved > 0.05, { moved: +moved.toFixed(3), before: [before.x, before.z].map((v) => +v.toFixed(2)), after: [after.x, after.z].map((v) => +v.toFixed(2)) });
 
+  // ---- pinch-and-pull: an empty pinch grabs the world; pulling the hand toward the body moves you forward.
+  // The hand is driven in reference-space (rig-local) coordinates here, like a real hand: it moves with the body.
+  {
+    const b0 = (await world()).rig;
+    await page.evaluate(() => window.__fakeXR.clearOverrides?.());
+    const local = (z, pinch) => page.evaluate(({ z, pinch }) => window.__fakeXR.setHandPose('right', { position: [0.1, 1.25, z], pinch }), { z, pinch });
+    await local(-0.55, 0);
+    await frames(8);
+    await local(-0.55, 1);
+    await frames(6);
+    for (let i = 1; i <= 24; i++) { await local(-0.55 + 0.4 * i / 24, 1); await frame(); }
+    await local(-0.15, 0);
+    await frames(20);
+    const b1 = (await world()).rig;
+    const fwdMoved = b0.z - b1.z; // pulling the world toward you (+z hand motion) carries the rig forward (−z)
+    // 0.4 m of pull one-to-one, plus a short glide from the release momentum — never a runaway
+    step('pinch-pull-moves-rig', fwdMoved > 0.35 && fwdMoved < 1.2, { forward: +fwdMoved.toFixed(3), before: [b0.x, b0.z].map((v) => +v.toFixed(2)), after: [b1.x, b1.z].map((v) => +v.toFixed(2)) });
+  }
+
   s = await stats();
   report.final = { drawCalls: s.drawCalls, triangles: s.triangles, energy: s.energy, errors: s.errors };
 } catch (err) {

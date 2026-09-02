@@ -29,8 +29,8 @@ export const wavesim = {
     const uniforms = {
       uPrev: { value: null },
       uTexel: { value: 1 / size },
-      uDamping: { value: 0.945 }, // ripples die within ~0.5 s and travel ~0.4 m: light stays with the hand
-      uSpeed: { value: 0.16 },
+      uDamping: { value: 0.98 }, // rings from a finger travel ~0.7 m before they fade; the glow stays with the hand (energy threshold)
+      uSpeed: { value: 0.2 },
       uGlowDecay: { value: 0.975 },
       uDisturb: { value: disturb },
       uCount: { value: 0 },
@@ -52,18 +52,26 @@ export const wavesim = {
           float lap = (l + r + u + d) * 0.25 - h;
           float vel = (h - hp) * uDamping;
           float hn = h + vel + lap * uSpeed;
+          float inj = 0.0; // how hard something is pushing the water here this step
           for (int i = 0; i < ${MAX_DISTURB}; i++) {
             if (i >= uCount) break;
             vec2 dv = vUv - uDisturb[i].xy; dv -= floor(dv + 0.5);
             float rr = uDisturb[i].z;
-            float g = exp(-dot(dv, dv) / (rr * rr));
-            hn += uDisturb[i].w * g;
+            float q = dot(dv, dv) / (rr * rr);
+            float g = exp(-q);
+            // zero-mean kernel (Laplacian of a Gaussian): a push lifts a crest and sinks a trough around it, so
+            // the water is displaced, never added — no mound builds up under a hand that keeps moving
+            hn += uDisturb[i].w * g * (1.0 - q);
+            inj += abs(uDisturb[i].w) * g;
           }
           hn = clamp(hn, -0.6, 0.6);
           hn *= 0.999; // tiny leak so the tile settles to flat
-          // heights are ~centimetres: a hand sweep makes ~0.1–0.3, ripples fade to ~0.01.
-          // Energy favours motion over displacement so trails follow the hand instead of blooming outward.
-          float energy = smoothstep(0.10, 0.75, abs(hn) * 0.5 + abs(hn - h) * 6.0);
+          // Plankton flash under shear, so the light is where the water is being pushed: brightest in the
+          // hand's own footprint, faint on the steep crests right next to it, and none on the rings that
+          // travel on across the lake — those stay pure geometry.
+          float shear = abs(hn - h) * 6.0 + abs(hn) * 0.5;
+          float energy = smoothstep(0.006, 0.07, inj) + 0.3 * smoothstep(0.5, 1.4, shear);
+          energy = max(min(energy, 1.0), c.a * 0.8); // a few frames of persistence so substeps and 72 Hz read alike
           glow = max(glow * uGlowDecay, energy);
           gl_FragColor = vec4(hn, h, glow, energy);
         }`,
@@ -158,8 +166,8 @@ export const wavesim = {
         const sp = Math.min(_wv.length(), 2.0);
         if (sp < 0.04) continue;
         const near = 1 - THREE.MathUtils.smoothstep(depth, 0.02, 0.35); // strongest right at the surface
-        const strength = sp * 0.05 * (0.35 + 0.65 * near) * stepScale;
-        push(j.position.x, j.position.z, j.radius * 2.2 + 0.03, Math.min(strength, 0.12));
+        const strength = sp * 0.075 * (0.35 + 0.65 * near) * stepScale;
+        push(j.position.x, j.position.z, j.radius * 2.2 + 0.03, Math.min(strength, 0.16));
       }
     }
     // the body moving through the water
@@ -172,7 +180,7 @@ export const wavesim = {
     s.queue.length = 0;
 
     const calm = ctx.water.calm || 0;
-    s.mat.uniforms.uDamping.value = 0.945 - calm * 0.03;
+    s.mat.uniforms.uDamping.value = 0.98 - calm * 0.02;
     s.mat.uniforms.uPrev.value = s.cur.texture;
 
     // The sim is tuned for one step per 72 Hz frame. Long frames (desktop at 30 fps, the test harness)

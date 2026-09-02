@@ -47,7 +47,7 @@ public-domain recording or synthesized live in Web Audio in response to what you
   brightens for a while. At the top of its climb it becomes a new, permanent
   star in your sky.
 - **1:00** Fireflies notice you. Hold a hand open and still above the water and
-  they drift over and settle on your fingertips, each landing with a tiny bell
+  they drift over and settle on your fingers and knuckles, each landing with a tiny bell
   note. Move fast and they scatter.
 - **1:30** Lotus buds float nearby. Touch one: it opens, glows in its own colour,
   and plays a note from a pentatonic scale. Open several and they form a chord
@@ -65,20 +65,23 @@ player sits down or stands up later the rig re-baselines over 15 s so the water 
 
 | Gesture | Detection | Response |
 |---|---|---|
-| Hand in water | any tracked joint below water level (1 cm hysteresis) | plankton glow + ripples that trail the hand, cyan tint and a meniscus line on the hand, water swish (volume ∝ speed), a "plip" on entry |
+| Hand in water | any tracked joint below water level (1 cm hysteresis) | real rings: every submerged joint pushes the wave simulation with a zero-mean kernel (a crest and a trough, so the water is displaced, never piled up) and the 12 m patch of surface around the player is vertex-displaced by the result; the plankton glow sits where the hand actually shears the water and trails behind it, and the nearest lanterns break into orange glints on the ripples; cyan tint and a meniscus line on the hand, water swish (volume ∝ speed), a "plip" on entry |
+| Pinch and pull (locomotion) | a pinch with nothing grabbable within 13 cm, either hand, above or below the water | the hand holds the world: the rig moves so the pinch point stays under the fingers (≤ 8 cm per frame); let go and you keep gliding with the hand's release velocity (≤ 1.6 m/s, drag 2/s). Both hands pulling average. The paddle stroke is suspended while a hand pulls. |
 | Paddle stroke (wading) | palm submerged > 3 cm, moving > 0.35 m/s, palm normal aligned with the motion (dot > 0.5), no pinch/grasp, hand in front of the body; after 15 cm / 0.2 s of stroke | rig glides opposite to the stroke (gain 2/s), drag 2/s, max 0.8 m/s, the drag rises to a cushion near the 48 m boundary, vignette ∝ speed, foveation 1.0 while gliding. Seated users get yaw from lateral strokes (≤ 30°/s) instead of strafing. |
 | Pinch / grasp | Meta's pinch event OR index↔thumb < 2 cm for 2 frames (release: > 3.5 cm for 3 frames and no OS pinch), OR a whole-hand grasp (mean finger curl > 0.55) | grab nearest grabbable within 13 cm; a pinch with nothing in reach still answers with a spark and a soft tick |
 | Release lantern | pinch ends while the lantern is above water | it hangs on an 8 cm string while held; released it rises (0.25→0.5 m/s), the aurora brightens once it is ~3 m up, a swell plays; ~25 s later it fades into fog and becomes a permanent star (persisted in localStorage) |
 | Release lantern in water / tracking lost while holding | pinch ends below water, or the hand is lost for > 1 s | it floats again (never rises) |
-| Open still hand | every finger curl < 0.35, filtered palm displacement < 3 cm over 0.5 s, above water; fireflies start turning toward it after 0.3 s and land after 1 s | fireflies land on the fingertips with a bell each; they scatter when the hand moves > 0.35 m/s |
+| Open still hand | every finger curl < 0.35, filtered palm displacement < 3 cm over 0.5 s, above water; fireflies start turning toward it after 0.3 s and land after 1 s | fireflies land on the fingertips, knuckles and the heel of the thumb (a different spot each) with a bell each; they scatter when the hand moves > 0.35 m/s |
 | Touch lotus bud | any fingertip within reach of a closed bud | bloom over 1.6 s + a pentatonic note made consonant with the current chord + glow + a ring on the water; all six open → a chord swell |
 | Calm | head and hands still, not wading (ctx.calm rises 0.25/s); both palms submerged and still is a bonus | ripples damp faster, the plankton breathe softly around you, a low drone fades in |
 | Tracking loss | wrist or index tip pose missing | hands dissolve over 350 ms instead of freezing; velocities are zeroed for 3 frames on reacquire; the Quest system menu (visible-blurred) freezes gestures and fades the audio |
 
-Reach: the player cannot move until they discover wading, so one lantern
+Reach: the player cannot move until they discover pulling, so one lantern
 (front-right, ~0.55 m) and one lotus cluster (front-left, ~0.65 m) start within
 arm's length, arriving lanterns come all the way in while nothing floats within
-1 m, and if nothing has been in reach for 30 s the nearest lantern drifts over.
+1 m, and whenever fewer than three lanterns float within reach every floating
+lantern within 16 m homes slowly toward the player (5–14 cm/s, easing to a stop at
+0.7 m) — the lake comes to you, so nobody has to travel to send a lantern off.
 Hints ("put a hand in the water", "pinch a lantern to lift it", …) are written in
 plankton light on the surface only when the player has evidently not found the
 thing, gated on what is actually within reach; a hint counts as learned only when
@@ -111,18 +114,28 @@ lantern amber (#ffb257 → #ff7a1a), aurora green→teal→magenta (#42ff9c, #35
   catalog sprite sits on its photographic star.
 - **Meteors**: a pool of additive line streaks along great circles, one every 2–3
   minutes at rest, more when the sky is active.
-- **Water**: single large plane, custom shader. Normal = two scrolling samples of
-  a real water normal map (1 m and 4 m tiles) + gradient of the wave simulation.
-  Reflection samples the sky panorama equirectangularly along the reflected view
-  vector, mixed with deep-water colour via Schlick Fresnel. Bioluminescence: emissive
-  cyan proportional to wave energy, plus a slow-decay "afterglow" channel so trails
-  linger ~3 s. Exponential fog. Opaque-with-alpha layering: underwater things
-  render first (renderOrder 1), water second (renderOrder 2, alpha 0.88), things
-  above water after (renderOrder 3+).
-- **Wave simulation**: GPGPU ping-pong, 512², one pass per frame, wave equation
-  with damping, tiling world-space (tile = 16 m; uv = fract(xz / 16)). Up to 16
-  disturbance points per frame (hand joints + head column). Channels: R = height,
-  G = previous height, B = afterglow.
+- **Water**: two meshes sharing one shader: a large flat far plane, and a 12 m
+  near patch (128²/160² segments) that follows the head and whose vertices are
+  displaced by the wave simulation (3.5 cm per unit of height), so rings from your
+  fingers are geometry, not just lighting; the far plane discards fragments inside
+  the patch. Normal = three scrolling samples of a real water normal map + the
+  slope of the displaced surface (×2.5 so rings read at night). Reflection samples
+  the sky panorama equirectangularly along the reflected view vector, mixed with
+  deep-water colour via Schlick Fresnel. Up to four nearby lanterns are point
+  lights whose specular lobes break up on the ripples (orange glints, Schlick on
+  the half vector). Bioluminescence: emissive cyan from the sim's energy and
+  slow-decay "afterglow" channels, gathered on the ripple slopes. Exponential fog.
+  Opaque-with-alpha layering: underwater things render first (renderOrder 1),
+  water second (renderOrder 2, alpha 0.88), things above water after (renderOrder 3+).
+- **Wave simulation**: GPGPU ping-pong, 512² (384² on Quest 2), wave equation with
+  damping (0.98, rings travel ~0.7 m before fading), tiling world-space (tile = 16 m;
+  uv = fract(xz / 16)), up to three substeps on long frames. Up to 16 disturbance
+  points per frame (hand joints + head column), each a Laplacian-of-Gaussian
+  kernel so it displaces water without adding volume. Channels: R = height,
+  G = previous height, B = afterglow, A = energy. Energy comes from the injection
+  itself (how hard something pushes here) plus a little from steep, fast crests —
+  never from the rings that travel on, so the light stays with the hand while the
+  geometry spreads across the lake.
 - **Mirror trick for reflections of emissive objects**: lanterns, fireflies, lotus
   glow and the aurora draw a mirrored, dimmer copy below the water plane
   (renderOrder 1, additive) — cheap, convincing, no planar-reflection pass.

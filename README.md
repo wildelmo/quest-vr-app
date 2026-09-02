@@ -7,8 +7,10 @@ You stand waist-deep in a still lake under the real night sky — ESO's Milky Wa
 naked-eye star from the Yale Bright Star Catalog at its true position. The water lights up where your
 hands move through it. Paper lanterns drift by; pinch one and let it go, and it climbs into the sky,
 the aurora answers, and it becomes a new star in your sky. Fireflies land on a hand held open and
-still. Lotus buds open when you touch them and each one sings a note that fits the music. Push the
-water with a submerged palm and you glide.
+still. Lotus buds open when you touch them and each one sings a note that fits the music. Your fingers
+raise real ripples that the lanterns' light breaks up into glints. To move, pinch the water (or the air)
+where nothing is in reach and pull it toward you; let go and you glide. Lanterns also drift over to you
+whenever fewer than three are within arm's length.
 
 Everything you hear is either a public-domain recording or synthesized live in Web Audio in response
 to what you do. See [DESIGN.md](DESIGN.md) for the full design and [CREDITS.md](CREDITS.md) for
@@ -43,8 +45,9 @@ npm install                 # only needed for the test harness (Playwright)
 npm run serve               # http://localhost:8787
 ```
 
-Open it in a desktop browser for a mouse-and-keyboard preview (drag to look, WASD to wade, the mouse is
-your right hand, click to pinch, hold Shift to dip the hand into the water). To try it on a headset from
+Open it in a desktop browser for a mouse-and-keyboard preview (right-drag or Q/E to look, WASD to wade,
+the mouse is your right hand, click to pinch — and pinch-drag with nothing in reach to pull yourself
+along — hold Shift to dip the hand into the water). To try it on a headset from
 a local server you need HTTPS or the Chrome remote-debugging port forward to the Quest.
 
 ## Test harness
@@ -76,5 +79,5 @@ One 384²/512² wave-sim pass, 58 draw calls, ~115k triangles and ~28k points wi
 72 Hz target. Quest 2 gets the 2k panorama and fewer particles; Quest 3 and desktop get the 4k panorama.
 
 `npm run scenario` drives the fake headset through the whole interaction loop (grab a lantern, let it go,
-watch it become a star; touch a lotus; hold still for a firefly; paddle) and fails if any step does not
-happen.
+watch it become a star; touch a lotus; hold still for a firefly; paddle; pinch and pull the world) and
+fails if any step does not happen.
