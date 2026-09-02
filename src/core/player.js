@@ -37,6 +37,13 @@ export function createPlayer(ctx) {
   let calm = 0;
   const strokes = { left: makeStroke(), right: makeStroke() };
   function makeStroke() { return { active: false, path: 0, time: 0 }; }
+  // pinch-and-pull: an empty pinch grabs the world; the rig follows the hand so the pinched spot stays under
+  // the fingers, with momentum on release. Works above or below the water, seated or standing. The palm is
+  // the anchor (not the pinch point): fingertips jump a few centimetres when a pinch opens, the palm does not.
+  const pulls = { left: makePull(), right: makePull() };
+  function makePull() { return { active: false, prev: new THREE.Vector3(), vel: new THREE.Vector3(), time: 0 }; }
+  const rigInv = new THREE.Matrix4();
+  const pullDelta = new THREE.Vector3();
 
   // ---- comfort vignette + opening fade (camera-attached quad; the radius is measured in clip space so it is
   // centred per eye and independent of the field of view)
@@ -130,6 +137,35 @@ export function createPlayer(ctx) {
     player.updateMatrixWorld(true);
   }
 
+  // returns true while any hand is pulling the world (the paddle stroke is suspended meanwhile)
+  function pulling(dt) {
+    rigInv.copy(player.matrixWorld).invert();
+    let any = false, n = 0;
+    pullDelta.set(0, 0, 0);
+    for (const h of ctx.hands.list) {
+      const pl = pulls[h.handedness];
+      const on = h.active && h.pinch.active && h.pinch.kind === 'pinch' && !h.grabbed;
+      if (on && !pl.active) { pl.active = true; pl.time = 0; pl.prev.copy(h.palm.position).applyMatrix4(rigInv); pl.vel.set(0, 0, 0); continue; }
+      if (!on) { if (pl.active) { pl.active = false; vel.x += pl.vel.x; vel.z += pl.vel.z; } continue; }
+      pl.time += dt;
+      _v.copy(h.palm.position).applyMatrix4(rigInv);          // rig-local palm position
+      tmp.subVectors(_v, pl.prev); pl.prev.copy(_v);           // hand motion relative to the body this frame
+      tmp.y = 0;
+      tmp.applyQuaternion(player.quaternion);                  // into world axes
+      pullDelta.add(tmp); n++;
+      // momentum carried into the release, smoothed
+      pl.vel.lerp(_v.set(-tmp.x / Math.max(dt, 1e-3), 0, -tmp.z / Math.max(dt, 1e-3)), Math.min(1, dt * 12));
+      any = true;
+    }
+    if (n) {
+      pullDelta.divideScalar(n);
+      const step = Math.min(pullDelta.length(), P.pullMaxStep);
+      if (step > 0) { pullDelta.setLength(step); player.position.sub(pullDelta); }
+      vel.set(0, 0, 0); // while holding on, the world only moves with the hand
+    }
+    return any;
+  }
+
   function wading(dt) {
     camera.getWorldDirection(fwd); fwd.y = 0; if (fwd.lengthSq() < 1e-6) return; fwd.normalize();
     rightV.set(-fwd.z, 0, fwd.x);
@@ -138,6 +174,7 @@ export function createPlayer(ctx) {
     yawRate = 0;
     for (const h of ctx.hands.list) {
       const s = strokes[h.handedness];
+      if (pulls[h.handedness].active) { s.active = false; continue; }
       const v = h.palm.velocityLocal;
       const speedH = Math.hypot(v.x, v.z);
       // a cupped paddling hand is fine; only a real pinch (holding something / pinching) disqualifies
@@ -212,14 +249,17 @@ export function createPlayer(ctx) {
   function update(dt) {
     const presenting = renderer.xr.isPresenting;
     if (presenting) { if (!calibrated) calibrate(); else rebaseline(dt); }
+    const held = (presenting || desktop) ? pulling(dt) : false;
     if (presenting || desktop) wading(dt);
     desktopMove(dt);
+    state.pulling = held;
 
     // integrate with drag; the boundary is a cushion of drag rather than a wall
     const r0 = Math.hypot(player.position.x, player.position.z);
     const drag = P.drag + 6 * THREE.MathUtils.smoothstep(r0, P.radiusLimit - 4, P.radiusLimit);
     const damp = Math.max(0, 1 - drag * dt);
     vel.x *= damp; vel.z *= damp;
+    { const sp = Math.hypot(vel.x, vel.z); if (sp > P.pullMaxSpeed) { vel.x *= P.pullMaxSpeed / sp; vel.z *= P.pullMaxSpeed / sp; } }
     if (Math.abs(vel.x) + Math.abs(vel.z) > 1e-4) {
       player.position.x += vel.x * dt;
       player.position.z += vel.z * dt;
@@ -233,7 +273,10 @@ export function createPlayer(ctx) {
     prevHead.copy(headWorld);
     if (headVel.length() > 5) headVel.setLength(5);
 
-    const speed = Math.hypot(vel.x, vel.z);
+    // motion for the comfort vignette: glide speed, or the hand's pull speed while holding on
+    let speed = Math.hypot(vel.x, vel.z);
+    const pullSpeed = held ? Math.min(P.pullMaxSpeed, pullDelta.length() / Math.max(dt, 1e-3)) : 0;
+    if (held) speed = Math.max(speed, pullSpeed);
     speedSmooth += (speed - speedSmooth) * Math.min(1, dt * 6);
     yawSmooth += (Math.abs(yawRate) - yawSmooth) * Math.min(1, dt * 6);
     const motion = Math.max(speedSmooth / P.maxSpeed, yawSmooth / P.seatedYawRate);
@@ -254,13 +297,14 @@ export function createPlayer(ctx) {
 
     updateCalm(dt);
 
-    state.speed = speed;
+    state.speed = Math.hypot(vel.x, vel.z);
+    state.pullSpeed = pullSpeed;
     state.calibrated = calibrated;
     state.seated = seated;
     state.eyeHeight = eyeHeight;
     state.stroking = strokes.left.active || strokes.right.active;
   }
 
-  const state = { speed: 0, headWorld, headVelocity: headVel, calibrated: false, velocity: vel, seated: false, eyeHeight, stroking: false };
+  const state = { speed: 0, headWorld, headVelocity: headVel, calibrated: false, velocity: vel, seated: false, eyeHeight, stroking: false, pulling: false, pullSpeed: 0 };
   return { update, enableDesktop, look, state, get velocity() { return vel; }, get calm() { return calm; } };
 }

@@ -15,7 +15,7 @@ const HINTS = [
   { id: 'lantern', text: 'pinch a lantern to lift it', after: 40, done: (ctx, s) => s.grabbed, ready: (ctx, s) => s.touchedWater && nearestLantern(ctx) < REACH + 0.15 },
   { id: 'lotus', text: 'the buds open when you touch them', after: 75, done: (ctx, s) => s.bloomed, ready: (ctx, s) => s.touchedWater && nearestLotus(ctx) < REACH + 0.15 },
   { id: 'still', text: 'hold a hand open and still', after: 95, done: (ctx, s) => s.fireflyLanded, ready: (ctx, s) => s.touchedWater },
-  { id: 'wade', text: 'push the water with your palm to drift', after: 70, done: (ctx, s) => s.moved, ready: (ctx, s) => s.touchedWater && (nearestLantern(ctx) > REACH + 0.2 || nearestLotus(ctx) > REACH + 0.2) },
+  { id: 'wade', text: 'pinch the water and pull it toward you', after: 60, done: (ctx, s) => s.moved, ready: (ctx, s) => s.touchedWater && (nearestLantern(ctx) > REACH + 0.2 || nearestLotus(ctx) > REACH + 0.2) },
 ];
 const SHOW_HANDS = { id: 'hands', text: 'show your hands to the headset', repeat: true };
 const NO_TRACKING = { id: 'notracking', text: 'turn on hand tracking · settings → movement tracking', repeat: true };
@@ -100,7 +100,7 @@ export const hints = {
     if (s.sessionStart < 0) return;
     const elapsed = t - s.sessionStart;
     if (!s.handsSeen && ctx.hands.list.some((h) => h.tracked)) s.handsSeen = true;
-    if (!s.moved && ctx.playerCtl.state.speed > 0.25) s.moved = true;
+    if (!s.moved && (ctx.playerCtl.state.speed > 0.25 || (ctx.playerCtl.state.pullSpeed || 0) > 0.2)) s.moved = true;
     const anyTracked = ctx.hands.list.some((h) => h.tracked);
     const presenting = ctx.renderer.xr.isPresenting;
     if (presenting && s.handsSeen) { if (!anyTracked) { if (s.handsLostSince < 0) s.handsLostSince = t; } else s.handsLostSince = -1; }

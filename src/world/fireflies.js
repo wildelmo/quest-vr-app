@@ -19,7 +19,8 @@ import { FIREFLY_VERT, FIREFLY_MIRROR_VERT, FIREFLY_FRAG } from '../shaders/fire
  */
 
 const WANDER = 0, APPROACH = 1, LANDED = 2, SCATTER = 3;
-const SLOT_JOINTS = ['index-finger-tip', 'middle-finger-tip', 'ring-finger-tip', 'pinky-finger-tip', 'thumb-tip', 'middle-finger-phalanx-proximal'];
+// landing spots, in the order they fill: fingertips, but also knuckles and the palm so they don't all perch on the tips
+const SLOT_JOINTS = ['index-finger-tip', 'middle-finger-phalanx-proximal', 'ring-finger-tip', 'index-finger-metacarpal', 'thumb-tip', 'pinky-finger-tip', 'middle-finger-tip', 'ring-finger-phalanx-proximal'];
 const SLOTS = SLOT_JOINTS.length;
 // home clouds: azimuth (degrees, left - / right + of the initial -Z forward) and distance from the player
 const HOME_SPECS = [{ az: -40, dist: 3.6 }, { az: 48, dist: 5.4 }, { az: 150, dist: 7.2 }];

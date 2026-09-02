@@ -11,6 +11,8 @@ export const CONFIG = {
     planktonColor2: 0x9fffe0,
     swellAmplitude: 0.012, // analytic bob used by floating things (and matched in the water shader)
     extent: 900,          // size of the water plane
+    nearPatch: 12,        // side of the vertex-displaced patch around the player (metres)
+    simHeightScale: 0.035, // metres of surface displacement per simulation height unit
   },
   player: {
     // The rig is offset so the water sits inside the headset's hand-tracking cone:
@@ -29,6 +31,8 @@ export const CONFIG = {
     seatedYawRate: 0.52,     // rad/s (≈30°/s) from lateral strokes when seated
     drag: 2.0,               // per second
     maxSpeed: 0.8,
+    pullMaxStep: 0.08,       // metres the rig may move per frame while a hand pulls the world
+    pullMaxSpeed: 1.6,       // glide speed after letting go
     radiusLimit: 48,         // keep the player inside this radius (shore starts ~60 m)
     desktopSpeed: 1.6,
     eyeHeightDesktop: 1.73,

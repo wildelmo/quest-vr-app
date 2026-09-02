@@ -174,7 +174,7 @@ export const lanterns = {
     ctx.lanterns = { list, count: 0, MAX, nearestDistance: Infinity };
     const s = this._ = {
       ctx, rng, list, bodies, bodyMat, glowMat, mirrorMat, flameMat, instGeos, setInstanceCount, markInstDirty, pPos, pBright, pFlame, pSeed, seedArr, brightArr, heldArr, aSeed, aBright, aHeld,
-      spawnTimer: SPAWN_INTERVAL, lastNearT: 0,
+      spawnTimer: SPAWN_INTERVAL * 0.5, lastNearT: 0,
       tmp: { v: new THREE.Vector3(), v2: new THREE.Vector3(), v3: new THREE.Vector3(), a0: new THREE.Vector3(), q: new THREE.Quaternion(), q2: new THREE.Quaternion(), m: new THREE.Matrix4(), axis: new THREE.Vector3(), one: new THREE.Vector3(1, 1, 1) },
     };
 
@@ -341,7 +341,8 @@ export const lanterns = {
     }
     ctx.lanterns.nearestDistance = nearestD;
     if (nearestD < 0.9) s.lastNearT = t;
-    const summon = nearest && t - s.lastNearT > 30 && nearestD > 0.6 ? nearest : null;
+    // lanterns come to you: while fewer than 3 float within reach, the nearby ones home in slowly
+    const wantMore = inReach < 3;
     const crowded = nearCount >= NEAR_LIMIT;
 
     for (let i = 0; i < list.length; i++) {
@@ -414,9 +415,11 @@ export const lanterns = {
             if (crowded) sp *= THREE.MathUtils.smoothstep(dp, L.loiterR, L.loiterR + 1.5); // wait out here
             vx += dxp / dp * sp; vz += dzp / dp * sp;
           }
-        } else if (L === summon && dp > 1e-3) {
-          // nothing has been within reach for a while: the nearest lantern drifts over, slowly
-          vx += dxp / dp * 0.08; vz += dzp / dp * 0.08;
+        } else if (wantMore && dp > 0.7 && dp < 16 && !L.attracted) {
+          // drift toward the player: unhurried near, a little quicker from far away; stops at arm's length
+          const sp = 0.05 + 0.09 * THREE.MathUtils.smoothstep(dp, 1.5, 9.0);
+          const ease = THREE.MathUtils.smoothstep(dp, 0.7, 1.1);
+          vx += dxp / dp * sp * ease; vz += dzp / dp * sp * ease;
         }
         // near-miss help: a gentle pull toward an open, visible hand above the water
         let attracted = false;
