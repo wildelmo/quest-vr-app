@@ -87,13 +87,13 @@ async function boot() {
   ctx.audio.load().catch((e) => console.warn('[audio] decode failed', e)); // decoding needs no gesture
   // event log for the harness / debugging
   ctx.eventLog = [];
-  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'starborn', 'lotusbloom', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart']) {
+  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'lanterntouch', 'starborn', 'lotusbloom', 'lotusstir', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart', 'leave', 'drip', 'hush', 'hushend', 'fireflyfollow', 'fireflyescort', 'fireflyspill', 'lakewave']) {
     ctx.events.on(type, (e) => { if (ctx.eventLog.length < 500) ctx.eventLog.push({ type, t: +ctx.time.t.toFixed(2), detail: summarize(e) }); });
   }
   function summarize(e) {
     if (!e || typeof e !== 'object') return null;
     const o = {};
-    for (const k of ['index', 'note', 'grabbed', 'kind', 'lost', 'released', 'seated', 'eyeHeight', 'hasHands', 'count', 'speed']) if (k in e) o[k] = e[k];
+    for (const k of ['index', 'note', 'grabbed', 'kind', 'lost', 'released', 'seated', 'eyeHeight', 'hasHands', 'count', 'speed', 'cause']) if (k in e) o[k] = e[k];
     if (e.hand?.handedness) o.hand = e.hand.handedness;
     if (e.pos?.x !== undefined) o.pos = [+e.pos.x.toFixed(2), +e.pos.y.toFixed(2), +e.pos.z.toFixed(2)];
     return o;
@@ -196,8 +196,8 @@ async function boot() {
     audioStats: () => ctx.audio?.stats?.(),
     events: () => ctx.eventLog.slice(),
     world: () => ({
-      lanterns: (ctx.lanterns?.list || []).map((l) => ({ x: +l.position.x.toFixed(2), y: +l.position.y.toFixed(2), z: +l.position.z.toFixed(2), state: l.state })),
-      lotus: (ctx.lotus?.flowers || []).map((f) => ({ x: +f.position.x.toFixed(2), y: +f.position.y.toFixed(2), z: +f.position.z.toFixed(2), bloom: +(f.bloom || 0).toFixed(2), open: !!f.open })),
+      lanterns: (ctx.lanterns?.list || []).map((l) => ({ x: +l.position.x.toFixed(2), y: +l.position.y.toFixed(2), z: +l.position.z.toFixed(2), state: l.state, pads: !!l.amongPads, touched: !!l.touched, push: +(l.push ? l.push.length() : 0).toFixed(3) })),
+      lotus: (ctx.lotus?.flowers || []).map((f) => ({ x: +f.position.x.toFixed(2), y: +f.position.y.toFixed(2), z: +f.position.z.toFixed(2), bloom: +(f.bloom || 0).toFixed(2), open: !!f.open, state: f.state, lean: +(f.lean || 0).toFixed(3) })),
       rig: { x: player.position.x, y: player.position.y, z: player.position.z, ry: player.rotation.y },
       head: ctx.playerCtl.state.headWorld.toArray().map((v) => +v.toFixed(3)),
     }),
@@ -209,9 +209,12 @@ async function boot() {
       hands: { left: ctx.hands.left.visible, right: ctx.hands.right.visible, pinchL: ctx.hands.left.pinch.active, pinchR: ctx.hands.right.pinch.active, submergedR: ctx.hands.right.submerged, debug: ctx.hands.debugInfo?.() },
       calibrated: ctx.playerCtl.state.calibrated, seated: ctx.playerCtl.state.seated, calm: ctx.calm,
       moonAltitudeDeg: ctx.sky?.moonAltitudeDeg, lanternStars: ctx.sky?.lanternStarCount?.(), aurora: ctx.aurora?.intensity,
-      lanterns: ctx.lanterns?.count, fireflies: ctx.fireflies?.count, fireflyLanded: ctx.fireflies?.landedCount, lotusOpen: ctx.lotus?.flowers?.filter((f) => f.open).length,
+      lanterns: ctx.lanterns?.count, lanternTouches: ctx.lanterns?.touches, fireflies: ctx.fireflies?.count, fireflyLanded: ctx.fireflies?.landedCount, lotusOpen: ctx.lotus?.flowers?.filter((f) => f.open).length,
+      fireflyFollowers: ctx.fireflies?.followers ? [ctx.fireflies.followers[0], ctx.fireflies.followers[1]] : [0, 0],
+      fireflyFollowArrived: ctx.fireflies?.followArrived ? [ctx.fireflies.followArrived[0], ctx.fireflies.followArrived[1]] : [0, 0],
+      fireflyEscorting: ctx.fireflies?.escortCount,
       player: { x: player.position.x, y: player.position.y, z: player.position.z },
-      water: ctx.water.level,
+      water: ctx.water.level, hush: ctx.hush?.strength,
     }),
     ctx,
   };

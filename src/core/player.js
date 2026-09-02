@@ -5,8 +5,10 @@ import { CONFIG } from '../config.js';
  * The player rig: a Group that owns the camera and the hands. In XR the headset pose moves the
  * camera inside the rig; locomotion moves/rotates the rig. Handles:
  *  - height calibration (water at the waist standing, chest seated; the world never moves)
- *  - wading: a deliberate paddle stroke with a submerged, aligned palm glides you the other way;
- *    seated users get yaw from lateral strokes
+ *  - locomotion: pinch-and-pull only. A pinch with nothing in reach holds the world; once the palm has
+ *    travelled a small dead zone (a missed grab never moves you) the rig follows the palm one-to-one,
+ *    with momentum on release. Both hands pinched: the world also turns with the line between them.
+ *  - the "leave" fade requested by the leave gesture (src/world/leave.js)
  *  - the comfort vignette (per-eye, in clip space), the opening fade and foveation while moving
  *  - ctx.calm (stillness of the whole body) for the modules that reward it
  *  - desktop mouse-look (right button / Q,E) and WASD fallback
@@ -31,19 +33,22 @@ export function createPlayer(ctx) {
   const calibSamples = [];
   let calibStart = 0;
   let eyeHeight = P.eyeHeightDesktop, seated = false, eyeEMA = 0, driftFor = 0, rigTargetY = 0;
-  let speedSmooth = 0, yawSmooth = 0, yawRate = 0;
+  let speedSmooth = 0, yawSmooth = 0;
   let fade = 1, fadeStart = -1, fadeDur = 4, fadeDelay = 1.5; // black until a session or the desktop preview starts
   let foveation = 0.5;
   let calm = 0;
-  const strokes = { left: makeStroke(), right: makeStroke() };
-  function makeStroke() { return { active: false, path: 0, time: 0 }; }
-  // pinch-and-pull: an empty pinch grabs the world; the rig follows the hand so the pinched spot stays under
-  // the fingers, with momentum on release. Works above or below the water, seated or standing. The palm is
-  // the anchor (not the pinch point): fingertips jump a few centimetres when a pinch opens, the palm does not.
+  // pinch-and-pull: the palm is the anchor (not the pinch point: fingertips jump a few centimetres when a pinch
+  // opens, the palm does not). One hand → its palm; both hands → their midpoint, and the line between them turns.
   const pulls = { left: makePull(), right: makePull() };
-  function makePull() { return { active: false, prev: new THREE.Vector3(), vel: new THREE.Vector3(), time: 0 }; }
+  function makePull() { return { active: false, time: 0, start: new THREE.Vector3(), local: new THREE.Vector3() }; }
+  const hold = { mode: 0, anchor: null, engaged: false, turning: false, time: 0, accum: 0, start: new THREE.Vector3(), prev: new THREE.Vector3(), cur: new THREE.Vector3(), line: new THREE.Vector2(), moveVel: new THREE.Vector3() };
+  const rigVel = new THREE.Vector3();   // the rig's actual world velocity (pull, turn and glide), for the wave sim and drips
+  const prevRig = new THREE.Vector3();
   const rigInv = new THREE.Matrix4();
   const pullDelta = new THREE.Vector3();
+  const _l2 = new THREE.Vector2();
+  let turnRate = 0;      // rad/s applied by a two-hand turn this frame (for the comfort vignette)
+  let leaveFade = 0;     // 0..1, set by the leave gesture
 
   // ---- comfort vignette + opening fade (camera-attached quad; the radius is measured in clip space so it is
   // centred per eye and independent of the field of view)
@@ -65,6 +70,7 @@ export function createPlayer(ctx) {
   function beginFade(delay, dur) { if (ctx.harness) { delay = 0; dur = 0.05; } fadeStart = ctx.time.t; fadeDelay = delay; fadeDur = dur; fade = 1; }
   ctx.events.on('xrstart', () => { calibrated = false; calibSamples.length = 0; calibStart = ctx.time.t; vel.set(0, 0, 0); player.position.y = 0; player.rotation.set(0, 0, 0); beginFade(1.5, 4); });
   ctx.events.on('xrend', () => {
+    leaveFade = 0; hold.mode = 0; hold.engaged = false; hold.turning = false;
     player.position.y = 0; player.rotation.set(0, 0, 0);
     camera.position.set(0, P.eyeHeightDesktop, 0);
     camera.fov = 75; camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
@@ -128,87 +134,84 @@ export function createPlayer(ctx) {
     if (Math.abs(player.position.y - rigTargetY) > 1e-4) player.position.y += (rigTargetY - player.position.y) * Math.min(1, dt / 15);
   }
 
-  function rotateRigAboutHead(angle) {
-    camera.getWorldPosition(headWorld);
-    _v.subVectors(player.position, headWorld);
+  // yaw the rig about a vertical axis through a world point (the head, or the point the hands hold)
+  function rotateRigAbout(pivot, angle) {
+    _v.subVectors(player.position, pivot);
     _v.applyAxisAngle(THREE.Object3D.DEFAULT_UP, angle);
-    player.position.copy(headWorld).add(_v);
+    player.position.copy(pivot).add(_v);
     player.rotation.y += angle;
     player.updateMatrixWorld(true);
   }
+  function rotateRigAboutHead(angle) { camera.getWorldPosition(headWorld); rotateRigAbout(headWorld, angle); }
+  const pivot = new THREE.Vector3();
 
-  // returns true while any hand is pulling the world (the paddle stroke is suspended meanwhile)
+  // Returns true while a hand holds the world (pinched with nothing in reach). Moving the rig only starts once
+  // the anchor has left the dead zone, so a pinch that merely missed a lantern never shifts the view.
   function pulling(dt) {
     rigInv.copy(player.matrixWorld).invert();
-    let any = false, n = 0;
-    pullDelta.set(0, 0, 0);
+    let nActive = 0;
     for (const h of ctx.hands.list) {
       const pl = pulls[h.handedness];
       const on = h.active && h.pinch.active && h.pinch.kind === 'pinch' && !h.grabbed;
-      if (on && !pl.active) { pl.active = true; pl.time = 0; pl.prev.copy(h.palm.position).applyMatrix4(rigInv); pl.vel.set(0, 0, 0); continue; }
-      if (!on) { if (pl.active) { pl.active = false; vel.x += pl.vel.x; vel.z += pl.vel.z; } continue; }
-      pl.time += dt;
-      _v.copy(h.palm.position).applyMatrix4(rigInv);          // rig-local palm position
-      tmp.subVectors(_v, pl.prev); pl.prev.copy(_v);           // hand motion relative to the body this frame
-      tmp.y = 0;
-      tmp.applyQuaternion(player.quaternion);                  // into world axes
-      pullDelta.add(tmp); n++;
-      // momentum carried into the release, smoothed
-      pl.vel.lerp(_v.set(-tmp.x / Math.max(dt, 1e-3), 0, -tmp.z / Math.max(dt, 1e-3)), Math.min(1, dt * 12));
-      any = true;
+      if (!on) { pl.active = false; continue; }
+      pl.local.copy(h.palm.position).applyMatrix4(rigInv); pl.local.y = 0;   // rig-local, horizontal
+      if (!pl.active) { pl.active = true; pl.time = 0; pl.start.copy(pl.local); } else pl.time += dt;
+      nActive++;
     }
-    if (n) {
-      pullDelta.divideScalar(n);
-      const step = Math.min(pullDelta.length(), P.pullMaxStep);
-      if (step > 0) { pullDelta.setLength(step); player.position.sub(pullDelta); }
-      vel.set(0, 0, 0); // while holding on, the world only moves with the hand
+    const L = pulls.left, R = pulls.right;
+    const mode = nActive === 2 ? 2 : nActive === 1 ? 1 : 0;
+    turnRate = 0;
+    pullDelta.set(0, 0, 0);
+    // a hand-over-hand swap on one frame keeps mode 1 but changes the anchoring palm: treat it as a change of grip
+    const anchor = mode === 1 ? (L.active ? L : R) : null;
+    if (mode !== hold.mode || anchor !== hold.anchor) {
+      // letting go (or changing grip) carries the momentum of the last engaged pull into a glide
+      if (hold.engaged) vel.add(hold.moveVel);
+      hold.mode = mode; hold.anchor = anchor; hold.engaged = false; hold.turning = false; hold.accum = 0; hold.time = 0; hold.moveVel.set(0, 0, 0);
+      if (mode === 1) hold.cur.copy(L.active ? L.local : R.local);
+      else if (mode === 2) { hold.cur.addVectors(L.local, R.local).multiplyScalar(0.5); hold.line.set(R.local.x - L.local.x, R.local.z - L.local.z); }
+      hold.start.copy(hold.cur); hold.prev.copy(hold.cur);
+      return mode > 0;
     }
-    return any;
-  }
-
-  function wading(dt) {
-    camera.getWorldDirection(fwd); fwd.y = 0; if (fwd.lengthSq() < 1e-6) return; fwd.normalize();
-    rightV.set(-fwd.z, 0, fwd.x);
-    camera.getWorldPosition(headWorld);
-    const cosCone = Math.cos(THREE.MathUtils.degToRad(P.wadeConeDeg));
-    yawRate = 0;
-    for (const h of ctx.hands.list) {
-      const s = strokes[h.handedness];
-      if (pulls[h.handedness].active) { s.active = false; continue; }
-      const v = h.palm.velocityLocal;
-      const speedH = Math.hypot(v.x, v.z);
-      // a cupped paddling hand is fine; only a real pinch (holding something / pinching) disqualifies
-      let ok = h.active && h.submergedDepth > P.strokeMinDepth && !(h.pinch.active && h.pinch.kind === 'pinch');
-      let align = 0;
-      if (ok && speedH > 0.05) {
-        // palm must push the water: normal roughly along the (horizontal) motion; compare in world space
-        _v.set(v.x, 0, v.z).applyQuaternion(player.quaternion).normalize();
-        align = h.palm.normal.x * _v.x + h.palm.normal.z * _v.z;
-        tmp.subVectors(h.palm.position, headWorld); tmp.y = 0; tmp.normalize();
-        if (tmp.dot(fwd) < cosCone) ok = false; // hand hanging beside/behind the body: ignore
-      }
-      if (!s.active) {
-        if (ok && speedH > P.wadeMinSpeed && align > P.strokeAlignOn) { s.active = true; s.path = 0; s.time = 0; }
-      } else {
-        if (!ok || speedH < P.strokeExitSpeed || align < P.strokeAlignOff) { s.active = false; continue; }
-        s.path += speedH * dt; s.time += dt;
-        if (s.path < P.strokeMinPath && s.time < P.strokeMinTime) continue;
-        _v.set(v.x, 0, v.z).applyQuaternion(player.quaternion); // world-space hand velocity (rig-relative)
-        const lateral = Math.abs(_v.x * rightV.x + _v.z * rightV.z) / Math.max(speedH, 1e-3);
-        if (seated && lateral > 0.7) {
-          // seated: a lateral stroke turns you instead of strafing (comfort: vignette follows yaw rate below)
-          const rate = THREE.MathUtils.clamp(speedH * 0.6, 0, P.seatedYawRate) * Math.sign(_v.x * rightV.x + _v.z * rightV.z);
-          rotateRigAboutHead(rate * dt);
-          yawRate += rate;
-        } else {
-          const gain = P.wadeGain * THREE.MathUtils.clamp((speedH - P.wadeMinSpeed) / 0.6 + 0.4, 0.4, 1.2);
-          vel.x -= _v.x * gain * dt;
-          vel.z -= _v.z * gain * dt;
-        }
+    if (mode === 0) return false;
+    hold.time += dt;
+    if (mode === 1) hold.cur.copy(L.active ? L.local : R.local);
+    else hold.cur.addVectors(L.local, R.local).multiplyScalar(0.5);
+    if (!hold.engaged) {
+      if (hold.time >= P.pullHoldTime && hold.cur.distanceTo(hold.start) >= P.pullDeadZone) hold.engaged = true;
+      hold.prev.copy(hold.cur); // the dead zone is forgiven: motion counts from here, no catch-up jump
+    }
+    if (hold.engaged) {
+      tmp.subVectors(hold.cur, hold.prev); hold.prev.copy(hold.cur);
+      tmp.applyQuaternion(player.quaternion);                   // into world axes
+      const step = Math.min(tmp.length(), P.pullMaxStep);
+      if (step > 0) { tmp.setLength(step); player.position.sub(tmp); pullDelta.copy(tmp); }
+      hold.moveVel.lerp(_v.set(-tmp.x / Math.max(dt, 1e-3), 0, -tmp.z / Math.max(dt, 1e-3)), Math.min(1, dt * 12));
+      vel.set(0, 0, 0);                                          // while holding on, the world only moves with the hand
+    } else {
+      vel.multiplyScalar(Math.max(0, 1 - 8 * dt));               // taking hold eases a glide out
+    }
+    if (mode === 2) {
+      // the world turns with the line between the hands (signed angle about +y, after its own dead zone)
+      _l2.set(R.local.x - L.local.x, R.local.z - L.local.z);
+      const dot = hold.line.x * _l2.x + hold.line.y * _l2.y;
+      const crossY = hold.line.y * _l2.x - hold.line.x * _l2.y;
+      // hands close together turn tracking jitter into yaw: the turn fades out below 25 cm of separation, and
+      // sub-0.1° wobbles are ignored
+      const sep = THREE.MathUtils.clamp(_l2.length() / 0.25, 0, 1);
+      let d = THREE.MathUtils.clamp(Math.atan2(crossY, dot), -0.2, 0.2) * sep;
+      if (Math.abs(d) < 0.0017) d = 0;
+      hold.line.copy(_l2);
+      if (!hold.turning) { hold.accum += d; if (hold.time >= P.pullHoldTime && Math.abs(hold.accum) >= THREE.MathUtils.degToRad(P.turnDeadZoneDeg)) hold.turning = true; }
+      else if (Math.abs(d) > 1e-6) {
+        // turn about the point the hands hold (their midpoint), so the world stays under the hands
+        player.updateMatrixWorld(true);
+        pivot.copy(hold.cur).applyMatrix4(player.matrixWorld);
+        rotateRigAbout(pivot, -d);
+        turnRate = d / Math.max(dt, 1e-3);
       }
     }
-    const sp = Math.hypot(vel.x, vel.z);
-    if (sp > P.maxSpeed) { vel.x *= P.maxSpeed / sp; vel.z *= P.maxSpeed / sp; }
+    return true;
   }
 
   function desktopMove(dt) {
@@ -233,12 +236,9 @@ export function createPlayer(ctx) {
 
   function updateCalm(dt) {
     const headSpeed = Math.hypot(headVel.x, headVel.y, headVel.z);
-    let handsStill = true, anyStroke = false;
-    for (const h of ctx.hands.list) {
-      if (h.tracked && h.stillDisp > 0.05) handsStill = false;
-      if (strokes[h.handedness].active) anyStroke = true;
-    }
-    const still = headSpeed < 0.08 && handsStill && !anyStroke && Math.hypot(vel.x, vel.z) < 0.05;
+    let handsStill = true;
+    for (const h of ctx.hands.list) if (h.tracked && h.stillDisp > 0.05) handsStill = false;
+    const still = headSpeed < 0.08 && handsStill && !hold.engaged && Math.hypot(vel.x, vel.z) < 0.05;
     calm = THREE.MathUtils.clamp(calm + (still ? 0.25 : -0.8) * dt, 0, 1);
     // the two-palm pose (both hands submerged and still) is a bonus
     const twoPalms = ctx.hands.list.every((h) => h.tracked && h.submerged && h.still);
@@ -250,9 +250,7 @@ export function createPlayer(ctx) {
     const presenting = renderer.xr.isPresenting;
     if (presenting) { if (!calibrated) calibrate(); else rebaseline(dt); }
     const held = (presenting || desktop) ? pulling(dt) : false;
-    if (presenting || desktop) wading(dt);
     desktopMove(dt);
-    state.pulling = held;
 
     // integrate with drag; the boundary is a cushion of drag rather than a wall
     const r0 = Math.hypot(player.position.x, player.position.z);
@@ -267,6 +265,10 @@ export function createPlayer(ctx) {
       if (r > P.radiusLimit) { const k = P.radiusLimit / r; player.position.x *= k; player.position.z *= k; vel.multiplyScalar(0.5); }
     }
     player.updateMatrixWorld(true);
+    // the rig's real world velocity this frame (a pull moves the rig without touching vel)
+    if (ctx.time.frame > 1) rigVel.subVectors(player.position, prevRig).divideScalar(Math.max(dt, 1e-3)); else rigVel.set(0, 0, 0);
+    prevRig.copy(player.position);
+    if (rigVel.length() > 6) rigVel.setLength(6);
     // head velocity in world (for the wave sim / audio / calm)
     camera.getWorldPosition(headWorld);
     if (ctx.time.frame > 1) headVel.subVectors(headWorld, prevHead).divideScalar(Math.max(dt, 1e-3));
@@ -275,11 +277,11 @@ export function createPlayer(ctx) {
 
     // motion for the comfort vignette: glide speed, or the hand's pull speed while holding on
     let speed = Math.hypot(vel.x, vel.z);
-    const pullSpeed = held ? Math.min(P.pullMaxSpeed, pullDelta.length() / Math.max(dt, 1e-3)) : 0;
+    const pullSpeed = hold.engaged ? Math.min(P.pullMaxSpeed, pullDelta.length() / Math.max(dt, 1e-3)) : 0;
     if (held) speed = Math.max(speed, pullSpeed);
     speedSmooth += (speed - speedSmooth) * Math.min(1, dt * 6);
-    yawSmooth += (Math.abs(yawRate) - yawSmooth) * Math.min(1, dt * 6);
-    const motion = Math.max(speedSmooth / P.maxSpeed, yawSmooth / P.seatedYawRate);
+    yawSmooth += (Math.abs(turnRate) - yawSmooth) * Math.min(1, dt * 6);
+    const motion = Math.max(speedSmooth / P.maxSpeed, yawSmooth / P.turnRate);
     const strength = THREE.MathUtils.clamp(motion, 0, 1) * 0.85;
     // opening fade
     if (fadeStart >= 0) {
@@ -289,8 +291,9 @@ export function createPlayer(ctx) {
       if (a > fadeDur) { fadeStart = -1; fade = 0; }
     }
     vignette.material.uniforms.uStrength.value = strength;
-    vignette.material.uniforms.uFull.value = fade;
-    vignette.visible = strength > 0.01 || fade > 0.001;
+    const full = Math.max(fade, leaveFade);
+    vignette.material.uniforms.uFull.value = full;
+    vignette.visible = strength > 0.01 || full > 0.001;
     // foveation: relaxed at rest, full while gliding under the vignette
     const fov = motion > 0.25 ? 1.0 : 0.5;
     if (presenting && fov !== foveation) { foveation = fov; try { renderer.xr.setFoveation(fov); } catch { /* */ } }
@@ -299,12 +302,17 @@ export function createPlayer(ctx) {
 
     state.speed = Math.hypot(vel.x, vel.z);
     state.pullSpeed = pullSpeed;
+    state.holding = held;
+    state.pulling = hold.engaged;
+    state.turning = hold.turning;
+    state.turnRate = turnRate;
     state.calibrated = calibrated;
     state.seated = seated;
     state.eyeHeight = eyeHeight;
-    state.stroking = strokes.left.active || strokes.right.active;
   }
 
-  const state = { speed: 0, headWorld, headVelocity: headVel, calibrated: false, velocity: vel, seated: false, eyeHeight, stroking: false, pulling: false, pullSpeed: 0 };
-  return { update, enableDesktop, look, state, get velocity() { return vel; }, get calm() { return calm; } };
+  function setLeave(v) { leaveFade = THREE.MathUtils.clamp(v || 0, 0, 1); }
+
+  const state = { speed: 0, headWorld, headVelocity: headVel, calibrated: false, velocity: rigVel, seated: false, eyeHeight, holding: false, pulling: false, turning: false, turnRate: 0, pullSpeed: 0 };
+  return { update, enableDesktop, look, setLeave, state, get velocity() { return rigVel; }, get calm() { return calm; } };
 }

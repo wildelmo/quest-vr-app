@@ -8,13 +8,28 @@ import { LOTUS_FLOWER_VERT, LOTUS_FLOWER_FRAG, LOTUS_GLOW_VERT, LOTUS_GLOW_FRAG 
  * sings a pentatonic degree ('lotusbloom'), bumps the world energy and pushes a ring into the water.
  * It closes again after a minute. When all six are open at once, 'lotuschord' fires once.
  *
+ * A closed bud also answers a hand that merely comes near: it leans toward the nearest fingertip
+ * within 35 cm (pivoting at its base) and its halo warms. Hold a fingertip still 9–22 cm above the
+ * pod and after 0.6 s a thin whisper rises ('lotusstir'); at 2 s the bud opens by itself with a
+ * softer, longer note ('lotusbloom' cause 'patient'). Touching it still opens it at once.
+ *
+ * A lantern the player has carried and set down among the pads warms a bud too: its light falls amber on
+ * the near side of the petals (per-instance aLantern in the shader), and after 2.5 s within 45 cm the bud
+ * opens slowly, over 5 s ('lotusbloom' cause 'lantern'), and stays open until 10 s after the lantern
+ * drifts away. Lanterns that merely home in by themselves (never touched) do not count.
+ *
  * Four draw calls: one InstancedMesh of pads (MeshLambert, lit by the moon + hemisphere light), one
  * InstancedMesh of flowers (custom ShaderMaterial, per-instance aBloom/aColor), one instanced set of
  * additive billboard quads for the glows (renderOrder 4) and their reflection drawn on the surface just
  * after the water (renderOrder 3).
  *
- * Public surface: ctx.lotus = { flowers: [{ index, position, bud, bloom, color, note, open }], open(i), clusters }
- * Events: 'lotusbloom' { index, note, pos, color }, 'lotuschord' {}
+ * When the lake wave rolls out from the player ('lakewave', fireflies.js), every open flower it passes brightens for two
+ * seconds as the front reaches it (its glow surges the way the chord's surge does; the audio restates its note in step).
+ *
+ * Public surface: ctx.lotus = { flowers: [{ index, position, bud, bloom, color, note, open, state, lean, leanX, leanZ,
+ *   hoverT, openSeconds, warm, warmNear, lanternIdx, waveAt }], open(i, opts), clusters }
+ * Events: 'lotusbloom' { index, note, pos, color, cause: 'touch'|'patient'|'lantern', hand }, 'lotusstir' { index, note, pos, hand },
+ *   'lotuschord' {}
  */
 
 const CLUSTERS = 6;
@@ -27,6 +42,16 @@ const OPEN_SECONDS = 1.6, CLOSE_SECONDS = 6, STAY_MIN = 55, STAY_MAX = 75;
 const PAD_LIFT = 0.004, FLOWER_LIFT = 0.006, BUD_HEIGHT = 0.045;
 const GLOW_SIZE = 0.35, MIRROR_GAIN = 0.3, SURGE_SECONDS = 3.0; // the reflection is drawn on the surface, so it needs less gain
 const GLOW_GAIN_CLOSED = 0.08, GLOW_GAIN_OPEN = 0.40; // additive halo brightness (the petals carry their own glow)
+const WARM_GAIN = 0.14;                                 // extra halo on a closed bud with a hand near it
+// the lean toward a fingertip: full angle inside `near`, none beyond `far`; the patience band is the height
+// above the pod (not touching) where a still fingertip counts, whispering at stirAt and opening at openAt
+const LEAN = { far: 0.35, near: 0.08, angle: 0.40, tauIn: 0.6, tauOut: 1.2, hoverMin: 0.09, hoverMax: 0.22, stirAt: 0.6, openAt: 2.0, decay: 2 };
+// a set-down lantern warming a bud: enter/exit is a horizontal hysteresis band, `need` seconds of warmth open it
+// over `openSeconds`, and it lingers open `linger` seconds after the lantern leaves; glowLight is the reach of
+// the amber light on the petals (shader), energy the (small) world-energy bump for such a bloom
+const WARM = { enter: 0.45, exit: 0.55, minBright: 0.3, need: 2.5, cap: 3.5, openSeconds: 5.0, linger: 10, energy: 0.08, glowLight: 0.6 };
+const WARM_HALO = 0.10;                                 // extra halo gain as the lantern's warmth builds
+const WAVE_SPEED = 2.5, WAVE_SECONDS = 2.0, WAVE_SURGE = 0.7; // the lake wave's front speed, a flower's brightening and its strength
 const PAD_COLOR = 0x0f2a1c, PAD_EMISSIVE = 0x02110a;
 
 function mulberry32(seed) {
@@ -216,8 +241,13 @@ export const lotus = {
       bud: new THREE.Vector3(c.x, ctx.water.level + FLOWER_LIFT + BUD_HEIGHT, c.z),
       color: new THREE.Color(colors[i % colors.length]),
       bloom: 0, open: false,
-      state: 'closed', timer: 0, bloomFrom: 0, stay: 0,
+      state: 'closed', timer: 0, bloomFrom: 0, stay: 0, openSeconds: OPEN_SECONDS,
       yaw: rnd() * Math.PI * 2, scale: 1.0 + rnd() * 0.25, phase: rnd() * Math.PI * 2, pulsePhase: rnd() * Math.PI * 2,
+      // lean toward a near fingertip (radians, about the base) and the patience clock for opening by stillness
+      leanX: 0, leanZ: 0, lean: 0, hoverT: 0, stirred: false, warmGlow: 0, rot: new THREE.Quaternion(),
+      // warmth from a lantern set down among the pads (seconds, capped), and which lantern it is
+      warm: 0, warmNear: false, lanternIdx: -1,
+      waveAt: -1,   // when the lake wave's front reaches this flower (-1: none pending)
     }));
 
     // ---- pads
@@ -247,10 +277,13 @@ export const lotus = {
     const bloomAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLUSTERS), 1).setUsage(THREE.DynamicDrawUsage);
     const colorAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLUSTERS * 3), 3);
     const phaseAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLUSTERS), 1);
+    // the brightest nearby lantern per flower (xyz, weight): amber light on the near side of the petals
+    const lanternAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLUSTERS * 4), 4).setUsage(THREE.DynamicDrawUsage);
     flowers.forEach((f, i) => { colorAttr.setXYZ(i, f.color.r, f.color.g, f.color.b); phaseAttr.setX(i, f.phase); });
     flowerGeo.setAttribute('aBloom', bloomAttr);
     flowerGeo.setAttribute('aColor', colorAttr);
     flowerGeo.setAttribute('aPhase', phaseAttr);
+    flowerGeo.setAttribute('aLantern', lanternAttr);
     const flowerUniforms = {
       uTime: { value: 0 },
       uMoonDir: { value: new THREE.Vector3(0.3, 0.8, 0.5).normalize() },
@@ -307,32 +340,45 @@ export const lotus = {
     const glowGain = { setX: (i, v) => { glowGainArr[i] = v; }, set needsUpdate(v) { for (const g of glowGeos) g.attributes.aGain.needsUpdate = v; } };
 
     // ---- interaction helpers
-    const openFlower = (i) => {
+    // opts: cause 'touch' (default) | 'patient' | 'lantern', hand (the hand that did it), openSeconds
+    const openFlower = (i, opts = {}) => {
+      const { cause = 'touch', hand = null, openSeconds = OPEN_SECONDS } = opts;
       const f = flowers[i];
       if (!f || f.state === 'opening' || f.state === 'open') return false;
-      f.state = 'opening'; f.timer = 0; f.bloomFrom = f.bloom; f.open = true;
+      f.state = 'opening'; f.timer = 0; f.bloomFrom = f.bloom; f.open = true; f.openSeconds = openSeconds;
+      f.hoverT = 0; f.stirred = false;
       f.stay = STAY_MIN + rnd() * (STAY_MAX - STAY_MIN);
-      ctx.energy = Math.min(1, ctx.energy + CONFIG.energy.lotus);
-      if (typeof ctx.water.disturb === 'function') ctx.water.disturb(f.position.x, f.position.z, 0.18, 0.28);
-      ctx.events.emit('lotusbloom', { index: i, note: f.note, pos: f.position.clone(), color: f.color });
+      // a lantern-warmed bloom is slow and quiet: a smaller bump to the world and a softer ring on the water
+      const lantern = cause === 'lantern';
+      ctx.energy = Math.min(1, ctx.energy + (lantern ? WARM.energy : CONFIG.energy.lotus));
+      if (typeof ctx.water.disturb === 'function') ctx.water.disturb(f.position.x, f.position.z, 0.18, lantern ? 0.18 : 0.28);
+      ctx.events.emit('lotusbloom', { index: i, note: f.note, pos: f.position.clone(), color: f.color, cause, hand });
       return true;
     };
 
+    // the lake wave: each open flower brightens as the front (WAVE_SPEED m/s from the wave's origin) reaches it
+    ctx.events.on('lakewave', (e) => {
+      const o = e && e.pos;
+      if (!o || typeof o.x !== 'number') return;
+      const t = ctx.time.t;
+      for (const f of flowers) f.waveAt = f.open ? t + Math.hypot(f.position.x - o.x, f.position.z - o.z) / WAVE_SPEED : -1;
+    });
+
     ctx.lotus = {
       flowers, clusters, pads,
-      /** Bloom flower i as if it had been touched (returns false if it is already open). */
-      open: (i) => openFlower(i),
+      /** Bloom flower i as if it had been touched (returns false if it is already open); opts as openFlower. */
+      open: (i, opts) => openFlower(i, opts),
       chordCount: 0,
       nearestBudDistance: Infinity, // horizontal distance from the head to the nearest closed bud
     };
 
     this._ = {
-      flowers, pads, padMesh, flowerMesh, flowerUniforms, bloomAttr, glowPoints, mirrorPoints, glowMat, mirrorMat,
+      flowers, pads, padMesh, flowerMesh, flowerUniforms, bloomAttr, lanternAttr, glowPoints, mirrorPoints, glowMat, mirrorMat,
       glowPos, glowSize, glowGain, openFlower, rnd,
       moonLight: null, moonLookupFrame: -1,
       surgeT: SURGE_SECONDS, chordArmed: true,
       _m: new THREE.Matrix4(), _q: new THREE.Quaternion(), _qy: new THREE.Quaternion(), _p: new THREE.Vector3(),
-      _s: new THREE.Vector3(), _n: new THREE.Vector3(), _up: new THREE.Vector3(0, 1, 0),
+      _s: new THREE.Vector3(), _n: new THREE.Vector3(), _up: new THREE.Vector3(0, 1, 0), _axis: new THREE.Vector3(),
     };
   },
 
@@ -341,7 +387,7 @@ export const lotus = {
     const t = ctx.time.t;
     const level = ctx.water.level;
     const swell = ctx.water.swell || (() => 0);
-    const { _m, _q, _qy, _p, _s, _n, _up } = S;
+    const { _m, _q, _qy, _p, _s, _n, _up, _axis } = S;
 
     // ---- pads: float on the swell, tilt with its slope, drift and turn very slowly
     const E = 0.05;
@@ -368,7 +414,7 @@ export const lotus = {
     for (const f of S.flowers) {
       f.timer += dt;
       if (f.state === 'opening') {
-        const u = Math.min(1, f.timer / OPEN_SECONDS);
+        const u = Math.min(1, f.timer / f.openSeconds);
         f.bloom = f.bloomFrom + (1 - f.bloomFrom) * easeOutCubic(u);
         if (u >= 1) { f.state = 'open'; f.timer = 0; f.bloom = 1; }
       } else if (f.state === 'open') {
@@ -388,6 +434,78 @@ export const lotus = {
       f.bud.set(f.position.x, y + BUD_HEIGHT * f.scale, f.position.z);
     }
 
+    // ---- lean + patience: a closed bud turns toward the nearest fingertip of an open, dry, idle hand
+    const hands = ctx.hands && ctx.hands.list ? ctx.hands.list : null;
+    const kIn = 1 - Math.exp(-dt / LEAN.tauIn), kOut = 1 - Math.exp(-dt / LEAN.tauOut);
+    for (let i = 0; i < S.flowers.length; i++) {
+      const f = S.flowers[i];
+      let tx = 0, tz = 0, p = 0, k = kOut;
+      if (f.state === 'closed' && hands) {
+        let bestD2 = Infinity, bestHand = null, bestTip = null;
+        for (let hi = 0; hi < hands.length; hi++) {
+          const h = hands[hi];
+          if (!h.visible || !h.active || h.submerged || h.pinch.active || h.grabbed) continue;
+          for (let j = 0; j < h.tips.length; j++) {
+            const d2 = h.tips[j].distanceToSquared(f.bud);
+            if (d2 < bestD2) { bestD2 = d2; bestHand = h; bestTip = h.tips[j]; }
+          }
+        }
+        const d = Math.sqrt(bestD2);
+        if (d < LEAN.far) {
+          p = 1 - smooth(Math.min(1, Math.max(0, (d - LEAN.near) / (LEAN.far - LEAN.near))));
+          const ux = bestTip.x - f.bud.x, uz = bestTip.z - f.bud.z, ul = Math.hypot(ux, uz);
+          if (ul > 1e-5) { tx = ux / ul * LEAN.angle * p; tz = uz / ul * LEAN.angle * p; }
+          k = kIn;
+        }
+        // patience: a still fingertip hovering in the band above the pod (not touching) opens it in time
+        if (d >= LEAN.hoverMin && d <= LEAN.hoverMax && bestTip.y - f.bud.y >= LEAN.hoverMin * 0.7 && bestHand.still) f.hoverT += dt;   // above the pod, not beside it
+        else { f.hoverT = Math.max(0, f.hoverT - LEAN.decay * dt); if (f.hoverT <= 0) f.stirred = false; }
+        if (f.hoverT >= LEAN.stirAt && !f.stirred) {
+          f.stirred = true;
+          ctx.events.emit('lotusstir', { index: i, note: f.note, pos: f.bud.clone(), hand: bestHand });
+        }
+        if (f.hoverT >= LEAN.openAt) S.openFlower(i, { cause: 'patient', hand: bestHand });
+      } else { f.hoverT = 0; f.stirred = false; }
+      f.leanX += (tx - f.leanX) * k;
+      f.leanZ += (tz - f.leanZ) * k;
+      f.lean = Math.hypot(f.leanX, f.leanZ);
+      f.warmGlow = p;
+      // the pose pivots at the base; the bud (touch target, halo centre) follows it
+      _qy.setFromAxisAngle(_up, f.yaw);
+      if (f.lean > 1e-4) { _axis.set(f.leanZ / f.lean, 0, -f.leanX / f.lean); f.rot.setFromAxisAngle(_axis, f.lean).multiply(_qy); }
+      else f.rot.copy(_qy);
+      f.bud.set(0, BUD_HEIGHT * f.scale, 0).applyQuaternion(f.rot).add(f.position);
+    }
+
+    // ---- warmth: a lantern the player set down among the pads (floating, once held, settled, lit) warms the
+    // bud open after a while and keeps it open; the brightest lantern nearby, whatever it is doing, lights the petals
+    const lanterns = ctx.lanterns && ctx.lanterns.list ? ctx.lanterns.list : null;
+    for (let i = 0; i < S.flowers.length; i++) {
+      const f = S.flowers[i];
+      let near = Infinity, nearIdx = -1, lightW = 0, light = null;
+      if (lanterns) {
+        for (let li = 0; li < lanterns.length; li++) {
+          const L = lanterns[li];
+          if (L.state === 'rising') continue;
+          const d = Math.hypot(L.position.x - f.position.x, L.position.z - f.position.z);
+          if (d < WARM.glowLight && L.bright > 0.05) {
+            const w = L.bright * (1 - smooth(Math.min(1, Math.max(0, (d - 0.35) / 0.25))));
+            if (w > lightW) { lightW = w; light = L; }
+          }
+          if (L.state === 'floating' && L.touched && !L.incoming && !L.dropping && L.bright > WARM.minBright && d < near) { near = d; nearIdx = li; }
+        }
+      }
+      if (near < WARM.enter) f.warmNear = true; else if (near > WARM.exit) f.warmNear = false;
+      f.lanternIdx = f.warmNear ? nearIdx : -1;
+      f.warm = Math.min(WARM.cap, Math.max(0, f.warm + (f.warmNear ? dt : -2 * dt)));
+      if (f.warm > WARM.need && f.state === 'closed' && f.bloom < TOUCH_MAX_BLOOM) S.openFlower(i, { cause: 'lantern', openSeconds: WARM.openSeconds });
+      // while the lantern stays, the flower stays: it closes only `linger` seconds after the lantern has left
+      if (f.warmNear && f.state === 'open') f.timer = Math.min(f.timer, f.stay - WARM.linger);
+      if (light) S.lanternAttr.setXYZW(i, light.position.x, light.position.y, light.position.z, lightW);
+      else S.lanternAttr.setW(i, 0);
+    }
+    S.lanternAttr.needsUpdate = true;
+
     // ---- nearest closed bud (for the hints)
     {
       const head = ctx.playerCtl ? ctx.playerCtl.state.headWorld : null;
@@ -401,13 +519,13 @@ export const lotus = {
       const r2 = TOUCH_RADIUS * TOUCH_RADIUS;
       for (const f of S.flowers) {
         if (f.bloom >= TOUCH_MAX_BLOOM || f.open) continue;
-        let hit = false;
+        let hit = null;
         for (const h of ctx.hands.list) {
           if (!h.visible) continue;
-          for (let k = 0; k < h.tips.length && !hit; k++) if (h.tips[k].distanceToSquared(f.bud) < r2) hit = true;
+          for (let k = 0; k < h.tips.length && !hit; k++) if (h.tips[k].distanceToSquared(f.bud) < r2) hit = h;
           if (hit) break;
         }
-        if (hit) S.openFlower(f.index);
+        if (hit) S.openFlower(f.index, { cause: 'touch', hand: hit });
       }
     }
 
@@ -423,15 +541,19 @@ export const lotus = {
     // ---- flower instances + glow attributes
     for (let i = 0; i < S.flowers.length; i++) {
       const f = S.flowers[i];
-      _qy.setFromAxisAngle(_up, f.yaw);
       _s.setScalar(f.scale);
-      _m.compose(f.position, _qy, _s);
+      _m.compose(f.position, f.rot, _s);
       S.flowerMesh.setMatrixAt(i, _m);
       S.bloomAttr.setX(i, f.bloom);
       const pulse = f.open ? 1 + 0.1 * Math.sin(t * (Math.PI * 2 / 4) + f.pulsePhase) : 1;
+      const closedGain = GLOW_GAIN_CLOSED + (f.bloom < TOUCH_MAX_BLOOM ? WARM_GAIN * f.warmGlow : 0); // warms as a hand nears
+      const lanternGain = WARM_HALO * smooth(Math.min(1, f.warm));                                      // and as a lantern's warmth builds
+      // the lake wave passing: this flower's own surge, a 2 s swell from the moment the front reaches it
+      const sf = f.waveAt > 0 ? Math.sin(Math.PI * Math.min(1, Math.max(0, (t - f.waveAt) / WAVE_SECONDS))) : 0;
+      const surgeF = Math.max(surge, WAVE_SURGE * sf);
       S.glowPos.setXYZ(i, f.bud.x, f.bud.y, f.bud.z);
-      S.glowSize.setX(i, GLOW_SIZE * (0.2 + f.bloom) * f.scale * (1 + 0.15 * surge));
-      S.glowGain.setX(i, (GLOW_GAIN_CLOSED + (GLOW_GAIN_OPEN - GLOW_GAIN_CLOSED) * f.bloom) * pulse * (1 + 0.8 * surge));
+      S.glowSize.setX(i, GLOW_SIZE * (0.2 + f.bloom) * f.scale * (1 + 0.15 * surgeF));
+      S.glowGain.setX(i, (closedGain + lanternGain + (GLOW_GAIN_OPEN - GLOW_GAIN_CLOSED) * f.bloom) * pulse * (1 + 0.8 * surgeF));
     }
     S.flowerMesh.instanceMatrix.needsUpdate = true;
     S.bloomAttr.needsUpdate = true;

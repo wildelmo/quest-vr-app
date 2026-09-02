@@ -10,8 +10,9 @@ import { fmBell } from './sfx.js';
  * MIDI 38–74 (+ a soft upper voice when the world is excited). Each voice = saw + triangle (±6 ct)
  * → low-pass (350·2^(1.2·energy) Hz with mild key tracking, ≤ 1.4 kHz) → gain with 4–6 s attack /
  * 6–10 s release, into a pad bus with a two-delay chorus. A D2 drone sits under everything.
- * Raindrop bells fall when the world is calm; the real CC0 pad swells are pitch-matched to the
- * current chord's root or fifth on big events. Every 3–5 minutes the pads take a 25–40 s "breath".
+ * Raindrop bells fall when the world is calm; the real CC0 pad swells are transposed to fit the
+ * current chord (judged on their whole pitch-class profile, see swellShift) and faded in and out over
+ * seconds on big events. Every 3–5 minutes the pads take a 25–40 s "breath".
  *
  * Node budget (persistent): 7 voices × 4 = 28, chorus 9, drone 4, pad bus 1, swell send 1 ≈ 43.
  * Exposes ctx.music (see makeMusicApi).
@@ -22,6 +23,9 @@ const PENTA = [0, 3, 5, 7, 10]; // minor pentatonic relative to the root
 const POOL = 10; // 5 new notes never have to steal from a voice that is still releasing
 const LO = 38, HI = 74, UPPER_LO = 72, UPPER_HI = 84;
 const VOICE_LEVEL = 0.05, UPPER_LEVEL = 0.03;
+const STEAL_FADE = 1.5;  // longest forced fade when a new note has to take a still-releasing voice (the note waits for it)
+const SWELL_ATTACK = 2.5, SWELL_RELEASE = 3.0; // envelope around a real pad swell so it never enters or leaves abruptly
+const SWELL_MIN_FIT = 0.5; // below this share of a pad's pitch-class energy on consonant classes the swell is skipped
 const SESSION_ARC = 1200; // seconds over which the session slowly settles
 
 // pitch classes relative to the root; each chord's tones are consonant with the minor pentatonic
@@ -45,15 +49,33 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
 const mod12 = (n) => ((n % 12) + 12) % 12;
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
-function holdAt(p, t) {
-  if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(t);
-  else { p.cancelScheduledValues(t); p.setValueAtTime(Math.max(0.0001, p.value), t); }
+
+/**
+ * Voice gain automation with our own record of the last ramp. cancelAndHoldAtTime() only inserts a hold
+ * point when a ramp is still in progress; once the previous ramp has finished, a ramp scheduled after it
+ * starts from that stale event (seconds in the past) and the gain snaps to the interpolated value — new
+ * notes popped in near full level and released notes dropped 10 dB at the chord change. Every change
+ * therefore goes through here: hold at the value our record says the gain has at `t`, then ramp.
+ */
+function gainAt(v, t) {
+  const e = v.env;
+  if (t >= e.t1) return e.v1;
+  if (t <= e.t0) return e.v0;
+  return e.v0 + (e.v1 - e.v0) * (t - e.t0) / (e.t1 - e.t0);
+}
+function rampGain(v, t, target, dur) {
+  const p = v.g.gain, from = gainAt(v, t), e = v.env;
+  if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(t); else p.cancelScheduledValues(t);
+  p.setValueAtTime(from, t);
+  p.linearRampToValueAtTime(target, t + dur);
+  e.t0 = t; e.v0 = from; e.t1 = t + dur; e.v1 = target;
 }
 
 const CHORDS = CHORD_DEFS.map((d) => ({
   name: d.name, rel: d.pcs.slice(), root: mod12(ROOT + d.root), fifth: mod12(ROOT + d.root + 7), pcs: d.pcs.map((p) => mod12(ROOT + p)),
 }));
 const PENTA_ABS = PENTA.map((p) => mod12(ROOT + p));
+const SCALE_ABS = [0, 2, 3, 5, 7, 10].map((p) => mod12(ROOT + p)); // every pitch class the chords use: D E F G A C
 const _v = new THREE.Vector3();
 
 export const music = {
@@ -73,6 +95,7 @@ export const music = {
       nextChordAt: now + 0.05, breathing: false, breathUntil: 0, breathAt: now + 180 + 120 * rng(),
       nextDrop: now + 8 + 6 * rng(), dropArmed: true, drops: [], dropKind: 0,
       lastSwell: -100, swellQueue: null, swellEnds: [], swellToggle: false,
+      hushing: false, // a hand rests on the water (hush.js): raindrops fall even though that hand is submerged
     };
     this._s = S;
     S.arc = () => clamp((c.currentTime - S.t0) / SESSION_ARC, 0, 1);
@@ -117,7 +140,7 @@ export const music = {
       oscA.connect(lp); oscB.connect(lp); lp.connect(g); g.connect(S.padBus);
       oscA.frequency.value = oscB.frequency.value = 110;
       oscA.start(now); oscB.start(now);
-      S.voices.push({ oscA, oscB, lp, g, midi: -1, on: false, offAt: 0, level: 0, freq: 110, tilt: 0.9 + 0.25 * rng() });
+      S.voices.push({ oscA, oscB, lp, g, midi: -1, on: false, offAt: 0, level: 0, freq: 110, tilt: 0.9 + 0.25 * rng(), env: { t0: now, v0: 0.0001, t1: now, v1: 0.0001 } });
     }
 
     // ---- swell reverb send (extra 0.4 on top of the bus send)
@@ -160,13 +183,16 @@ export const music = {
     }
 
     // ---- raindrop notes when the world is calm
+    // (a hush overrides the submerged-hand rule — the resting hand is in the water — and the drops come closer together)
     const anySub = !!ctx.hands?.list?.some((h) => h.visible && h.submerged);
-    const calmWorld = energy < 0.15 && !anySub;
+    S.hushing = (ctx.hush?.strength || 0) > 0.02;   // read live: the hushend event fires before the frame's strength is written
+    const calmWorld = (energy < 0.15 && !anySub) || S.hushing;
+    const gap = () => (S.hushing ? 3 + 4 * S.rng() : 6 + 8 * S.rng());
     if (!calmWorld) S.dropArmed = false;
-    else if (!S.dropArmed) { S.dropArmed = true; S.nextDrop = now + 6 + 8 * S.rng(); }
+    else if (!S.dropArmed) { S.dropArmed = true; S.nextDrop = now + gap(); }
     if (calmWorld && now + LOOKAHEAD >= S.nextDrop) {
       raindrop(S, Math.max(S.nextDrop, now + 0.01));
-      S.nextDrop = Math.max(S.nextDrop, now) + 6 + 8 * S.rng();
+      S.nextDrop = Math.max(S.nextDrop, now) + gap();
     }
 
     // ---- queued swell
@@ -301,11 +327,11 @@ function changeChord(S, t, energy) {
     if (!v.on) continue;
     if (want.has(v.midi)) {
       const lvl = want.get(v.midi);
-      if (Math.abs(lvl - v.level) > 1e-3) { holdAt(v.g.gain, t); v.g.gain.linearRampToValueAtTime(lvl, t + 3); v.level = lvl; }
+      if (Math.abs(lvl - v.level) > 1e-3) { rampGain(v, t, lvl, 3); v.level = lvl; }
       want.delete(v.midi);
     } else noteOff(v, t, release);
   }
-  for (const [midi, lvl] of want) { const pk = pickFree(S, t); noteOn(S, pk.v, midi, lvl, pk.at, attack, pk.at === t); }
+  for (const [midi, lvl] of want) { const pk = pickFree(S, t); noteOn(S, pk.v, midi, lvl, pk.at, attack); }
 
   S.prevIdx = S.chordIdx; S.chordIdx = idx; S.chord = chord;
   S.voicing = voicing; S.upper = upper;
@@ -316,8 +342,9 @@ function changeChord(S, t, energy) {
 
 /**
  * Picks a voice for a new note: a fully released one if any; otherwise the one whose release ends soonest,
- * shortened to end within 0.3 s, and the new note starts exactly when that fade reaches silence (no pitch
- * jump at full level). Returns { v, at } — `at` is when the note may start.
+ * shortened to end within STEAL_FADE, and the new note starts exactly when that fade reaches silence (no
+ * pitch jump at full level; with a 4–6 s attack the wait is inaudible). Returns { v, at } — `at` is when
+ * the note may start.
  */
 function pickFree(S, t) {
   let free = null, soonest = null;
@@ -328,28 +355,25 @@ function pickFree(S, t) {
   }
   if (free) return { v: free, at: t };
   if (soonest) {
-    const at = Math.min(soonest.offAt, t + 0.3);
-    if (soonest.offAt > at) { holdAt(soonest.g.gain, t); soonest.g.gain.linearRampToValueAtTime(0.0001, at); soonest.offAt = at; }
+    const at = Math.min(soonest.offAt, t + STEAL_FADE);
+    if (soonest.offAt > at) { rampGain(soonest, t, 0.0001, at - t); soonest.offAt = at; }
     return { v: soonest, at };
   }
-  // every voice is sounding (cannot happen with POOL > 5): steal the quietest with a short fade
+  // every voice is sounding (cannot happen with POOL > 5): steal the quietest with a fade
   let best = S.voices[0];
   for (const v of S.voices) if (v.level < best.level) best = v;
-  noteOff(best, t, 0.3);
-  return { v: best, at: t + 0.3 };
+  noteOff(best, t, STEAL_FADE);
+  return { v: best, at: t + STEAL_FADE };
 }
 
-function noteOn(S, v, midi, level, t, attack, fresh = true) {
+function noteOn(S, v, midi, level, t, attack) {
   const f = mtof(midi);
-  v.oscA.frequency.setValueAtTime(f, t); v.oscB.frequency.setValueAtTime(f, t);
-  if (fresh) holdAt(v.g.gain, t);
-  else v.g.gain.setValueAtTime(0.0001, t); // the previous release ends exactly here; append, don't cancel it
-  v.g.gain.linearRampToValueAtTime(level, t + attack);
+  v.oscA.frequency.setValueAtTime(f, t); v.oscB.frequency.setValueAtTime(f, t); // the gain is at 0.0001 here
+  rampGain(v, t, level, attack);
   v.midi = midi; v.on = true; v.level = level; v.freq = f;
 }
 function noteOff(v, t, release) {
-  holdAt(v.g.gain, t);
-  v.g.gain.linearRampToValueAtTime(0.0001, t + release);
+  rampGain(v, t, 0.0001, release);
   v.on = false; v.offAt = t + release; v.level = 0;
 }
 function releaseAll(S, t, release) { for (const v of S.voices) if (v.on) noteOff(v, t, release); }
@@ -372,12 +396,54 @@ function raindrop(S, t) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// real pad swells, pitch-matched to the chord (root or fifth, whichever needs the smaller shift)
+// real pad swells, transposed to fit the chord and faded in/out
 function requestSwell(S, name, gain) {
   const now = S.c.currentTime;
   if (now < S.lastSwell + 8) { S.swellQueue = { name, gain, at: S.lastSwell + 8 }; return; }
   playSwell(S, name, gain);
 }
+
+/**
+ * The transposition (semitones, fractional) that best fits a pad sample to the current chord, or null when
+ * nothing fits. The pads are chords themselves (the two Northern Lights pads are a G minor ninth), so
+ * matching only their measured fundamental to the chord root drops a foreign key on top of the pads; instead
+ * every shift within ±5 semitones is scored on the sample's pitch-class profile (manifest chroma): energy on
+ * chord tones counts 1, on other scale tones that are not a semitone above a chord tone 0.9 (the engine's
+ * own consonance rule), anything else 0, minus a slight cost per semitone. The measured cents offset is
+ * folded in so the sample's fundamental lands on an exact semitone. Samples without a profile fall back to
+ * the root/fifth match when their pitch is reliable and play untouched (texture) when it is not.
+ */
+function swellShift(S, name) {
+  const { api } = S;
+  const info = api.info(name);
+  const chroma = info?.analysis?.key?.chroma;
+  const cents = (info && info.cents) || 0;
+  const chord = S.chord;
+  if (!chroma || chroma.length !== 12) {
+    const p = api.pitch(name);
+    if (!p || !p.reliable) return 0;
+    let best = 0, bestAbs = 99;
+    for (const pc of [chord.root, chord.fifth]) {
+      const d = ((pc - p.midi) % 12 + 18) % 12 - 6;
+      if (Math.abs(d) < bestAbs) { bestAbs = Math.abs(d); best = d; }
+    }
+    return bestAbs <= 5 ? best : 0;
+  }
+  const w = new Array(12).fill(0);
+  for (let pc = 0; pc < 12; pc++) {
+    if (chord.pcs.includes(pc)) w[pc] = 1;
+    else if (SCALE_ABS.includes(pc) && !chord.pcs.includes(mod12(pc - 1))) w[pc] = 0.9;
+  }
+  let best = 0, bestFit = -1;
+  for (let k = -5; k <= 5; k++) {
+    let s = -0.01 * Math.abs(k);
+    for (let pc = 0; pc < 12; pc++) s += chroma[mod12(pc - k)] * w[pc];
+    if (s > bestFit) { bestFit = s; best = k; }
+  }
+  if (bestFit < SWELL_MIN_FIT) return null;
+  return best - cents / 100;
+}
+
 function playSwell(S, name, gain) {
   const { api } = S;
   const now = S.c.currentTime;
@@ -385,19 +451,22 @@ function playSwell(S, name, gain) {
   if (!buf) return;
   S.swellEnds = S.swellEnds.filter((e) => e > now);
   if (S.swellEnds.length >= 2) return;
-  let rate = 1;
-  const p = api.pitch(name);
-  if (p && p.reliable) {
-    let best = 0, bestAbs = 99;
-    for (const pc of [S.chord.root, S.chord.fifth]) {
-      const d = ((pc - p.midi) % 12 + 18) % 12 - 6;
-      if (Math.abs(d) < bestAbs) { bestAbs = Math.abs(d); best = d; }
-    }
-    if (bestAbs <= 5) rate = Math.pow(2, best / 12);
-  }
-  const res = api.play(name, { gain: clamp(gain, 0, 0.5), rate, out: S.out });
+  const shift = swellShift(S, name);
+  if (shift == null) return; // no consonant transposition: the pads, sfx and aurora carry the moment alone
+  const rate = Math.pow(2, shift / 12);
+  const res = api.play(name, { gain: 0.0001, rate, out: S.out });
   if (!res) return;
+  // play() would start the sample at full level: shape it with a slow attack and a release that ends with the buffer
+  const dur = buf.duration / rate;
+  const level = Math.max(0.0002, clamp(gain, 0, 0.5));
+  const attack = Math.min(SWELL_ATTACK, dur * 0.3);
+  const release = Math.min(SWELL_RELEASE, dur * 0.4);
+  const g = res.gain.gain;
+  g.setValueAtTime(0.0001, now);
+  g.linearRampToValueAtTime(level, now + attack);
+  g.setValueAtTime(level, now + Math.max(attack, dur - release));
+  g.linearRampToValueAtTime(0.0001, now + dur);
   try { res.gain.connect(S.swellWet); } catch { /* */ }
-  S.lastSwell = now;
-  S.swellEnds.push(now + buf.duration / rate);
+  S.lastSwell = now; S.lastSwellShift = shift;
+  S.swellEnds.push(now + dur);
 }

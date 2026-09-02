@@ -5,11 +5,14 @@ import { water } from './water.js';
 import { sky } from './sky.js';
 import { aurora } from './aurora.js';
 import { plankton } from './plankton.js';
+import { drips } from './drips.js';
 import { hints } from './hints.js';
 import { shore } from './shore.js';
 import { mist } from './mist.js';
 import { lotus } from './lotus.js';
 import { lanterns } from './lanterns.js';
 import { fireflies } from './fireflies.js';
+import { hush } from './hush.js';
+import { leave } from './leave.js';
 
-export const WORLD_MODULES = [wavesim, water, sky, aurora, plankton, shore, mist, lotus, lanterns, fireflies, hints];
+export const WORLD_MODULES = [wavesim, water, sky, aurora, plankton, drips, shore, mist, lotus, lanterns, fireflies, hush, leave, hints];

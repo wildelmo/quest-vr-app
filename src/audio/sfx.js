@@ -9,7 +9,7 @@ import { CONFIG } from '../config.js';
  * enter/exit plips and ticks, the calm-reward drone, and the aurora voice after a star is born.
  *
  * Node budget (persistent): bells 8 × 6 = 48, crackle 3 × 3 = 9, swish 2 × 2 = 4, glide 2,
- * calm drone 5, noise sources 2 ≈ 70. HRTF only on the two hand swishes.
+ * calm drone 5, hand voices 2 × 5 = 10, noise sources 2 ≈ 80. HRTF only on the two hand swishes.
  */
 const LOOKAHEAD = 0.15;
 const BELL_POOL = 8;
@@ -116,17 +116,41 @@ export const sfx = {
       S.calm = { o1, o2, g2, lp, g };
     }
 
+    // ---- the hand voice: per hand, two sines on the chord's root and fifth two octaves up, low-passed, at the centroid of
+    // the fireflies strung out behind that hand; it breathes in as the strand fills (silent below one, full at ten)
+    S.voice = [];
+    for (let i = 0; i < 2; i++) {
+      const o1 = c.createOscillator(); o1.type = 'sine'; o1.frequency.value = mtof(84 + mod12(ROOT));
+      const o2 = c.createOscillator(); o2.type = 'sine'; o2.frequency.value = mtof(84 + mod12(ROOT + 7));
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2500; lp.Q.value = 0.5;
+      const g = c.createGain(); g.gain.value = 0.0001;
+      const pa = api.spatial({ refDistance: 1.0, rolloff: 1.2, out: S.out.chimes });
+      o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(pa.input);
+      o1.start(now); o2.start(now);
+      S.voice.push({ o1, o2, lp, g, pa });
+    }
+
     // ---- events
     const on = (name, fn) => S.offs.push(ctx.events.on(name, (e) => { try { fn(e || {}); } catch (err) { console.error('[sfx]', name, err); } }));
     on('lotusbloom', (e) => onLotus(S, e));
+    on('lotusstir', (e) => onLotusStir(S, e));
     on('fireflyland', (e) => onFirefly(S, e));
     on('lanterngrab', (e) => { if (hasXYZ(e.pos)) noiseBurst(S, { pos: e.pos, dur: 0.09, gain: 0.12, type: 'bandpass', freq: 1500, q: 1.0 }); });
     on('lanternrelease', (e) => onLanternRelease(S, e));
+    // a soft paper tap when a hand meets a floating lantern, louder for a brisk brush; a sustained nuzzle is
+    // silent (the lanterns module fires this once per fresh contact, at most every 0.25 s)
+    on('lanterntouch', (e) => { if (!hasXYZ(e.pos)) return; const sp = clamp((typeof e.speed === 'number' ? e.speed : 0) / 0.8, 0, 1); noiseBurst(S, { pos: e.pos, dur: 0.05 + 0.05 * sp, gain: 0.03 + 0.10 * sp, type: 'bandpass', freq: 900, q: 1.2 }); });
     on('lanternsplash', (e) => { if (hasXYZ(e.pos)) playAt(S, SPLASHES[Math.floor(S.rng() * 4)], e.pos, { gain: 0.4, refDistance: 1.5, out: S.out.world }); });
     on('lanternstar', (e) => onLanternStar(S, e));
     on('handenter', (e) => onHandEnter(S, e));
     on('handexit', (e) => onHandExit(S, e));
+    on('drip', (e) => onDrip(S, e));
     on('pinchmiss', (e) => { const p = hasXYZ(e.point) ? e.point : e.hand?.pinch?.point; if (hasXYZ(p)) noiseBurst(S, { pos: p, dur: 0.02, gain: 0.05, type: 'bandpass', freq: 2000, q: 3 }); });
+    on('hush', (e) => onHush(S, e));
+    on('fireflyfollow', (e) => onFollow(S, e));
+    on('fireflyescort', (e) => onEscort(S, e));
+    on('fireflyspill', (e) => onSpill(S, e));
+    on('lakewave', (e) => onLakeWave(S, e));
   },
 
   update(api, ctx, dt) {
@@ -158,14 +182,30 @@ export const sfx = {
       // glide rush from the player's own wading
       const speed = ctx.playerCtl?.state?.speed || 0;
       S.glide.g.gain.setTargetAtTime(smoothstep(0.2, 1.0, speed) * 0.18, now, 0.15);
+      // the hand voices follow the strand behind each hand and swell with how much of it has arrived
+      const ff = ctx.fireflies;
+      for (let i = 0; i < S.voice.length; i++) {
+        const v = S.voice[i];
+        const n = ff?.followArrived ? ff.followArrived[i] : 0;
+        const cen = ff?.followCentroid;
+        if (cen && n > 0) v.pa.position.set(cen[i * 3], cen[i * 3 + 1], cen[i * 3 + 2]);
+        v.g.gain.setTargetAtTime(0.03 * smoothstep(0, 10, n), now, 0.3);
+      }
     }
 
     // ---- slow controls (4 Hz): calm drone
     S.slowAcc += dt;
     if (S.slowAcc >= 0.25) {
       S.slowAcc = 0;
-      const calm = Math.max(ctx.water?.calm || 0, ctx.calm || 0);
+      const calm = Math.max(ctx.water?.calm || 0, ctx.calm || 0, ctx.hush?.strength || 0); // a hush is calm too
       S.calm.g.gain.setTargetAtTime(calm > 0.5 ? 0.06 : 0.0001, now, 1.5);
+      // the hand voices stay on the current chord
+      const ch = ctx.music?.currentChord;
+      const root = ch ? ch.root : mod12(ROOT), fifth = ch ? ch.fifth : mod12(ROOT + 7);
+      for (const v of S.voice) {
+        v.o1.frequency.setTargetAtTime(mtof(84 + mod12(root)), now, 0.3);
+        v.o2.frequency.setTargetAtTime(mtof(84 + mod12(fifth)), now, 0.3);
+      }
     }
 
     // ---- lantern crackle: nearest ≤ 3 lanterns re-evaluated every 0.5 s, positions every frame
@@ -206,10 +246,11 @@ export const sfx = {
     for (const sw of S.swish) { kill(sw.bp); try { sw.pa.dispose(); } catch { /* */ } }
     kill(S.glide.lp); kill(S.glide.g);
     kill(S.calm.o1); kill(S.calm.o2); kill(S.calm.g2); kill(S.calm.lp); kill(S.calm.g);
+    for (const v of S.voice || []) { kill(v.o1); kill(v.o2); kill(v.lp); kill(v.g); try { v.pa.dispose(); } catch { /* */ } }
     kill(S.noiseWhite); kill(S.noisePink);
   },
 
-  /** bell({ midi, pos, gain, dur, kind, index, when, wet, detune, refDistance }) → pool voice or null. */
+  /** bell({ midi, pos, gain, dur, kind, index, when, wet, detune, refDistance, attack }) → pool voice or null. */
   bell(opts) { return this._s ? triggerBell(this._s, opts) : null; },
 };
 
@@ -223,7 +264,7 @@ function nearAtten(pos, head) {
 
 // ---------------------------------------------------------------------------------------------
 // FM bell pool
-function triggerBell(S, { midi = 74, pos = null, gain = 0.3, dur = 1.8, kind = 'glass', index = null, when = 0, wet = 0, detune = 0, refDistance = 2, tag = '' } = {}) {
+function triggerBell(S, { midi = 74, pos = null, gain = 0.3, dur = 1.8, kind = 'glass', index = null, when = 0, wet = 0, detune = 0, refDistance = 2, tag = '', attack = 0.005 } = {}) {
   const c = S.c;
   const now = c.currentTime;
   let t = Math.max(when || 0, now + 0.005);
@@ -256,7 +297,7 @@ function triggerBell(S, { midi = 74, pos = null, gain = 0.3, dur = 1.8, kind = '
   v.mg.gain.exponentialRampToValueAtTime(Math.max(0.001, f * idx * 0.04), t + dur * 0.55);
   holdAt(v.env.gain, t);
   v.env.gain.setValueAtTime(0.0001, t);
-  v.env.gain.linearRampToValueAtTime(Math.max(0.0002, g), t + 0.005);
+  v.env.gain.linearRampToValueAtTime(Math.max(0.0002, g), t + Math.max(0.005, attack));
   v.env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   v.send.gain.setValueAtTime(clamp(wet, 0, 1), t);
   if (pos) v.pa.position.set(pos.x, pos.y, pos.z); else v.pa.position.copy(head);
@@ -313,10 +354,22 @@ function notePlayed(S, midi) { S.playerNotes.push(midi); if (S.playerNotes.lengt
 function onLotus(S, e) {
   const pos = hasXYZ(e.pos) ? e.pos : S.head();
   const midi = pitchFor(S, e.note | 0, 5);
-  triggerBell(S, { midi, pos, gain: 0.45, dur: 3.2, kind: (e.index | 0) & 1 ? 'ceramic' : 'glass', tag: 'lotus' });
+  // a bud that opened by itself under a patient hand sings softer and longer than one that was touched;
+  // one warmed open by a lantern swells in over a third of a second instead of striking
+  const patient = e.cause === 'patient', lantern = e.cause === 'lantern';
+  if (lantern) triggerBell(S, { midi, pos, gain: 0.32, dur: 5.0, kind: 'ceramic', attack: 0.35, wet: 0.4, tag: 'lotus' });
+  else triggerBell(S, { midi, pos, gain: patient ? 0.40 : 0.45, dur: patient ? 4.2 : 3.2, attack: patient ? 0.06 : 0.005, kind: (e.index | 0) & 1 ? 'ceramic' : 'glass', tag: 'lotus' });
   const layer = pickTuned(S, BOWLS.concat(TINGS), midi);
-  if (layer) playAt(S, layer.name, pos, { gain: 0.25, rate: layer.rate, refDistance: 2, out: S.out.chimes });
+  if (layer) playAt(S, layer.name, pos, { gain: lantern ? 0.18 : 0.25, rate: layer.rate, refDistance: 2, out: S.out.chimes });
   notePlayed(S, midi);
+}
+
+// a thin rising whisper two octaves up from the bud's note: the pod stirring under a still fingertip.
+// It simply finishes on its own if the hand leaves.
+function onLotusStir(S, e) {
+  if (!hasXYZ(e.pos)) return;
+  const f = mtof(pitchFor(S, e.note | 0, 6));
+  noiseBurst(S, { pos: e.pos, dur: 1.4, gain: 0.035, type: 'bandpass', freq: 2 * f, q: 14, sweepTo: 3 * f, kind: 'white', refDistance: 1.0 });
 }
 
 function onFirefly(S, e) {
@@ -334,7 +387,8 @@ function onLanternRelease(S, e) {
   const pos = hasXYZ(e.pos) ? e.pos : (hasXYZ(e.hand?.palm?.position) ? e.hand.palm.position : S.head());
   playAt(S, 'whoosh_gentle', pos, { gain: 0.25, rate: 1.05, refDistance: 1.5, out: S.out.world });
   const root = S.ctx.music?.currentChord?.root ?? mod12(ROOT);
-  triggerBell(S, { midi: 48 + mod12(root), pos, gain: 0.3, dur: 4, kind: 'ceramic', when: S.c.currentTime + 0.4, tag: 'lantern' });
+  // a low ceramic bell on the chord root, struck softly (40 ms attack) so it blooms under the pads instead of hitting them
+  triggerBell(S, { midi: 48 + mod12(root), pos, gain: 0.3, dur: 4, kind: 'ceramic', when: S.c.currentTime + 0.4, attack: 0.04, tag: 'lantern' });
 }
 
 function onLanternStar(S, e) {
@@ -354,7 +408,62 @@ function onLanternStar(S, e) {
   S.auroraNotes = S.playerNotes.slice(-4);
 }
 
+// a hush takes under a resting palm: a low ceramic bowl on the chord root, struck so softly (120 ms) that it seems to
+// have been there already, half in the reverb, with a real bowl three octaves up over it (the tuned bowls live there)
+function onHush(S, e) {
+  const pos = hasXYZ(e.pos) ? e.pos : (hasXYZ(e.hand?.palm?.position) ? e.hand.palm.position : S.head());
+  const root = S.ctx.music?.currentChord?.root ?? mod12(ROOT);
+  const midi = 48 + mod12(root);
+  triggerBell(S, { midi, pos, gain: 0.22, dur: 6, kind: 'ceramic', attack: 0.12, wet: 0.5, tag: 'hush' });
+  const layer = pickTuned(S, BOWLS, midi + 36);
+  if (layer) playAt(S, layer.name, pos, { gain: 0.12, rate: layer.rate, refDistance: 2, out: S.out.chimes });
+}
+
+// a firefly takes its place in the ribbon behind a hand: a small glass bell for the first, a higher one for the eighth
+function onFollow(S, e) {
+  const pos = hasXYZ(e.pos) ? e.pos : (hasXYZ(e.hand?.palm?.position) ? e.hand.palm.position : S.head());
+  const n = e.count | 0;
+  if (n === 1) triggerBell(S, { midi: pitchFor(S, 2, 6), pos, gain: 0.10, dur: 1.2, kind: 'glass', wet: 0.5, tag: 'ribbon' });
+  else if (n === 8) triggerBell(S, { midi: pitchFor(S, 4, 6), pos, gain: 0.12, dur: 1.2, kind: 'glass', wet: 0.5, tag: 'ribbon' });
+}
+
+// fireflies lift off with a released lantern: a quick run of small glass bells up the scale, one per firefly (five at most)
+function onEscort(S, e) {
+  const pos = hasXYZ(e.pos) ? e.pos : S.head();
+  const now = S.c.currentTime;
+  const n = Math.min(e.count | 0, 5);
+  for (let k = 0; k < n; k++) triggerBell(S, { midi: pitchFor(S, k, 6), pos, gain: 0.07, dur: 0.9, kind: 'glass', when: now + 0.05 + k * 0.09, wet: 0.5, tag: 'escort' });
+}
+
+// the escort spills away as sparks: four falling bells and a brief high hiss
+function onSpill(S, e) {
+  const pos = hasXYZ(e.pos) ? e.pos : S.head();
+  const now = S.c.currentTime;
+  for (let k = 0; k < 4; k++) triggerBell(S, { midi: pitchFor(S, 4 - k, 6), pos, gain: 0.05, dur: 0.9, kind: 'glass', when: now + 0.02 + k * 0.07, wet: 0.5, tag: 'spill' });
+  noiseBurst(S, { pos, type: 'highpass', freq: 4000, q: 0.7, dur: 0.3, gain: 0.03 });
+}
+
+// the lake passes a star on: every open lotus restates its note as the 2.5 m/s front reaches it, under one soft breath
+function onLakeWave(S, e) {
+  const head = S.head();
+  const flowers = S.ctx.lotus?.flowers;
+  const now = S.c.currentTime;
+  if (flowers) {
+    // the star's own four bells are still ringing: the wave gets the pool's other four voices, nearest flowers first
+    const open = [];
+    for (const f of flowers) if (f.open && hasXYZ(f.bud)) open.push({ f, d: Math.hypot(f.bud.x - head.x, f.bud.z - head.z) });
+    open.sort((a, b) => a.d - b.d);
+    for (const { f, d } of open.slice(0, 4)) {
+      triggerBell(S, { midi: pitchFor(S, f.note | 0, 5), pos: f.bud, gain: 0.10, dur: 2.6, kind: 'glass', attack: 0.03, wet: 0.7, when: now + d / 2.5, tag: 'wave' });
+    }
+  }
+  noiseBurst(S, { pos: head, kind: 'pink', type: 'lowpass', freq: 600, q: 0.5, dur: 1.5, gain: 0.05 });
+}
+
+function hushingHand(S, hand) { const hi = S.ctx.hands?.list?.indexOf(hand); return hi >= 0 && !!S.ctx.hush?.circles?.[hi]?.active; }
+
 function onHandEnter(S, e) {
+  if (hushingHand(S, e.hand)) return;   // a palm resting on the water jitters across the surface; it is not going in
   const h = e.hand;
   const pos = hasXYZ(h?.palm?.position) ? h.palm.position : null;
   if (!pos) return;
@@ -364,7 +473,18 @@ function onHandEnter(S, e) {
   if (speed > 0.5) playAt(S, SPLASHES[Math.floor(S.rng() * 4)], pos, { gain: 0.2, refDistance: 1.5, out: S.out.world });
 }
 
+// a droplet from a lifted hand meeting the surface: a very quiet, very short high plip, pitch scattered so a
+// run of drips reads as water and not as a metronome (rate-limited to 8/s by the drips module)
+function onDrip(S, e) {
+  const pos = hasXYZ(e.pos) ? e.pos : null;
+  if (!pos) return;
+  const b = clamp(typeof e.bright === 'number' ? e.bright : 0.6, 0.2, 1.2);
+  const f = 2600 + S.rng() * 1800;
+  noiseBurst(S, { pos, dur: 0.028, gain: 0.012 + 0.018 * b, type: 'bandpass', freq: f, sweepTo: f * 0.55, q: 6, refDistance: 0.8 });
+}
+
 function onHandExit(S, e) {
+  if (hushingHand(S, e.hand)) return;
   const pos = hasXYZ(e.hand?.palm?.position) ? e.hand.palm.position : null;
   if (!pos) return;
   const n = 2 + (S.rng() < 0.5 ? 1 : 0);

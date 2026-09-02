@@ -141,6 +141,7 @@ export const ambience = {
     S.startle = startle;
     S.offs.push(ctx.events.on('lanternsplash', () => startle(6, 12)));
     S.offs.push(ctx.events.on('lotuschord', () => startle(4, 6)));
+    S.offs.push(ctx.events.on('lakewave', () => startle(2, 4)));   // the crickets pause for a breath as the wave passes
     // (blur/focus fades of the master bus are owned by the engine — see engine.js)
   },
 

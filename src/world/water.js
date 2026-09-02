@@ -46,6 +46,7 @@ export const water = {
       uPatchHalf: { value: W.nearPatch / 2 },
       uLights: { value: new Float32Array(MAX_LIGHTS * 4) }, // nearest lanterns: xyz, brightness
       uLightColor: { value: new THREE.Color(CONFIG.colors.lantern) },
+      uHush: { value: new Float32Array(8) }, // hush circles: world x, z, radius, strength (copied from ctx.water.hushWorld)
     };
     // Two meshes share these uniforms: a flat far plane, and a near patch around the player whose vertices are
     // displaced by the wave simulation so ripples from your fingers are real geometry, not just lighting.
@@ -69,6 +70,7 @@ export const water = {
         uniform mat3 uSkyInv; uniform float uSkyExposure, uTime, uTile, uSimTexel, uAlpha, uMoonStrength, uFogDensity, uCalm, uDebug, uHeightScale, uPatchHalf;
         uniform vec3 uDeep, uPlankton, uPlankton2, uMoonDir, uMoonColor, uFogColor, uPlayer, uAurora, uLightColor;
         uniform vec4 uLights[${MAX_LIGHTS}];
+        uniform vec4 uHush[2];
         varying vec3 vWorld;
         ${GLSL_GAL_UV}
         ${GLSL_HASH}
@@ -92,6 +94,16 @@ export const water = {
           vec2 nxy = (n0.xy * 1.0 + n1.xy * 0.9 + n2.xy * 0.35) * detail * (0.55 - 0.25 * uCalm);
           // --- wave simulation gradient
           float dPlayer = length(p - uPlayer.xz);
+          // --- hush: a resting hand's disc of still water. hf = 1 inside, soft edge over the outer 40 % of the
+          // radius; hedge is the thin ring of plankton light on the spreading front (gone once fully grown)
+          float hf = 0.0, hedge = 0.0;
+          if (uHush[0].w > 0.0 || uHush[1].w > 0.0) for (int i = 0; i < 2; i++) {
+            vec2 hd = p - uHush[i].xy;
+            float hrad = max(uHush[i].z, 1e-3);
+            float hl = length(hd);
+            hf = max(hf, uHush[i].w * (1.0 - smoothstep(0.6 * hrad, hrad, hl)));
+            hedge += 0.10 * uHush[i].w * (1.0 - smoothstep(0.0, 0.035, abs(hl - hrad))) * max(0.0, 1.0 - hrad / 1.2);
+          }
           float simFade = 1.0 - smoothstep(6.0, 8.5, dPlayer);
           vec2 suv = fract(p / uTile);
           vec4 sim = texture2D(uSim, suv);
@@ -101,6 +113,7 @@ export const water = {
           vec2 grad = vec2(hr - sim.r, hu - sim.r) * (1.0 / (uSimTexel * uTile)); // dh/dx in (units/m)
           // slope of the displaced surface (uHeightScale metres per unit), exaggerated ×2.5 so rings read at night
           nxy += -grad * uHeightScale * 2.5 * simFade;
+          nxy *= 1.0 - 0.92 * hf; // glass-still inside the hush: a mirror
           vec3 N = normalize(vec3(nxy.x, 1.0, nxy.y));
           // --- reflection of the real sky
           vec3 R = reflect(-V, N);
@@ -117,6 +130,7 @@ export const water = {
           // --- fresnel mix
           float ndv = max(dot(N, V), 0.0);
           float F = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
+          F = max(F, 0.32 * hf); // a deliberate lift so the stars and the aurora come up through the disc at this steep angle
           vec3 col = mix(uDeep, skyCol, F) + moon;
           // --- the nearest lanterns: their light breaks up on the ripples, so rings from your fingers read
           // as orange glints even where the sky reflection is too dim to show them
@@ -141,7 +155,9 @@ export const water = {
           float crest = clamp(length(grad) * uHeightScale * 6.0, 0.0, 1.0);
           bio *= 0.7 + 0.6 * crest; // the plankton light gathers on the ripple slopes, so rings show inside the glow
           bio += uCalm * 0.05 * (0.5 + 0.5 * sin(t * 0.8 + dPlayer * 2.0)) * (1.0 - smoothstep(1.5, 4.5, dPlayer)) * speck;
+          bio *= 1.0 - 0.9 * hf; // the plankton go quiet inside the hush
           col += mix(uPlankton, uPlankton2, dens2) * bio * 0.7;
+          col += uPlankton2 * hedge;
           // --- fog
           float fog = fogExp2(dist, uFogDensity);
           col = mix(col, uFogColor, fog);
@@ -183,7 +199,8 @@ export const water = {
     const u = this.uniforms;
     u.uTime.value = ctx.time.t;
     u.uSim.value = ctx.water.simTexture;
-    u.uCalm.value = ctx.water.calm || 0;
+    u.uCalm.value = Math.max(ctx.water.calm || 0, 0.6 * (ctx.water.hush?.strength || 0)); // a full hush counts as 0.6 calm
+    if (ctx.water.hushWorld) u.uHush.value.set(ctx.water.hushWorld);
     const p = ctx.playerCtl.state.headWorld;
     u.uPlayer.value.copy(p);
     // keep the quad centred on the player (the shader works in world space, so this is invisible)
