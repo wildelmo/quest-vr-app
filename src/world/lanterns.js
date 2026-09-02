@@ -221,7 +221,7 @@ export const lanterns = {
         bright: incoming ? 0 : BRIGHT_FLOAT, flame: 1,
         yaw: rng() * Math.PI * 2, spin: (rng() - 0.5) * 0.3,
         lean: new THREE.Vector2(), leanT: new THREE.Vector2(),
-        push: new THREE.Vector2(), spinKick: 0, touchT: -1e9, inContact: false, // a hand's nudge: glide, yaw kick, last touch
+        push: new THREE.Vector2(), spinKick: 0, touchT: -1e9, contactT: -1e9, inContact: false, // a hand's nudge: glide, yaw kick, last touch
         escorts: 0, spilled: false,        // the firefly escort of a rising lantern (fireflies.js)
         wind: WIND_DIR.clone().rotateAround(new THREE.Vector2(), THREE.MathUtils.degToRad((rng() - 0.5) * 40)).multiplyScalar(WIND_SPEED),
         walk: new THREE.Vector2(), walkT: new THREE.Vector2(), walkTimer: rng() * 3,
@@ -257,7 +257,7 @@ export const lanterns = {
       L.top.copy(L.position).y += H * 0.5;
       L.vel.set(0, 0, 0); L.bobVel.set(0, 0, 0); L.att.set(0, 0); L.up.set(0, 1, 0);
       L.lean.set(0, 0); L.leanT.set(0, 0);
-      L.push.set(0, 0); L.spinKick = 0; L.inContact = false;
+      L.push.set(0, 0); L.spinKick = 0; L.inContact = false; L.contactT = -1e9;
       L.state = 'floating'; L.incoming = true; L.bright = 0; L.held = null; L.dropping = false; L.attracted = false;
       L.touched = false; L.amongPads = false;
       L.escorts = 0; L.spilled = false;
@@ -285,7 +285,7 @@ export const lanterns = {
       L.state = 'held'; L.held = hand; L.incoming = false; L.attracted = false; L.dropping = false; L.touched = true;
       L.anchor.copy(hand.pinch.point);
       if (!wasRising) { L.top.copy(L.position).addScaledVector(L.up, H * 0.5); L.bobVel.copy(L.vel); }
-      L.att.set(0, 0); L.push.set(0, 0); L.spinKick = 0; L.inContact = false;
+      L.att.set(0, 0); L.push.set(0, 0); L.spinKick = 0; L.inContact = false; L.contactT = -1e9;
       L.escorts = 0; L.spilled = false;
       // ease the string from its current length to STRING over ~120 ms (with a little overshoot)
       L.grabT = 0; L.grabLen = Math.max(0.01, L.top.distanceTo(L.anchor));
@@ -608,7 +608,7 @@ function nudgeContact(L, hands, ctx, t, dt) {
   }
   if (contact) {
     if (push.lengthSq() > NUDGE.pushMax * NUDGE.pushMax) push.setLength(NUDGE.pushMax);
-    if (!L.inContact && t - L.touchT > NUDGE.eventGap) {
+    if (t - L.contactT > NUDGE.eventGap) { // a fresh touch: no contact for a while, not just one jittery frame apart
       L.touchT = t;
       if (vnMax > NUDGE.gutterSpeed) L.bright = Math.max(0.3, L.bright - 0.2); // the flame gutters; the float easing restores it
       ctx.water.disturb?.(P.x, P.z, 0.1, 0.05 + 0.2 * Math.min(1, vnMax));
@@ -617,6 +617,7 @@ function nudgeContact(L, hands, ctx, t, dt) {
     }
   }
   L.inContact = contact;
+  if (contact) L.contactT = t;
 }
 
 /**

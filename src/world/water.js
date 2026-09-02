@@ -97,7 +97,7 @@ export const water = {
           // --- hush: a resting hand's disc of still water. hf = 1 inside, soft edge over the outer 40 % of the
           // radius; hedge is the thin ring of plankton light on the spreading front (gone once fully grown)
           float hf = 0.0, hedge = 0.0;
-          for (int i = 0; i < 2; i++) {
+          if (uHush[0].w > 0.0 || uHush[1].w > 0.0) for (int i = 0; i < 2; i++) {
             vec2 hd = p - uHush[i].xy;
             float hrad = max(uHush[i].z, 1e-3);
             float hl = length(hd);

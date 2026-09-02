@@ -161,7 +161,7 @@ export const drips = {
         const j = h.joints[DRIP_JOINTS[k]];
         if (j.valid && j.position.y < level + 0.003) S.wetUntil[wb + k] = t + P.wetTime;
       }
-      if (h.leftWater && t - S.exitT[hi] > P.retrigger) {
+      if (h.leftWater && t - S.exitT[hi] > P.retrigger && !ctx.hush?.circles?.[hi]?.active) { // a hushing palm jittering at the surface is not lifting out
         const charge = THREE.MathUtils.clamp(S.subT[hi] / P.chargeTime, P.chargeMin, 1);
         S.charge[hi] = charge; S.exitT[hi] = t; S.subT[hi] = 0; S.acc[hi] = 0;
         S.burstLeft[hi] = Math.round((P.burstMin + rnd() * (P.burstMax - P.burstMin)) * (0.5 + 0.5 * charge));

@@ -409,14 +409,14 @@ function onLanternStar(S, e) {
 }
 
 // a hush takes under a resting palm: a low ceramic bowl on the chord root, struck so softly (120 ms) that it seems to
-// have been there already, half in the reverb, with a real bowl an octave up under it
+// have been there already, half in the reverb, with a real bowl three octaves up over it (the tuned bowls live there)
 function onHush(S, e) {
   const pos = hasXYZ(e.pos) ? e.pos : (hasXYZ(e.hand?.palm?.position) ? e.hand.palm.position : S.head());
   const root = S.ctx.music?.currentChord?.root ?? mod12(ROOT);
   const midi = 48 + mod12(root);
   triggerBell(S, { midi, pos, gain: 0.22, dur: 6, kind: 'ceramic', attack: 0.12, wet: 0.5, tag: 'hush' });
-  const layer = pickTuned(S, BOWLS, midi + 12);
-  if (layer) playAt(S, layer.name, pos, { gain: 0.16, rate: layer.rate, refDistance: 2, out: S.out.chimes });
+  const layer = pickTuned(S, BOWLS, midi + 36);
+  if (layer) playAt(S, layer.name, pos, { gain: 0.12, rate: layer.rate, refDistance: 2, out: S.out.chimes });
 }
 
 // a firefly takes its place in the ribbon behind a hand: a small glass bell for the first, a higher one for the eighth
@@ -449,16 +449,21 @@ function onLakeWave(S, e) {
   const flowers = S.ctx.lotus?.flowers;
   const now = S.c.currentTime;
   if (flowers) {
-    for (const f of flowers) {
-      if (!f.open || !hasXYZ(f.bud)) continue;
-      const when = now + Math.hypot(f.bud.x - head.x, f.bud.z - head.z) / 2.5;
-      triggerBell(S, { midi: pitchFor(S, f.note | 0, 5), pos: f.bud, gain: 0.10, dur: 2.6, kind: 'glass', attack: 0.03, wet: 0.7, when, tag: 'wave' });
+    // the star's own four bells are still ringing: the wave gets the pool's other four voices, nearest flowers first
+    const open = [];
+    for (const f of flowers) if (f.open && hasXYZ(f.bud)) open.push({ f, d: Math.hypot(f.bud.x - head.x, f.bud.z - head.z) });
+    open.sort((a, b) => a.d - b.d);
+    for (const { f, d } of open.slice(0, 4)) {
+      triggerBell(S, { midi: pitchFor(S, f.note | 0, 5), pos: f.bud, gain: 0.10, dur: 2.6, kind: 'glass', attack: 0.03, wet: 0.7, when: now + d / 2.5, tag: 'wave' });
     }
   }
   noiseBurst(S, { pos: head, kind: 'pink', type: 'lowpass', freq: 600, q: 0.5, dur: 1.5, gain: 0.05 });
 }
 
+function hushingHand(S, hand) { const hi = S.ctx.hands?.list?.indexOf(hand); return hi >= 0 && !!S.ctx.hush?.circles?.[hi]?.active; }
+
 function onHandEnter(S, e) {
+  if (hushingHand(S, e.hand)) return;   // a palm resting on the water jitters across the surface; it is not going in
   const h = e.hand;
   const pos = hasXYZ(h?.palm?.position) ? h.palm.position : null;
   if (!pos) return;
@@ -479,6 +484,7 @@ function onDrip(S, e) {
 }
 
 function onHandExit(S, e) {
+  if (hushingHand(S, e.hand)) return;
   const pos = hasXYZ(e.hand?.palm?.position) ? e.hand.palm.position : null;
   if (!pos) return;
   const n = 2 + (S.rng() < 0.5 ? 1 : 0);

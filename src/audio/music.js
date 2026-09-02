@@ -150,8 +150,6 @@ export const music = {
 
     S.offs.push(ctx.events.on('lanternrelease', () => { S.swellToggle = !S.swellToggle; requestSwell(S, S.swellToggle ? 'pad_northern_brilliant' : 'pad_northern_swell', 0.35); }));
     S.offs.push(ctx.events.on('lotuschord', () => requestSwell(S, 'pad_bioluminescence', 0.45)));
-    S.offs.push(ctx.events.on('hush', () => { S.hushing = true; }));
-    S.offs.push(ctx.events.on('hushend', () => { S.hushing = (ctx.hush?.strength || 0) > 0.02; })); // the other hand may still rest
   },
 
   update(api, ctx, dt) {
@@ -187,6 +185,7 @@ export const music = {
     // ---- raindrop notes when the world is calm
     // (a hush overrides the submerged-hand rule — the resting hand is in the water — and the drops come closer together)
     const anySub = !!ctx.hands?.list?.some((h) => h.visible && h.submerged);
+    S.hushing = (ctx.hush?.strength || 0) > 0.02;   // read live: the hushend event fires before the frame's strength is written
     const calmWorld = (energy < 0.15 && !anySub) || S.hushing;
     const gap = () => (S.hushing ? 3 + 4 * S.rng() : 6 + 8 * S.rng());
     if (!calmWorld) S.dropArmed = false;

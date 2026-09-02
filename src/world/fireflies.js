@@ -196,7 +196,7 @@ export const fireflies = {
     const ribMax = Math.max(1, Math.round(RIB.max * (ctx.quality.particleScale || 1)));
     const rib = {
       max: ribMax,
-      slowFor: new Float32Array(2), pauseT: new Float32Array(2), lostT: new Float32Array(2), followT: new Float32Array(2),
+      slowFor: new Float32Array(2), pauseT: new Float32Array(2), lostT: new Float32Array(2), followT: new Float32Array(2), breakT: new Float32Array(2),
       drifting: [false, false], hold: [false, false],
       slots: new Int16Array(2 * ribMax).fill(-1),           // follower index k per hand → firefly, so k is unique
       trail: [new Float32Array(3 * RIB.ring), new Float32Array(3 * RIB.ring)],
@@ -242,7 +242,7 @@ export const fireflies = {
         const st = state[i];
         let range;
         if (st === WANDER) { if (cooldown[i] > 0) continue; range = ESC.wanderRange; }
-        else if (st === LANDED || st === APPROACH) range = ESC.handRange;
+        else if ((st === LANDED || st === APPROACH) && ctx.hands.list[slotHand[i]] === e.hand) range = ESC.handRange;   // only the releasing hand's own
         else continue;   // escorts of another lantern, the ribbon's followers and scattering fireflies stay where they are
         const dx = pos[i * 3] - lp.x, dy = pos[i * 3 + 1] - lp.y, dz = pos[i * 3 + 2] - lp.z;
         const d2 = dx * dx + dy * dy + dz * dz;
@@ -349,14 +349,15 @@ export const fireflies = {
     for (let hi = 0; hi < 2; hi++) {
       const hs = hands[hi];
       const sp = hs ? hs.palm.speed : 0;
-      let hold = !!hs && !hs.submerged && !hs.pinch.active && !hs.grabbed && hs.open && sp <= RIB.breakSpeed;
-      if (hold && !hs.visible) { rib.lostT[hi] += dt; if (rib.lostT[hi] >= RIB.lostGrace) hold = false; }
+      if (hs && sp > RIB.breakSpeed) rib.breakT[hi] += dt; else rib.breakT[hi] = 0;   // one jittery frame over the break speed is not a fling
+      let hold = !!hs && !hs.submerged && !hs.pinch.active && !hs.grabbed && hs.open && rib.breakT[hi] < 0.1;
+      if (hold && (!hs.visible || !hs.tracked)) { rib.lostT[hi] += dt; if (rib.lostT[hi] >= RIB.lostGrace) hold = false; }
       else rib.lostT[hi] = 0;
       const poseOk = hold && hs.visible && hs.active && hs.palm.normal.y > RIB.normalY;
       const drifting = poseOk && !hs.still && sp >= RIB.speedMin && sp <= RIB.speedMax && hs.palm.speedH >= 0.6 * sp;
       if (drifting) { rib.slowFor[hi] += dt; rib.pauseT[hi] = 0; }
       else if (poseOk && sp <= RIB.speedMax && (sp < RIB.speedMin || hs.still) && rib.pauseT[hi] < RIB.pauseGrace) rib.pauseT[hi] += dt;
-      else if (hold && !hs.visible) { /* lost within the grace: keep the accumulator */ }
+      else if (hold && (!hs.visible || !hs.tracked)) { /* lost within the grace: keep the accumulator */ }
       else rib.slowFor[hi] = 0;
       rib.drifting[hi] = drifting; rib.hold[hi] = hold;
       rib.followT[hi] -= dt;
@@ -769,7 +770,10 @@ export const fireflies = {
 
       // never below the water, never above the band
       if (y < yMin) { y = yMin; if (vy < 0) vy = -vy * 0.5; }
-      else if (y > yMax) { y = yMax; if (vy > 0) vy = -vy * 0.5; }
+      else if (y > yMax) {
+        if (st === SCATTER || st === WANDER) vy = Math.min(vy, -(y - yMax) * 1.5);   // sparks spilled above the band sink back, no snap
+        else { y = yMax; if (vy > 0) vy = -vy * 0.5; }
+      }
 
       state[i] = st;
       pos[i3] = x; pos[i3 + 1] = y; pos[i3 + 2] = z;

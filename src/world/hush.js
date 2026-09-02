@@ -56,11 +56,13 @@ export const hush = {
       // the pose: open, palm down, the palm joint within a few centimetres of the surface (the pads dip: h.still
       // is computed regardless of submersion), still, not pinching and not holding anything
       let pose = false;
-      if (h && h.visible && h.active && h.open && h.still && !h.pinch.active && !h.grabbed && h.palm.normal.y < HUSH.normalY) {
+      const ps = ctx.playerCtl.state;   // a hand left at the surface after a pull, while the rig still glides, is not resting
+      if (h && h.visible && h.active && h.open && h.still && !h.pinch.active && !h.grabbed && !ps.holding && ps.speed < 0.1 && h.palm.normal.y < HUSH.normalY) {
         const dy = h.palm.position.y - level;
         pose = dy >= HUSH.yMin && dy <= HUSH.yMax;
       }
       if (pose) c.hold = Math.min(HUSH.hold, c.hold + dt); else c.hold = Math.max(0, c.hold - HUSH.holdDecay * dt);
+      if (h && h.pinch.justReleased) c.hold = 0;   // the hand that just let go of the world starts its dwell afresh
 
       if (!c.active && pose && c.hold >= HUSH.hold) {
         c.active = true; c.wasActive = false;

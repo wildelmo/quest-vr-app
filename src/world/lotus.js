@@ -458,7 +458,7 @@ export const lotus = {
           k = kIn;
         }
         // patience: a still fingertip hovering in the band above the pod (not touching) opens it in time
-        if (d >= LEAN.hoverMin && d <= LEAN.hoverMax && bestHand.still) f.hoverT += dt;
+        if (d >= LEAN.hoverMin && d <= LEAN.hoverMax && bestTip.y - f.bud.y >= LEAN.hoverMin * 0.7 && bestHand.still) f.hoverT += dt;   // above the pod, not beside it
         else { f.hoverT = Math.max(0, f.hoverT - LEAN.decay * dt); if (f.hoverT <= 0) f.stirred = false; }
         if (f.hoverT >= LEAN.stirAt && !f.stirred) {
           f.stirred = true;
