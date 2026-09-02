@@ -104,7 +104,7 @@ export const water = {
           float speck = dens * 0.6 + dens2 * 0.4;
           float bio = (sim.b * 0.45 + sim.a * 0.9) * (0.25 + 0.75 * speck) * simFade;
           bio += uCalm * 0.05 * (0.5 + 0.5 * sin(t * 0.8 + dPlayer * 2.0)) * (1.0 - smoothstep(1.5, 4.5, dPlayer)) * speck;
-          col += mix(uPlankton, uPlankton2, dens2) * bio * 1.1;
+          col += mix(uPlankton, uPlankton2, dens2) * bio * 0.9;
           // --- fog
           float fog = fogExp2(dist, uFogDensity);
           col = mix(col, uFogColor, fog);

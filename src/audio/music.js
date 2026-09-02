@@ -21,7 +21,7 @@ const ROOT = CONFIG.music?.rootMidi ?? 62;
 const PENTA = [0, 3, 5, 7, 10]; // minor pentatonic relative to the root
 const POOL = 7;
 const LO = 38, HI = 74, UPPER_LO = 72, UPPER_HI = 84;
-const VOICE_LEVEL = 0.045, UPPER_LEVEL = 0.025;
+const VOICE_LEVEL = 0.05, UPPER_LEVEL = 0.03;
 const SESSION_ARC = 1200; // seconds over which the session slowly settles
 
 // pitch classes relative to the root; each chord's tones are consonant with the minor pentatonic

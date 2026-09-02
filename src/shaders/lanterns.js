@@ -85,10 +85,12 @@ varying float vA;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   float d = max(-mv.z, 0.05);
-  mv.xyz *= max(d - uPull, 0.02) / d;
+  float ws = min(uSize, 0.35 * d);
+  // a point sprite has one depth: slide it toward the eye by more than its own radius so the water in
+  // front of the lantern's base (seen from above) cannot clip the lower half of the halo
+  mv.xyz *= max(d - (uPull + ws * 0.6), 0.12) / d;
   float fl = 0.92 + 0.08 * sin(uTime * 9.0 + aSeed * 50.0) * sin(uTime * 5.3 + aSeed * 20.0);
   vA = aBright * fl * (1.0 - smoothstep(30.0, 60.0, d));
-  float ws = min(uSize, 0.35 * d);
   gl_PointSize = clamp(ws * uPixelScale / d, 1.0, 1024.0);
   gl_Position = projectionMatrix * mv;
 }
@@ -103,19 +105,20 @@ void main() {
  */
 export const LANTERN_MIRROR_VERT = /* glsl */`
 attribute float aBright; attribute float aSeed;
-uniform float uPixelScale; uniform float uSize; uniform float uWaterLevel; uniform float uTime;
+uniform float uPixelScale; uniform float uSize; uniform float uWaterLevel; uniform float uTime; uniform float uPull;
 varying float vA;
 void main() {
   vec3 m = vec3(position.x, 2.0 * uWaterLevel - position.y, position.z);
   vec4 mv = modelViewMatrix * vec4(m, 1.0);
   float d = max(-mv.z, 0.05);
+  float ws = min(uSize, 0.35 * d);
   float camH = cameraPosition.y - uWaterLevel;
   float imgH = m.y - uWaterLevel;
   float f = clamp(camH / max(camH - imgH, 1e-3), 0.0, 1.0); // fraction of the ray at the water plane
-  mv.xyz *= max(f * 0.985, 0.02);
+  // sit just in front of the surface point, by more than the halo's radius (see LANTERN_GLOW_VERT)
+  mv.xyz *= max(f * d - (uPull + ws * 0.6), 0.12) / d;
   float fl = 0.92 + 0.08 * sin(uTime * 9.0 + aSeed * 50.0) * sin(uTime * 5.3 + aSeed * 20.0);
   vA = aBright * fl * (1.0 - smoothstep(30.0, 60.0, d));
-  float ws = min(uSize, 0.35 * d);
   gl_PointSize = clamp(ws * uPixelScale / d, 1.0, 1024.0);
   gl_Position = projectionMatrix * mv;
 }

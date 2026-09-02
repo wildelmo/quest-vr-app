@@ -1,65 +1,110 @@
 import * as THREE from 'three';
 
 /**
- * Audio engine scaffold. The context is created lazily on the first user gesture (unlock()).
- * Sub-systems (ambience, music, sfx) attach themselves through ctx.audio once it is running.
- * See src/audio/ambience.js, music.js, sfx.js.
+ * Audio engine.
+ *
+ * Lifecycle (matters on Quest): unlock() must be called synchronously inside the user's click — it creates
+ * the graph and calls resume() without awaiting anything, so the transient activation is still valid for
+ * requestSession(). load() decodes the sample buffers afterwards (after the XR session started) and then
+ * start()s the subsystems.
+ *
+ * Graph:  buses.bed / world / music / chimes  →  master  →  compressor  →  soft limiter  →  output
+ *         each bus also sends to a parallel convolution reverb (bed: none, world: light, music/chimes: full)
+ *
+ * Sub-systems (ambience, music, sfx) attach through add(); see src/audio/index.js.
  */
 export function createAudio(ctx) {
   const listener = new THREE.AudioListener();
   ctx.camera.add(listener);
   const api = {
-    listener, context: null, master: null, reverb: null, dry: null, wet: null, running: false,
+    listener, context: null, master: null, reverb: null, running: false, started: false, unlocked: false, loaded: false,
     buffers: {}, manifest: ctx.assets?.audio?.manifest || [], _noise: {},
-    subsystems: [],
-    async unlock() {
-      if (api.running) { try { await api.context.resume(); } catch { /* ignore */ } return; }
+    subsystems: [], buses: null, bus: null,
+    masterLevel: 0.9,
+
+    /** Synchronous: build the graph and kick resume(). Safe to call more than once. */
+    unlock() {
+      if (api.unlocked) { try { api.context.resume(); } catch { /* */ } return; }
+      api.unlocked = true;
       try {
-        const context = listener.context;
-        api.context = context;
-        api.master = context.createGain(); api.master.gain.value = 0.0;
-        api.comp = context.createDynamicsCompressor();
-        api.comp.threshold.value = -14; api.comp.knee.value = 18; api.comp.ratio.value = 3; api.comp.attack.value = 0.01; api.comp.release.value = 0.25;
-        api.master.connect(api.comp);
-        api.comp.connect(listener.getInput());
-        api.analyser = context.createAnalyser(); api.analyser.fftSize = 2048; api.analyser.smoothingTimeConstant = 0;
-        api.comp.connect(api.analyser);
+        const c = listener.context;
+        api.context = c;
+        // output chain
+        api.master = c.createGain(); api.master.gain.value = 0.0;
+        api.comp = c.createDynamicsCompressor();
+        api.comp.threshold.value = -12; api.comp.knee.value = 6; api.comp.ratio.value = 3.5; api.comp.attack.value = 0.005; api.comp.release.value = 0.25;
+        api.limiter = c.createWaveShaper(); api.limiter.curve = makeSoftClip(2.0); api.limiter.oversample = '2x';
+        api.master.connect(api.comp); api.comp.connect(api.limiter); api.limiter.connect(listener.getInput());
+        api.analyser = c.createAnalyser(); api.analyser.fftSize = 2048; api.analyser.smoothingTimeConstant = 0;
+        api.limiter.connect(api.analyser);
         api._ana = new Float32Array(api.analyser.fftSize);
-        // send/return reverb
-        api.reverb = context.createConvolver();
-        api.reverb.buffer = makeImpulse(context, 4.2, 2.6);
-        api.wet = context.createGain(); api.wet.gain.value = 0.32;
-        api.dry = context.createGain(); api.dry.gain.value = 1.0;
-        api.dry.connect(api.master);
-        api.wet.connect(api.reverb); api.reverb.connect(api.master);
-        api.bus = context.createGain(); api.bus.connect(api.dry); api.bus.connect(api.wet);
-        await context.resume();
-        api.running = context.state === 'running';
-        if (!api.running) {
-          const retry = () => { context.resume().then(() => { api.running = context.state === 'running'; if (api.running) { document.removeEventListener('pointerdown', retry); api.start(); } }); };
-          document.addEventListener('pointerdown', retry);
-        }
-        await decodeAll(api, ctx);
-        if (api.running) api.start();
+        // reverb as a parallel path
+        api.reverb = c.createConvolver();
+        api.reverb.buffer = makeImpulse(c, 4.5, 2.8);
+        api.reverbHP = c.createBiquadFilter(); api.reverbHP.type = 'highpass'; api.reverbHP.frequency.value = 120;
+        api.reverbReturn = c.createGain(); api.reverbReturn.gain.value = 0.45;
+        api.reverb.connect(api.reverbHP); api.reverbHP.connect(api.reverbReturn); api.reverbReturn.connect(api.master);
+        // layer buses with their own reverb sends
+        const mk = (level, send) => {
+          const g = c.createGain(); g.gain.value = level; g.connect(api.master);
+          const s = c.createGain(); s.gain.value = send; g.connect(s); s.connect(api.reverb);
+          g.send = s; return g;
+        };
+        api.buses = { bed: mk(1.0, 0.0), world: mk(1.0, 0.18), music: mk(1.0, 0.7), chimes: mk(1.0, 0.8) };
+        api.bus = api.buses.world; // default for anything that doesn't pick a layer
+        api.dry = api.master; api.wet = api.reverb;
+        const p = c.resume();
+        if (p && p.then) p.then(() => { api.running = c.state === 'running'; api.maybeStart(); }).catch(() => {});
+        api.running = c.state === 'running';
+        c.onstatechange = () => {
+          api.running = c.state === 'running';
+          if (c.state === 'suspended' && ctx.mode !== 'landing') c.resume().catch(() => {});
+        };
+        // if the browser refused (no gesture), try again on the next pointer/touch
+        const retry = () => { c.resume().then(() => { api.running = c.state === 'running'; if (api.running) { document.removeEventListener('pointerdown', retry); api.maybeStart(); } }).catch(() => {}); };
+        if (!api.running) document.addEventListener('pointerdown', retry);
       } catch (err) { console.warn('[audio] unlock failed', err); }
     },
+
+    /** Async: decode the sample buffers (wind first), then start the subsystems. */
+    async load() {
+      if (api.loaded || !api.context) return;
+      api.loaded = true;
+      const bytes = ctx.assets?.audio?.bytes || {};
+      const names = Object.keys(bytes).sort((a, b) => (a.startsWith('wind') ? -1 : b.startsWith('wind') ? 1 : 0));
+      for (const file of names) {
+        try { api.buffers[file.replace(/\.ogg$/, '')] = await api.context.decodeAudioData(bytes[file].slice(0)); }
+        catch (err) { console.warn('[audio] decode failed', file, err); }
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      api.decoded = true;
+      api.maybeStart();
+    },
+    maybeStart() { if (api.running && api.decoded && !api.started) api.start(); },
     start() {
       if (api.started) return; api.started = true;
       const t = api.context.currentTime;
-      api.master.gain.setValueAtTime(0, t); api.master.gain.linearRampToValueAtTime(api.masterLevel, t + 2.5);
+      api.master.gain.cancelScheduledValues(t);
+      api.master.gain.setValueAtTime(0, t); api.master.gain.linearRampToValueAtTime(api.masterLevel, t + 6);
       for (const s of api.subsystems) { try { s.start?.(api, ctx); } catch (e) { console.error('[audio] subsystem start failed', e); } }
       ctx.events.emit('audiostart');
+    },
+    fadeMaster(level, seconds) {
+      if (!api.master) return;
+      const t = api.context.currentTime;
+      api.master.gain.cancelScheduledValues(t);
+      api.master.gain.setTargetAtTime(level, t, Math.max(0.01, seconds / 3));
     },
     update(dt) {
       if (!api.started) return;
       for (const s of api.subsystems) { try { s.update?.(api, ctx, dt); } catch (e) { if (!s._err) { s._err = true; console.error('[audio] subsystem update failed', e); } } }
     },
     add(sub) { api.subsystems.push(sub); if (api.started) { try { sub.start?.(api, ctx); } catch (e) { console.error(e); } } return sub; },
-    // helpers used by subsystems
+
+    // ---- helpers used by subsystems
     buffer(name) { return api.buffers[name] || null; },
     now() { return api.context ? api.context.currentTime : 0; },
-    masterLevel: 0.9,
-    /** Loudness of what reaches the listener (post-compressor): { rms, peak, rmsDb, peakDb } over the last ~46 ms. */
+    /** Loudness of what reaches the listener (post-limiter): { rms, peak, rmsDb, peakDb } over the last ~46 ms. */
     stats() {
       if (!api.analyser) return { rms: 0, peak: 0, rmsDb: -Infinity, peakDb: -Infinity };
       const d = api._ana; api.analyser.getFloatTimeDomainData(d);
@@ -108,7 +153,7 @@ export function createAudio(ctx) {
       return buf;
     },
     /**
-     * A PositionalAudio routed like play(): input GainNode → panner → api.bus, added to ctx.scene so the panner
+     * A PositionalAudio routed like play(): input GainNode → panner → bus, added to ctx.scene so the panner
      * follows pa.position every frame. Equalpower panning unless hrtf is requested (keep HRTF for a few sources).
      * Returns the PositionalAudio with .input (connect your graph here) and .dispose().
      */
@@ -157,32 +202,41 @@ export function createAudio(ctx) {
       return { src, gain: g, node: null };
     },
   };
+
+  ctx.events.on('xrblur', () => api.fadeMaster(0, 0.1));
+  ctx.events.on('xrfocus', () => { if (api.context) api.context.resume().catch(() => {}); api.fadeMaster(api.masterLevel, 1.0); });
+  ctx.events.on('xrend', () => api.fadeMaster(api.masterLevel * 0.85, 0.3));
   return api;
 }
 
-async function decodeAll(api, ctx) {
-  const bytes = ctx.assets?.audio?.bytes || {};
-  const entries = Object.entries(bytes);
-  await Promise.all(entries.map(async ([file, ab]) => {
-    try { api.buffers[file.replace(/\.ogg$/, '')] = await api.context.decodeAudioData(ab.slice(0)); }
-    catch (err) { console.warn('[audio] decode failed', file, err); }
-  }));
+// tanh-style soft clip so stacked events never reach 0 dBFS
+function makeSoftClip(k) {
+  const n = 1024, curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; curve[i] = Math.tanh(k * x) / Math.tanh(k); }
+  return curve;
 }
 
-// Procedural stereo impulse response: decorrelated noise with exponential decay and a darkening tail.
+// Procedural stereo impulse response: decorrelated noise, exponential decay, a tail that darkens from
+// ~7 kHz to ~1.2 kHz, 30 ms pre-delay. Reads as open sky rather than a room.
 function makeImpulse(context, seconds, decay) {
   const rate = context.sampleRate;
   const len = Math.floor(rate * seconds);
+  const pre = Math.floor(rate * 0.03);
   const ir = context.createBuffer(2, len, rate);
+  let seed = 0x1234abcd;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   for (let ch = 0; ch < 2; ch++) {
     const d = ir.getChannelData(ch);
     let lp = 0;
-    for (let i = 0; i < len; i++) {
-      const t = i / len;
+    for (let i = pre; i < len; i++) {
+      const t = (i - pre) / (len - pre);
       const env = Math.pow(1 - t, decay);
-      const n = Math.random() * 2 - 1;
-      lp += (n - lp) * (0.35 - 0.3 * t); // progressively darker
-      d[i] = lp * env * (i < 400 ? i / 400 : 1);
+      const n = rnd() * 2 - 1;
+      const fc = 7000 * Math.pow(1200 / 7000, t); // darkening cutoff
+      const a = 1 - Math.exp(-2 * Math.PI * fc / rate);
+      lp += (n - lp) * a;
+      const ramp = i - pre < 200 ? (i - pre) / 200 : 1;
+      d[i] = lp * env * ramp;
     }
   }
   return ir;

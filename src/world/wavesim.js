@@ -28,7 +28,7 @@ export const wavesim = {
     const uniforms = {
       uPrev: { value: null },
       uTexel: { value: 1 / size },
-      uDamping: { value: 0.975 },
+      uDamping: { value: 0.965 }, // ripples die within ~0.8 s and travel ~0.6 m: light stays with the hand
       uSpeed: { value: 0.16 },
       uGlowDecay: { value: 0.985 },
       uDisturb: { value: disturb },
@@ -86,9 +86,42 @@ export const wavesim = {
     ctx.water.calm = 0;
     ctx.water.disturb = (x, z, radius, strength) => { if (queue.length < 64) queue.push({ x, z, radius, strength }); };
 
-    const state = { rtA, rtB, mat, simScene, simCam, queue, tile, cur, next };
+    const state = { rtA, rtB, mat, simScene, simCam, queue, tile, cur, next, size };
     this._s = state;
     this._headPrev = new THREE.Vector3();
+    // debugging aid: render the sim texture into an RGBA8 target and return pixels + stats
+    ctx.water.simSnapshot = () => this.snapshot(ctx);
+  },
+
+  snapshot(ctx) {
+    const s = this._s, { renderer } = ctx;
+    const size = 256;
+    if (!s.snapRT) {
+      s.snapRT = new THREE.WebGLRenderTarget(size, size, { type: THREE.UnsignedByteType, format: THREE.RGBAFormat, depthBuffer: false });
+      s.snapMat = new THREE.ShaderMaterial({
+        uniforms: { uTex: { value: null } },
+        vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+        fragmentShader: `uniform sampler2D uTex; varying vec2 vUv; void main(){ vec4 c = texture2D(uTex, vUv); gl_FragColor = vec4(clamp(c.r * 2.0 + 0.5, 0.0, 1.0), c.b, c.a, 1.0); }`,
+        depthTest: false, depthWrite: false,
+      });
+      s.snapQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), s.snapMat);
+      s.snapScene = new THREE.Scene(); s.snapScene.add(s.snapQuad);
+      s.snapPixels = new Uint8Array(size * size * 4);
+    }
+    s.snapMat.uniforms.uTex.value = s.cur.texture;
+    const xrWas = renderer.xr.enabled; renderer.xr.enabled = false;
+    renderer.setRenderTarget(s.snapRT); renderer.render(s.snapScene, s.simCam);
+    renderer.readRenderTargetPixels(s.snapRT, 0, 0, size, size, s.snapPixels);
+    renderer.setRenderTarget(null); renderer.xr.enabled = xrWas;
+    const px = s.snapPixels;
+    let maxH = 0, sumGlow = 0, glowAbove = 0, energyAbove = 0;
+    for (let i = 0; i < size * size; i++) {
+      const h = Math.abs(px[i * 4] / 255 - 0.5) * 0.5; if (h > maxH) maxH = h;
+      const g = px[i * 4 + 1] / 255, e = px[i * 4 + 2] / 255;
+      sumGlow += g; if (g > 0.3) glowAbove++; if (e > 0.3) energyAbove++;
+    }
+    const n = size * size;
+    return { size, maxH, meanGlow: sumGlow / n, glowFrac: glowAbove / n, energyFrac: energyAbove / n, pixels: Array.from(px) };
   },
 
   update(ctx, dt) {
@@ -133,7 +166,7 @@ export const wavesim = {
     s.queue.length = 0;
 
     const calm = ctx.water.calm || 0;
-    s.mat.uniforms.uDamping.value = 0.975 - calm * 0.03;
+    s.mat.uniforms.uDamping.value = 0.965 - calm * 0.03;
     s.mat.uniforms.uPrev.value = s.cur.texture;
 
     // The sim is tuned for one step per 72 Hz frame. Long frames (desktop at 30 fps, the test harness)

@@ -59,21 +59,25 @@ export const plankton = {
           p.y += 0.01 * sin(uTime * 0.7 + aSeed * 50.0);
           vec4 sim = texture2D(uSim, fract(p.xz / uTile));
           float energy = sim.b * 0.75 + sim.a * 1.3;
-          float twinkle = pow(0.5 + 0.5 * sin(uTime * (1.5 + aSeed * 3.0) + aSeed * 90.0), 8.0);
-          float base = 0.015 + 0.05 * twinkle * step(0.7, aSeed);
+          // no constant floor: thousands of dim points seen from 0.6 m would sum into a carpet.
+          // ~8% of the plankton twinkle on their own, briefly.
+          float twinkle = pow(0.5 + 0.5 * sin(uTime * (1.5 + aSeed * 3.0) + aSeed * 90.0), 12.0);
+          float base = 0.28 * twinkle * step(0.92, aSeed);
           float breathe = uCalm * 0.35 * (0.5 + 0.5 * sin(uTime * 0.8 + aSeed * 6.0 - length(p.xz - uPlayer.xz) * 1.5)) * (1.0 - smoothstep(1.5, 5.0, length(p.xz - uPlayer.xz)));
           float hand = 0.0;
-          for (int i = 0; i < 2; i++) { float d = distance(p, uHand[i]); hand += uHandOn[i] * (1.0 - smoothstep(0.05, 0.3, d)); }
+          // a small soft halo around a submerged hand (kept tight: it is seen from 0.5 m away)
+          for (int i = 0; i < 2; i++) { float d = distance(p, uHand[i]); float k = 1.0 - smoothstep(0.02, 0.17, d); hand += uHandOn[i] * k * k; }
           float depthFade = smoothstep(-0.9, -0.05, p.y - uLevel);
           // only a fraction of the plankton respond to a given amount of energy (speckle, not a carpet)
           float react = smoothstep(0.55 - energy * 0.5, 1.0, aSeed);
-          float b = (base + energy * 1.6 * react + breathe + hand * 0.8 * react) * (0.6 + 0.4 * aSeed) * depthFade;
+          float b = (base + energy * 1.6 * react + breathe + hand * 0.45 * react) * (0.6 + 0.4 * aSeed) * depthFade;
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           float dist = -mv.z;
           b *= 1.0 - smoothstep(6.0, 9.0, dist);
+          b *= smoothstep(0.15, 0.4, dist); // nothing huge right at the eyes
           vB = min(b, 1.3); vMix = aSeed;
           float size = (0.008 + 0.014 * aSeed + 0.015 * min(energy, 1.0)) * uPixelScale / max(dist, 0.1);
-          gl_PointSize = clamp(size, 0.0, 14.0);
+          gl_PointSize = clamp(size, 0.0, 10.0);
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: /* glsl */`

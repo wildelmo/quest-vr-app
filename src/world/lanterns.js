@@ -136,7 +136,7 @@ export const lanterns = {
       uSize: { value: 0.55 },
       uWaterLevel: { value: level },
       uTime: { value: 0 },
-      uPull: { value: 0.11 },
+      uPull: { value: 0.08 },
       uGain: { value: gain },
     });
     const glowMat = new THREE.ShaderMaterial({
@@ -164,7 +164,7 @@ export const lanterns = {
     const s = this._ = {
       ctx, rng, list, bodies, bodyMat, glowMat, mirrorMat, flameMat, pGeo, pPos, pBright, pFlame, seedArr, brightArr, heldArr, aSeed, aBright, aHeld,
       spawnTimer: SPAWN_INTERVAL,
-      tmp: { v: new THREE.Vector3(), v2: new THREE.Vector3(), q: new THREE.Quaternion(), q2: new THREE.Quaternion(), m: new THREE.Matrix4(), axis: new THREE.Vector3(), one: new THREE.Vector3(1, 1, 1) },
+      tmp: { v: new THREE.Vector3(), v2: new THREE.Vector3(), v3: new THREE.Vector3(), a0: new THREE.Vector3(), q: new THREE.Quaternion(), q2: new THREE.Quaternion(), m: new THREE.Matrix4(), axis: new THREE.Vector3(), one: new THREE.Vector3(1, 1, 1) },
     };
 
     const rigPos = () => ctx.player.position;
@@ -320,6 +320,7 @@ export const lanterns = {
 
       if (L.state === 'held' || L.state === 'rising') {
         const A = L.anchor;
+        const A0 = tmp.a0.copy(A);
         let bilateral = false, len = STRING;
         if (L.state === 'held') {
           const hand = L.held;
@@ -347,7 +348,7 @@ export const lanterns = {
           if (!L.energyFired && P.y - level > ENERGY_ALT) { L.energyFired = true; ctx.energy = 1 - (1 - ctx.energy) * 0.65; }
           if (tau >= RISE_TOTAL) { s.becomeStar(L); continue; }
         }
-        stepPendulum(L, A, dt, bilateral, len, level, tmp);
+        stepPendulum(L, A0, A, dt, bilateral, len, level, tmp);
         // body axis follows the string when it hangs taut from above; when the string is slack or pulls
         // from below (a buoyant lantern held under the hand) it rights itself instead of flipping over
         tmp.v.subVectors(A, L.top);
@@ -480,25 +481,30 @@ export const lanterns = {
 };
 
 /**
- * Position-based pendulum step for the lantern's top (the bob) on a string from anchor A.
+ * Position-based pendulum step for the lantern's top (the bob) on a string whose anchor moved from
+ * A0 to A during this frame (interpolated over the substeps so a fast anchor never jumps past the bob).
  * Gravity + damping (3/s in air, 10/s in water) + buoyancy when the body is pushed under; the string
  * is a rope (only pulls) unless `bilateral`, which is used while it eases onto the string after a grab.
  */
-function stepPendulum(L, A, dt, bilateral, len, level, tmp) {
+function stepPendulum(L, A0, A, dt, bilateral, len, level, tmp) {
   const P = L.top, V = L.bobVel;
-  const n = dt > 0.03 ? 2 : 1, h = dt / n;
+  const move = A.distanceTo(A0);
+  const n = Math.min(8, Math.max(1, Math.ceil(Math.max(dt / 0.025, move / 0.04))));
+  const h = dt / n;
+  const Ak = tmp.v3;
   for (let k = 0; k < n; k++) {
+    Ak.lerpVectors(A0, A, (k + 1) / n);
     const bottom = P.y - H;
     let ay = -GRAVITY, damp = 3;
     if (bottom < level) { const depth = Math.min(1, (level - bottom) / (H * 0.6)); ay += GRAVITY * (0.6 + 1.2 * depth); damp = 10; }
     V.y += ay * h;
     V.multiplyScalar(Math.exp(-damp * h));
     tmp.v.copy(P).addScaledVector(V, h);
-    tmp.v2.subVectors(tmp.v, A);
+    tmp.v2.subVectors(tmp.v, Ak);
     const d = tmp.v2.length();
-    if (d > 1e-5 && (bilateral || d > len)) { tmp.v2.multiplyScalar(len / d); tmp.v.copy(A).add(tmp.v2); }
+    if (d > 1e-5 && (bilateral || d > len)) { tmp.v2.multiplyScalar(len / d); tmp.v.copy(Ak).add(tmp.v2); }
     V.subVectors(tmp.v, P).divideScalar(h);
-    const sp = V.length(); if (sp > 6) V.multiplyScalar(6 / sp);
+    const sp = V.length(); if (sp > 12) V.multiplyScalar(12 / sp);
     P.copy(tmp.v);
   }
 }

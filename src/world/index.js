@@ -8,5 +8,8 @@ import { plankton } from './plankton.js';
 import { hints } from './hints.js';
 import { shore } from './shore.js';
 import { mist } from './mist.js';
+import { lotus } from './lotus.js';
+import { lanterns } from './lanterns.js';
+import { fireflies } from './fireflies.js';
 
-export const WORLD_MODULES = [wavesim, water, sky, aurora, plankton, shore, mist, hints];
+export const WORLD_MODULES = [wavesim, water, sky, aurora, plankton, shore, mist, lotus, lanterns, fireflies, hints];

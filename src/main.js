@@ -6,6 +6,7 @@ import { createXR } from './core/xr.js';
 import { createPlayer } from './core/player.js';
 import { createHands } from './core/hands.js';
 import { createAudio } from './audio/engine.js';
+import { registerAudio } from './audio/index.js';
 import { WORLD_MODULES } from './world/index.js';
 
 const params = new URLSearchParams(location.search);
@@ -79,6 +80,7 @@ async function boot() {
   });
 
   ctx.audio = createAudio(ctx);
+  try { registerAudio(ctx); } catch (err) { showError(`[audio] register failed: ${err?.stack || err}`); }
   ctx.hands = createHands(ctx);
   ctx.playerCtl = createPlayer(ctx);
   ctx.xr = createXR(ctx);
@@ -150,6 +152,8 @@ async function boot() {
     look: (yaw, pitch) => ctx.playerCtl.look(yaw, pitch),
     setHand: (h) => ctx.hands.setDesktopHand(h),
     setTime: (s) => { ctx.time.t = s; ctx.events.emit('timejump', { t: s }); },
+    simSnapshot: () => ctx.water.simSnapshot?.(),
+    audioStats: () => ctx.audio?.stats?.(),
     stats: () => ({
       frame: ctx.time.frame, t: ctx.time.t, fps: ctx.fps,
       drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, points: renderer.info.render.points,
@@ -157,6 +161,8 @@ async function boot() {
       xr: renderer.xr.isPresenting, mode: ctx.mode, energy: ctx.energy, errors: ctx.errors.slice(),
       hands: { left: ctx.hands.left.visible, right: ctx.hands.right.visible, pinchL: ctx.hands.left.pinch.active, pinchR: ctx.hands.right.pinch.active, submergedR: ctx.hands.right.submerged, debug: ctx.hands.debugInfo?.() },
       calibrated: ctx.playerCtl.state.calibrated, seated: ctx.playerCtl.state.seated, calm: ctx.calm,
+      moonAltitudeDeg: ctx.sky?.moonAltitudeDeg, lanternStars: ctx.sky?.lanternStarCount?.(), aurora: ctx.aurora?.intensity,
+      lanterns: ctx.lanterns?.count, fireflies: ctx.fireflies?.count, fireflyLanded: ctx.fireflies?.landedCount, lotusOpen: ctx.lotus?.flowers?.filter((f) => f.open).length,
       player: { x: player.position.x, y: player.position.y, z: player.position.z },
       water: ctx.water.level,
     }),
@@ -166,14 +172,16 @@ async function boot() {
   if (HARNESS) enterDesktop(true);
 
   async function enterXR() {
-    await ctx.audio.unlock();
+    ctx.audio.unlock();           // synchronous, inside the click: keeps the transient activation for requestSession
     await ctx.xr.start();
+    ctx.audio.load().catch((e) => console.warn('[audio] load failed', e));
   }
   function enterDesktop(quiet) {
     ctx.mode = 'desktop';
     ui.landing?.classList.add('hidden');
     if (!quiet) { ui.hud?.classList.add('show'); setTimeout(() => ui.hud?.classList.remove('show'), 12000); }
-    ctx.audio.unlock().catch(() => {});
+    ctx.audio.unlock();
+    ctx.audio.load().catch((e) => console.warn('[audio] load failed', e));
     ctx.playerCtl.enableDesktop();
     ctx.hands.enableDesktop();
     ctx.events.emit('desktopstart');
