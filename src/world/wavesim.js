@@ -28,9 +28,9 @@ export const wavesim = {
     const uniforms = {
       uPrev: { value: null },
       uTexel: { value: 1 / size },
-      uDamping: { value: 0.965 }, // ripples die within ~0.8 s and travel ~0.6 m: light stays with the hand
+      uDamping: { value: 0.945 }, // ripples die within ~0.5 s and travel ~0.4 m: light stays with the hand
       uSpeed: { value: 0.16 },
-      uGlowDecay: { value: 0.985 },
+      uGlowDecay: { value: 0.975 },
       uDisturb: { value: disturb },
       uCount: { value: 0 },
     };
@@ -62,7 +62,7 @@ export const wavesim = {
           hn *= 0.999; // tiny leak so the tile settles to flat
           // heights are ~centimetres: a hand sweep makes ~0.1–0.3, ripples fade to ~0.01.
           // Energy favours motion over displacement so trails follow the hand instead of blooming outward.
-          float energy = smoothstep(0.05, 0.42, abs(hn) * 0.6 + abs(hn - h) * 6.0);
+          float energy = smoothstep(0.10, 0.75, abs(hn) * 0.5 + abs(hn - h) * 6.0);
           glow = max(glow * uGlowDecay, energy);
           gl_FragColor = vec4(hn, h, glow, energy);
         }`,
@@ -137,10 +137,11 @@ export const wavesim = {
       if (n >= MAX_DISTURB) return;
       disturb[n * 4] = ((x / tile) % 1 + 1) % 1;
       disturb[n * 4 + 1] = ((z / tile) % 1 + 1) % 1;
-      disturb[n * 4 + 2] = Math.max(radius, 0.02) / tile;
+      disturb[n * 4 + 2] = THREE.MathUtils.clamp(radius, 0.02, 0.6) / tile;
       disturb[n * 4 + 3] = strength;
       n++;
     };
+    ctx.water.lastDisturb = disturb; // debugging aid (read via the harness)
     // hands
     for (const h of ctx.hands.list) {
       if (!h.visible || !h.submerged) continue;
@@ -166,7 +167,7 @@ export const wavesim = {
     s.queue.length = 0;
 
     const calm = ctx.water.calm || 0;
-    s.mat.uniforms.uDamping.value = 0.965 - calm * 0.03;
+    s.mat.uniforms.uDamping.value = 0.945 - calm * 0.03;
     s.mat.uniforms.uPrev.value = s.cur.texture;
 
     // The sim is tuned for one step per 72 Hz frame. Long frames (desktop at 30 fps, the test harness)

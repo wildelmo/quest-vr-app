@@ -333,6 +333,8 @@ export const sky = {
     rebuildLanternStars();
     ctx.events.on('lanternstar', (e) => { if (e?.dir) ctx.sky.addLanternStar(e.dir); });
     ctx.sky.lanternStarCount = () => lanternList.length;
+    // after moonset the sky goes darker and, for a minute and a half, meteors come more often
+    ctx.events.on('moonset', () => { this._.showerUntil = ctx.time.t + 90; });
 
     let moonWasUp = true;
     this._ = {
@@ -392,8 +394,9 @@ export const sky = {
       if (s.lmag[i] !== m) { s.lmag[i] = m; dirty = true; }
     }
     if (dirty) s.lGeo.attributes.aMag.needsUpdate = true;
-    // meteors: one every ~2–3 minutes at rest, more when the sky is active
-    s.nextMeteor -= dt * (1 + ctx.energy * 3 + (ctx.sky.meteorShower || 0) * 8);
+    // meteors: one every ~2–3 minutes at rest, more when the sky is active, a shower after moonset
+    ctx.sky.meteorShower = s.showerUntil ? THREE.MathUtils.clamp((s.showerUntil - t) / 30, 0, 1) : 0;
+    s.nextMeteor -= dt * (1 + ctx.energy * 3 + ctx.sky.meteorShower * 10);
     if (s.nextMeteor <= 0) { this.spawnMeteor(ctx); s.nextMeteor = 90 + s.mrnd() * 90; }
     for (let i = 0; i < s.meteorPool.length; i++) {
       const m = s.meteorPool[i];

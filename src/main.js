@@ -29,7 +29,7 @@ const ctx = {
   time: { t: 0, dt: 0, frame: 0, now: 0 },
   water: { level: CONFIG.water.level, tileSize: CONFIG.water.tileSize, simTexture: null, swell: null },
   hands: null, energy: 0, events: new Events(), audio: null, assets: null, grabbables: [],
-  quality: detectQuality(), harness: HARNESS, xr: null, errors: [],
+  quality: detectQuality(), harness: HARNESS, debug: params.has('debug'), xr: null, errors: [],
   mode: 'landing', // 'landing' | 'desktop' | 'xr'
 };
 window.__nocturneCtx = ctx;
@@ -81,6 +81,19 @@ async function boot() {
 
   ctx.audio = createAudio(ctx);
   try { registerAudio(ctx); } catch (err) { showError(`[audio] register failed: ${err?.stack || err}`); }
+  // event log for the harness / debugging
+  ctx.eventLog = [];
+  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'starborn', 'lotusbloom', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart']) {
+    ctx.events.on(type, (e) => { if (ctx.eventLog.length < 500) ctx.eventLog.push({ type, t: +ctx.time.t.toFixed(2), detail: summarize(e) }); });
+  }
+  function summarize(e) {
+    if (!e || typeof e !== 'object') return null;
+    const o = {};
+    for (const k of ['index', 'note', 'grabbed', 'kind', 'lost', 'released', 'seated', 'eyeHeight', 'hasHands', 'count', 'speed']) if (k in e) o[k] = e[k];
+    if (e.hand?.handedness) o.hand = e.hand.handedness;
+    if (e.pos?.x !== undefined) o.pos = [+e.pos.x.toFixed(2), +e.pos.y.toFixed(2), +e.pos.z.toFixed(2)];
+    return o;
+  }
   ctx.hands = createHands(ctx);
   ctx.playerCtl = createPlayer(ctx);
   ctx.xr = createXR(ctx);
@@ -115,8 +128,20 @@ async function boot() {
   }
   ui.desktop?.addEventListener('click', () => enterDesktop());
 
-  ctx.events.on('xrstart', () => { ctx.mode = 'xr'; ui.landing?.classList.add('hidden'); ui.hud?.classList.remove('show'); });
-  ctx.events.on('xrend', () => { if (ctx.mode === 'xr') enterDesktop(); });
+  let sessionStartT = 0;
+  ctx.events.on('xrstart', () => { ctx.mode = 'xr'; sessionStartT = ctx.time.t; ui.landing?.classList.add('hidden'); ui.hud?.classList.remove('show'); });
+  ctx.events.on('xrend', () => {
+    if (ctx.mode !== 'xr') return;
+    // back on the landing page: a small note about the night that was
+    const minutes = Math.max(1, Math.round((ctx.time.t - sessionStartT) / 60));
+    const stars = ctx.sky?.lanternStarCount?.() || 0;
+    if (ui.status) ui.status.textContent = `You spent ${minutes} minute${minutes === 1 ? '' : 's'} on the water` + (stars ? ` and left ${stars} star${stars === 1 ? '' : 's'} in the sky.` : '.');
+    if (ui.enter) ui.enter.textContent = 'Return to the water';
+    ctx.mode = 'landing';
+    ui.landing?.classList.remove('hidden');
+    ctx.playerCtl.enableDesktop();
+    ctx.hands.enableDesktop();
+  });
 
   // ---- loop
   let last = performance.now();
@@ -154,6 +179,13 @@ async function boot() {
     setTime: (s) => { ctx.time.t = s; ctx.events.emit('timejump', { t: s }); },
     simSnapshot: () => ctx.water.simSnapshot?.(),
     audioStats: () => ctx.audio?.stats?.(),
+    events: () => ctx.eventLog.slice(),
+    world: () => ({
+      lanterns: (ctx.lanterns?.list || []).map((l) => ({ x: +l.position.x.toFixed(2), y: +l.position.y.toFixed(2), z: +l.position.z.toFixed(2), state: l.state })),
+      lotus: (ctx.lotus?.flowers || []).map((f) => ({ x: +f.position.x.toFixed(2), y: +f.position.y.toFixed(2), z: +f.position.z.toFixed(2), bloom: +(f.bloom || 0).toFixed(2), open: !!f.open })),
+      rig: { x: player.position.x, y: player.position.y, z: player.position.z, ry: player.rotation.y },
+      head: ctx.playerCtl.state.headWorld.toArray().map((v) => +v.toFixed(3)),
+    }),
     stats: () => ({
       frame: ctx.time.frame, t: ctx.time.t, fps: ctx.fps,
       drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, points: renderer.info.render.points,

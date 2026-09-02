@@ -66,11 +66,11 @@ export const plankton = {
           float breathe = uCalm * 0.35 * (0.5 + 0.5 * sin(uTime * 0.8 + aSeed * 6.0 - length(p.xz - uPlayer.xz) * 1.5)) * (1.0 - smoothstep(1.5, 5.0, length(p.xz - uPlayer.xz)));
           float hand = 0.0;
           // a small soft halo around a submerged hand (kept tight: it is seen from 0.5 m away)
-          for (int i = 0; i < 2; i++) { float d = distance(p, uHand[i]); float k = 1.0 - smoothstep(0.02, 0.17, d); hand += uHandOn[i] * k * k; }
+          for (int i = 0; i < 2; i++) { float d = distance(p, uHand[i]); float k = 1.0 - smoothstep(0.02, 0.15, d); hand += uHandOn[i] * k * k * k; }
           float depthFade = smoothstep(-0.9, -0.05, p.y - uLevel);
           // only a fraction of the plankton respond to a given amount of energy (speckle, not a carpet)
           float react = smoothstep(0.55 - energy * 0.5, 1.0, aSeed);
-          float b = (base + energy * 1.6 * react + breathe + hand * 0.45 * react) * (0.6 + 0.4 * aSeed) * depthFade;
+          float b = (base + energy * 1.6 * react + breathe + hand * 0.14 * react) * (0.6 + 0.4 * aSeed) * depthFade;
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           float dist = -mv.z;
           b *= 1.0 - smoothstep(6.0, 9.0, dist);

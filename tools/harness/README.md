@@ -219,3 +219,10 @@ Inside a Playwright test you can also drive it directly:
   comes from `fake-xr.js`; do not use it to validate browser API conformance.
 - Screenshots capture the page, not the compositor's view of a headset: the
   canvas shows the side-by-side `XRWebGLLayer` framebuffer plus any HTML overlay.
+
+## Wave-simulation probe
+
+`node tools/harness/sim-probe.mjs [--frames N] [--out dir]` runs the desktop mode, sweeps the virtual
+hand through the water for N rendered frames, and writes `sim.png` (R = height, G = afterglow,
+B = energy of the sim tile) plus `view.png` and prints tile statistics. Useful when tuning
+`src/world/wavesim.js` — the numbers tell you whether glow is local to the hand or spreading.

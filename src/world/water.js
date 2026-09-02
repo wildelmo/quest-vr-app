@@ -38,6 +38,7 @@ export const water = {
       uPlayer: { value: new THREE.Vector3() },
       uCalm: { value: 0 },
       uAurora: { value: new THREE.Color(0x000000) },
+      uDebug: { value: 0 },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms,
@@ -51,7 +52,7 @@ export const water = {
       fragmentShader: /* glsl */`
         precision highp float;
         uniform sampler2D uNormals, uSim, uNoise, uSky;
-        uniform mat3 uSkyInv; uniform float uSkyExposure, uTime, uTile, uSimTexel, uAlpha, uMoonStrength, uFogDensity, uCalm;
+        uniform mat3 uSkyInv; uniform float uSkyExposure, uTime, uTile, uSimTexel, uAlpha, uMoonStrength, uFogDensity, uCalm, uDebug;
         uniform vec3 uDeep, uPlankton, uPlankton2, uMoonDir, uMoonColor, uFogColor, uPlayer, uAurora;
         varying vec3 vWorld;
         ${GLSL_GAL_UV}
@@ -102,13 +103,16 @@ export const water = {
           float dens = texture2D(uNoise, p * 0.35).r;
           float dens2 = texture2D(uNoise, p * 1.7 + vec2(t * 0.01)).g;
           float speck = dens * 0.6 + dens2 * 0.4;
-          float bio = (sim.b * 0.45 + sim.a * 0.9) * (0.25 + 0.75 * speck) * simFade;
+          float bio = (sim.b * 0.5 + sim.a * 0.8) * (0.2 + 0.8 * speck) * simFade;
+          bio = pow(bio, 1.6); // mid values stay dim: light concentrates where the water actually moves
           bio += uCalm * 0.05 * (0.5 + 0.5 * sin(t * 0.8 + dPlayer * 2.0)) * (1.0 - smoothstep(1.5, 4.5, dPlayer)) * speck;
-          col += mix(uPlankton, uPlankton2, dens2) * bio * 0.9;
+          col += mix(uPlankton, uPlankton2, dens2) * bio * 0.7;
           // --- fog
           float fog = fogExp2(dist, uFogDensity);
           col = mix(col, uFogColor, fog);
           float alpha = mix(uAlpha, 1.0, max(F, fog));
+          if (uDebug > 0.5) { col = vec3(sim.a, sim.b, simFade * 0.3); alpha = 1.0; }
+          if (uDebug > 1.5) { col = vec3(bio, 0.0, 0.0); alpha = 1.0; }
           gl_FragColor = vec4(col, alpha);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>

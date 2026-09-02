@@ -15,6 +15,7 @@ const HINTS = [
   { id: 'lotus', text: 'the buds open when you touch them', after: 130, done: (ctx, s) => s.bloomed, ready: (ctx, s) => s.touchedWater && nearestLotus(ctx) < 1.6 },
 ];
 const SHOW_HANDS = { id: 'hands', text: 'show your hands to the headset', repeat: true };
+const NO_TRACKING = { id: 'notracking', text: 'turn on hand tracking · settings → movement tracking', repeat: true };
 
 function nearestLantern(ctx) {
   const l = ctx.lanterns?.list; if (!l || !l.length) return Infinity;
@@ -51,7 +52,7 @@ export const hints = {
     ctx.events.on('grab', () => { s.grabbed = true; });
     ctx.events.on('fireflyland', () => { s.fireflyLanded = true; });
     ctx.events.on('lotusbloom', () => { s.bloomed = true; });
-    ctx.events.on('xrstart', () => { s.sessionStart = ctx.time.t; });
+    ctx.events.on('xrstart', (e) => { s.sessionStart = ctx.time.t; s.noTracking = e && e.hasHands === false; s.handsSeen = false; });
     ctx.events.on('desktopstart', () => { s.sessionStart = ctx.time.t; });
 
     const learned = ctx.harness ? {} : loadLearned();
@@ -89,7 +90,8 @@ export const hints = {
 
     // choose what to show
     let want = null;
-    if (presenting && s.handsLostSince >= 0 && t - s.handsLostSince > 8) want = SHOW_HANDS;
+    if (presenting && !s.handsSeen && (s.noTracking || elapsed > 12)) want = NO_TRACKING;
+    else if (presenting && s.handsLostSince >= 0 && t - s.handsLostSince > 8) want = SHOW_HANDS;
     else if (t > st.cooldownUntil) {
       for (const h of HINTS) {
         if (learned[h.id] || h.done(ctx, s) || elapsed < h.after) continue;
@@ -97,10 +99,10 @@ export const hints = {
         want = h; break;
       }
     }
-    if (st.current && st.current !== SHOW_HANDS) {
+    if (st.current && !st.current.repeat) {
       const h = st.current;
       if (h.done(ctx, s) || t - st.shownAt > 14) { learned[h.id] = true; if (!ctx.harness) saveLearned(learned); st.current = null; st.cooldownUntil = t + 20; }
-    } else if (st.current === SHOW_HANDS && want !== SHOW_HANDS) st.current = null;
+    } else if (st.current && st.current.repeat && want !== st.current) st.current = null;
     if (!st.current && want && want !== st.current) { st.current = want; st.shownAt = t; draw(want.text); }
 
     st.target = st.current ? 1 : 0;
