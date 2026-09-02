@@ -1,14 +1,17 @@
 import * as THREE from 'three';
+import { AUDIO_USED } from '../audio/index.js';
 
 // Asset manifest. Paths are relative to index.html so the site works under a sub-path (GitHub Pages).
 const TEXTURES = {
   panorama4k: { url: 'assets/sky/milkyway_4k.jpg', srgb: true, mips: true, tier: '4k' },
   panorama2k: { url: 'assets/sky/milkyway_2k.jpg', srgb: true, mips: true, tier: '2k' },
   moon: { url: 'assets/textures/moon_1024.jpg', srgb: true, mips: true },
-  waterNormals: { url: 'assets/textures/waternormals.jpg', srgb: false, mips: true, repeat: true },
-  noise: { url: 'assets/textures/noise.png', srgb: false, mips: true, repeat: true },
-  caustic: { url: 'assets/textures/caustic.jpg', srgb: false, mips: true, repeat: true },
-  paper: { url: 'assets/textures/paper.png', srgb: false, mips: true, repeat: true },
+  // aniso 1 on the detail maps: their contribution is already band-limited with distance, and anisotropic
+  // taps at grazing angles are the most expensive fetches on a tiled GPU
+  waterNormals: { url: 'assets/textures/waternormals.jpg', srgb: false, mips: true, repeat: true, aniso: 1 },
+  noise: { url: 'assets/textures/noise.png', srgb: false, mips: true, repeat: true, aniso: 1 },
+  caustic: { url: 'assets/textures/caustic.jpg', srgb: false, mips: true, repeat: true, aniso: 1 },
+  paper: { url: 'assets/textures/paper.png', srgb: false, mips: true, repeat: true, aniso: 1 },
   glowSoft: { url: 'assets/textures/glow_soft.png', srgb: false, mips: true },
   glowFirefly: { url: 'assets/textures/glow_firefly.png', srgb: false, mips: true },
   spark: { url: 'assets/textures/spark1.png', srgb: true, mips: true },
@@ -48,7 +51,7 @@ export async function loadAssets(ctx, onProgress = () => {}) {
       t.minFilter = d.mips ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
       t.magFilter = THREE.LinearFilter;
       if (d.repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
-      t.anisotropy = Math.min(quality.anisotropy, ctx.renderer.capabilities.getMaxAnisotropy());
+      t.anisotropy = Math.min(d.aniso ?? quality.anisotropy, ctx.renderer.capabilities.getMaxAnisotropy());
       assets.tex[key] = t;
       tick(key); resolve(t);
     }, undefined, (err) => {
@@ -79,7 +82,7 @@ export async function loadAssets(ctx, onProgress = () => {}) {
 
   jobs.push((async () => {
     try {
-      const manifest = await fetchJSON(DATA.audioManifest);
+      const manifest = (await fetchJSON(DATA.audioManifest)).filter((item) => AUDIO_USED.has(String(item.file).replace(/\.ogg$/, '')));
       assets.audio.manifest = manifest;
       await Promise.all(manifest.map(async (item) => {
         try { assets.audio.bytes[item.file] = await fetchBin('assets/audio/' + item.file); }

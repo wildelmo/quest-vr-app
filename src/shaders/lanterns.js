@@ -73,62 +73,66 @@ void main() {
 `;
 
 /**
- * Glow sprites (THREE.Points). Positions are the lantern centres. The point is pulled toward the
- * eye along its view ray (uPull metres) so the opaque body does not depth-clip the sprite; its
- * world size is clamped to 0.35 x distance so a lantern at the face does not flood the view.
- * Far glows fade out (30..60 m) so arrivals emerge from the murk and ascents vanish into it.
+ * Glow halos: instanced billboard quads (not point sprites — GLES drops a point primitive entirely when its
+ * centre leaves one eye's clip volume, so big halos would pop per eye at the edge of view; quads clip per
+ * vertex). aCenter is the lantern centre; the unit quad (position.xy in ±0.5) is offset in VIEW space so it
+ * faces each eye. The centre is pulled toward the eye along its view ray (uPull metres) so the opaque body
+ * does not depth-clip the halo, and the quad is scaled by the same factor so its angular size is unchanged.
+ * World size is clamped to 0.35 x distance so a lantern at the face does not flood the view. Far glows
+ * fade out (30..60 m) so arrivals emerge from the murk and ascents vanish into it.
  */
 export const LANTERN_GLOW_VERT = /* glsl */`
-attribute float aBright; attribute float aSeed;
-uniform float uPixelScale; uniform float uSize; uniform float uWaterLevel; uniform float uTime; uniform float uPull;
-varying float vA;
+attribute vec3 aCenter; attribute float aBright; attribute float aSeed;
+uniform float uSize; uniform float uWaterLevel; uniform float uTime; uniform float uPull;
+varying float vA; varying vec2 vUv;
 void main() {
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vec4 mv = viewMatrix * vec4(aCenter, 1.0);
   float d = max(-mv.z, 0.05);
   float ws = min(uSize, 0.35 * d);
-  // a point sprite has one depth: slide it toward the eye by more than its own radius so the water in
-  // front of the lantern's base (seen from above) cannot clip the lower half of the halo
-  mv.xyz *= max(d - (uPull + ws * 0.6), 0.12) / d;
+  float k = max(d - (uPull + ws * 0.6), 0.12) / d;
+  mv.xyz *= k;
+  mv.xy += position.xy * ws * k;
   float fl = 0.92 + 0.08 * sin(uTime * 9.0 + aSeed * 50.0) * sin(uTime * 5.3 + aSeed * 20.0);
   vA = aBright * fl * (1.0 - smoothstep(30.0, 60.0, d));
-  gl_PointSize = clamp(ws * uPixelScale / d, 1.0, 1024.0);
+  vUv = uv;
   gl_Position = projectionMatrix * mv;
 }
 `;
 
 /**
  * Mirrored glow: the virtual image of the glow below the water plane, sized by its distance, but the
- * sprite is slid along the view ray to just in front of the point where that ray meets the surface.
+ * quad is slid along the view ray to just in front of the point where that ray meets the surface.
  * Drawn after the water (renderOrder 3, depth-tested) it reads as a reflection on the surface instead
  * of being swallowed by the water's alpha, and anything between the eye and that surface point still
  * occludes it. When the eye is below the surface the mirror image is above it and the same math holds.
  */
 export const LANTERN_MIRROR_VERT = /* glsl */`
-attribute float aBright; attribute float aSeed;
-uniform float uPixelScale; uniform float uSize; uniform float uWaterLevel; uniform float uTime; uniform float uPull;
-varying float vA;
+attribute vec3 aCenter; attribute float aBright; attribute float aSeed;
+uniform float uSize; uniform float uWaterLevel; uniform float uTime; uniform float uPull;
+varying float vA; varying vec2 vUv;
 void main() {
-  vec3 m = vec3(position.x, 2.0 * uWaterLevel - position.y, position.z);
-  vec4 mv = modelViewMatrix * vec4(m, 1.0);
+  vec3 m = vec3(aCenter.x, 2.0 * uWaterLevel - aCenter.y, aCenter.z);
+  vec4 mv = viewMatrix * vec4(m, 1.0);
   float d = max(-mv.z, 0.05);
   float ws = min(uSize, 0.35 * d);
   float camH = cameraPosition.y - uWaterLevel;
   float imgH = m.y - uWaterLevel;
   float f = clamp(camH / max(camH - imgH, 1e-3), 0.0, 1.0); // fraction of the ray at the water plane
-  // sit just in front of the surface point, by more than the halo's radius (see LANTERN_GLOW_VERT)
-  mv.xyz *= max(f * d - (uPull + ws * 0.6), 0.12) / d;
+  float k = max(f * d - (uPull + ws * 0.6), 0.12) / d;
+  mv.xyz *= k;
+  mv.xy += position.xy * ws * k;
   float fl = 0.92 + 0.08 * sin(uTime * 9.0 + aSeed * 50.0) * sin(uTime * 5.3 + aSeed * 20.0);
   vA = aBright * fl * (1.0 - smoothstep(30.0, 60.0, d));
-  gl_PointSize = clamp(ws * uPixelScale / d, 1.0, 1024.0);
+  vUv = uv;
   gl_Position = projectionMatrix * mv;
 }
 `;
 
 export const LANTERN_GLOW_FRAG = /* glsl */`
 uniform sampler2D uMap; uniform vec3 uColor; uniform vec3 uColorHot; uniform float uGain;
-varying float vA;
+varying float vA; varying vec2 vUv;
 void main() {
-  float a = texture2D(uMap, gl_PointCoord).a;
+  float a = texture2D(uMap, vUv).a;
   vec3 c = mix(uColor, uColorHot, 0.35 * a) * (a * a * 1.1 + a * 0.45) * vA * uGain;
   gl_FragColor = vec4(c, 1.0);
   #include <tonemapping_fragment>
@@ -138,30 +142,33 @@ void main() {
 
 /** The flame itself: a 3 cm hot dot at the candle (5 cm below the centre), flickering. aFlame = extra gain. */
 export const LANTERN_FLAME_VERT = /* glsl */`
-attribute float aBright; attribute float aSeed; attribute float aFlame;
-uniform float uPixelScale; uniform float uTime; uniform float uPull;
-varying float vA; varying float vHot;
+attribute vec3 aCenter; attribute float aBright; attribute float aSeed; attribute float aFlame;
+uniform float uTime; uniform float uPull;
+varying float vA; varying float vHot; varying vec2 vUv;
 ${GLSL_HASH}
 ${GLSL_NOISE}
 void main() {
-  vec3 p = position + vec3(0.0, -0.05, 0.0);
-  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vec3 p = aCenter + vec3(0.0, -0.05, 0.0);
+  vec4 mv = viewMatrix * vec4(p, 1.0);
   float d = max(-mv.z, 0.05);
-  mv.xyz *= max(d - uPull, 0.02) / d;
+  float k = max(d - uPull, 0.02) / d;
   float n = vnoise(vec2(uTime * 7.0 + aSeed * 113.0, aSeed * 41.0));
   float fl = 0.8 + 0.2 * n;
+  float ws = 0.03 * (0.85 + 0.3 * n) * aFlame;
+  mv.xyz *= k;
+  mv.xy += position.xy * ws * k;
   vA = (0.25 + 0.75 * aBright) * fl * aFlame * (1.0 - smoothstep(30.0, 60.0, d));
   vHot = n;
-  gl_PointSize = clamp(0.03 * (0.85 + 0.3 * n) * aFlame * uPixelScale / d, 1.0, 256.0);
+  vUv = uv;
   gl_Position = projectionMatrix * mv;
 }
 `;
 
 export const LANTERN_FLAME_FRAG = /* glsl */`
 uniform sampler2D uMap;
-varying float vA; varying float vHot;
+varying float vA; varying float vHot; varying vec2 vUv;
 void main() {
-  float a = texture2D(uMap, gl_PointCoord).a;
+  float a = texture2D(uMap, vUv).a;
   vec3 hot = vec3(1.0, 0.93, 0.78);
   vec3 orange = vec3(1.0, 0.48, 0.12);
   vec3 c = mix(orange, hot, a * a * (0.5 + 0.5 * vHot)) * a * vA * 2.6;

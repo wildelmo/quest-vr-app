@@ -164,7 +164,8 @@ export const sky = {
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }`,
-      transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, fog: false,
+      // depthTest on: the hills and pines (≤ 170 m) must occlude stars sitting at ~890 m
+      transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, fog: false,
     });
     const starPoints = new THREE.Points(starGeo, starMat);
     starPoints.renderOrder = -19; starPoints.frustumCulled = false; starPoints.name = 'stars';
@@ -193,7 +194,7 @@ export const sky = {
     const mGeo = new THREE.BufferGeometry();
     mGeo.setAttribute('position', new THREE.BufferAttribute(mPos, 3).setUsage(THREE.DynamicDrawUsage));
     mGeo.setAttribute('color', new THREE.BufferAttribute(mCol, 3).setUsage(THREE.DynamicDrawUsage));
-    const meteors = new THREE.LineSegments(mGeo, new THREE.LineBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, depthTest: false, fog: false }));
+    const meteors = new THREE.LineSegments(mGeo, new THREE.LineBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, depthTest: true, fog: false }));
     meteors.renderOrder = -17; meteors.frustumCulled = false; meteors.name = 'meteors';
     group.add(meteors);
     const meteorPool = Array.from({ length: MAX_METEORS }, () => ({ active: false, t0: 0, dur: 0.7, a: new THREE.Vector3(), b: new THREE.Vector3(), bright: 1 }));
@@ -226,10 +227,10 @@ export const sky = {
     const moon = new THREE.Mesh(new THREE.SphereGeometry(moonR, 32, 24), moonMat);
     moon.renderOrder = -17; moon.frustumCulled = false; moon.name = 'moon';
     group.add(moon);
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.glowSoft, color: new THREE.Color(M.tint).multiplyScalar(0.55), blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, fog: false, transparent: true }));
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.glowSoft, color: new THREE.Color(M.tint).multiplyScalar(0.55), blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, fog: false, transparent: true }));
     halo.scale.setScalar(moonR * 9); halo.renderOrder = -16;
     group.add(halo);
-    const halo2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.glowSoft, color: new THREE.Color(M.tint).multiplyScalar(0.10), blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, fog: false, transparent: true }));
+    const halo2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.glowSoft, color: new THREE.Color(M.tint).multiplyScalar(0.10), blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, fog: false, transparent: true }));
     halo2.scale.setScalar(moonR * 40); halo2.renderOrder = -16;
     group.add(halo2);
 
@@ -335,11 +336,15 @@ export const sky = {
     ctx.sky.lanternStarCount = () => lanternList.length;
     // after moonset the sky goes darker and, for a minute and a half, meteors come more often
     ctx.events.on('moonset', () => { this._.showerUntil = ctx.time.t + 90; });
+    // the night starts when the session does (not when the page loaded): the crescent is always there at 0:00
+    const restart = () => { this._.skyT0 = ctx.time.t; this._.moonWasUp = true; this._.showerUntil = 0; };
+    ctx.events.on('xrstart', restart);
+    ctx.events.on('desktopstart', restart);
 
     let moonWasUp = true;
     this._ = {
       group, domeMat, starMat, starPoints, moon, moonMat, halo, halo2, moonLight, hemi, applyRotation, lanternList, lmag, lGeo,
-      worldToSky, worldToPhoto, photoCorrection, moonDirWorld, R, sunLocal, meteorPool, mPos, mCol, mGeo, mrnd,
+      worldToSky, worldToPhoto, photoCorrection, moonDirWorld, R, sunLocal, meteorPool, mPos, mCol, mGeo, mrnd, skyT0: 0, showerUntil: 0,
       get nextMeteor() { return nextMeteor; }, set nextMeteor(v) { nextMeteor = v; }, get moonWasUp() { return moonWasUp; }, set moonWasUp(v) { moonWasUp = v; },
       tmp: new THREE.Vector3(), tmp2: new THREE.Vector3(), tmp3: new THREE.Vector3(),
     };
@@ -366,7 +371,7 @@ export const sky = {
   update(ctx, dt) {
     const s = this._;
     const t = ctx.time.t;
-    s.applyRotation(t);
+    s.applyRotation(t - s.skyT0); // session time, so the moon is always up at the start
     s.domeMat.uniforms.uAurora.value.copy(ctx.sky.auroraTint);
     s.starMat.uniforms.uTime.value = t;
     const h = ctx.renderer.xr.isPresenting ? 1700 : ctx.renderer.domElement.height;

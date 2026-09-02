@@ -37,11 +37,12 @@ export const CONFIG = {
     pinchOn: 0.020,
     pinchOff: 0.035,
     grabRadius: 0.13,
-    stillDisp: 0.03,      // max displacement of the filtered palm over 0.5 s to count as still
+    stillDisp: 0.03,      // max displacement of the filtered palm over the window to count as still
+    stillWindow: 0.5,     // seconds
     stillTime: 1.0,       // seconds of stillness before fireflies commit to landing
     curlOpen: 0.35,       // every finger curl below this → open hand
-    graspOn: 0.55,        // mean curl above this → whole-hand grasp (acts like a pinch)
-    graspOff: 0.40,
+    graspOn: 0.75,        // mean curl above this → whole-hand grasp (grabs only when something is in reach)
+    graspOff: 0.60,
     lostFade: 0.35,       // seconds to fade hands out after tracking loss
     graceGrab: 1.0,       // seconds a held object survives tracking loss before it is released into the water
   },

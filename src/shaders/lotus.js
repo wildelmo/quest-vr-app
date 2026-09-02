@@ -111,29 +111,45 @@ void main() {
 }`;
 
 /**
- * Glow sprites (one Points, 6 points) and their mirrored copy under the water (uMirror = 1, the same
- * geometry, a second material). Size is in metres, projected with the camera's real focal length.
+ * Glow halos: instanced billboard quads (6 instances) offset in VIEW space so they face each eye — not point
+ * sprites, which GLES drops whole when their centre leaves one eye's frustum. aCenter is the bud position.
+ * With uMirror = 1 the quad shows the virtual image below the water plane, slid along the view ray to just
+ * in front of where that ray meets the surface, so drawn after the water (depth-tested) it reads as a
+ * reflection on the surface instead of being swallowed by the water's alpha. Size is in metres, clamped to
+ * 0.35 x distance so a bud at the face does not flood the view.
  */
 export const LOTUS_GLOW_VERT = /* glsl */`
-attribute vec3 aColor; attribute float aSize; attribute float aGain;
-uniform float uMirror; uniform float uLevel; uniform float uViewportH; uniform float uGainMul;
-varying vec3 vColor; varying float vGain;
+attribute vec3 aCenter; attribute vec3 aColor; attribute float aSize; attribute float aGain;
+uniform float uMirror; uniform float uLevel; uniform float uGainMul;
+varying vec3 vColor; varying float vGain; varying vec2 vUv;
 void main() {
-  vec3 p = position;
+  vec3 p = aCenter;
   p.y = mix(p.y, 2.0 * uLevel - p.y, uMirror);
-  vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  float px = aSize * projectionMatrix[1][1] * 0.5 * uViewportH / max(-mv.z, 0.05);
-  gl_PointSize = clamp(px, 1.0, 1024.0);
+  vec4 mv = viewMatrix * vec4(p, 1.0);
+  float d = max(-mv.z, 0.05);
+  float ws = min(aSize, 0.35 * d);
+  float k;
+  if (uMirror > 0.5) {
+    float camH = cameraPosition.y - uLevel;
+    float imgH = p.y - uLevel;
+    float f = clamp(camH / max(camH - imgH, 1e-3), 0.0, 1.0);
+    k = max(f * d - ws * 0.6, 0.12) / d;
+  } else {
+    k = max(d - 0.03, 0.05) / d; // a touch toward the eye so the petals do not clip the halo
+  }
+  mv.xyz *= k;
+  mv.xy += position.xy * ws * k;
   gl_Position = projectionMatrix * mv;
   vColor = aColor;
   vGain = aGain * uGainMul;
+  vUv = uv;
 }`;
 
 export const LOTUS_GLOW_FRAG = /* glsl */`
 uniform sampler2D uMap;
-varying vec3 vColor; varying float vGain;
+varying vec3 vColor; varying float vGain; varying vec2 vUv;
 void main() {
-  float a = texture2D(uMap, gl_PointCoord).a;
+  float a = texture2D(uMap, vUv).a;
   gl_FragColor = vec4(vColor * a * vGain, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

@@ -3,10 +3,11 @@ import * as THREE from 'three';
 /**
  * Audio engine.
  *
- * Lifecycle (matters on Quest): unlock() must be called synchronously inside the user's click — it creates
- * the graph and calls resume() without awaiting anything, so the transient activation is still valid for
- * requestSession(). load() decodes the sample buffers afterwards (after the XR session started) and then
- * start()s the subsystems.
+ * Lifecycle (matters on Quest): the AudioContext exists from boot (suspended), so sample decoding and the
+ * reverb impulse are prepared while the landing page is up. unlock() must be called synchronously inside
+ * the user's click — it wires the graph and calls resume() without awaiting anything, so the transient
+ * activation is still valid for requestSession(). Subsystems start as soon as the context runs (they null-
+ * check buffers and pick them up lazily), so the wind and crickets are there when the picture fades in.
  *
  * Graph:  buses.bed / world / music / chimes  →  master  →  compressor  →  soft limiter  →  output
  *         each bus also sends to a parallel convolution reverb (bed: none, world: light, music/chimes: full)
@@ -16,31 +17,53 @@ import * as THREE from 'three';
 export function createAudio(ctx) {
   const listener = new THREE.AudioListener();
   ctx.camera.add(listener);
+  const context = listener.context; // created suspended; decoding works before any gesture
   const api = {
-    listener, context: null, master: null, reverb: null, running: false, started: false, unlocked: false, loaded: false,
+    listener, context, master: null, reverb: null, running: false, started: false, unlocked: false, decoded: false,
     buffers: {}, manifest: ctx.assets?.audio?.manifest || [], _noise: {},
     subsystems: [], buses: null, bus: null,
     masterLevel: 0.9,
+    landingLevel: 0.0,
 
-    /** Synchronous: build the graph and kick resume(). Safe to call more than once. */
+    /** Async, called at boot: decode the sample buffers (wind first, then everything in parallel). */
+    async load() {
+      if (api._loading) return api._loading;
+      api._loading = (async () => {
+        const bytes = ctx.assets?.audio?.bytes || {};
+        const names = Object.keys(bytes);
+        const decode = async (file) => {
+          try { api.buffers[file.replace(/\.ogg$/, '')] = await context.decodeAudioData(bytes[file].slice(0)); }
+          catch (err) { console.warn('[audio] decode failed', file, err); }
+        };
+        const first = names.filter((n) => n.startsWith('wind') || n.startsWith('water_loop'));
+        await Promise.all(first.map(decode));
+        api.windReady = true;
+        api.maybeStart();
+        await Promise.all(names.filter((n) => !first.includes(n)).map(decode));
+        api.decoded = true;
+        api.maybeStart();
+      })();
+      return api._loading;
+    },
+
+    /** Synchronous: wire the graph and kick resume(). Safe to call more than once. */
     unlock() {
-      if (api.unlocked) { try { api.context.resume(); } catch { /* */ } return; }
+      if (api.unlocked) { try { context.resume(); } catch { /* */ } return; }
       api.unlocked = true;
       try {
-        const c = listener.context;
-        api.context = c;
+        const c = context;
         // output chain
         api.master = c.createGain(); api.master.gain.value = 0.0;
         api.comp = c.createDynamicsCompressor();
         api.comp.threshold.value = -12; api.comp.knee.value = 6; api.comp.ratio.value = 3.5; api.comp.attack.value = 0.005; api.comp.release.value = 0.25;
-        api.limiter = c.createWaveShaper(); api.limiter.curve = makeSoftClip(2.0); api.limiter.oversample = '2x';
+        api.limiter = c.createWaveShaper(); api.limiter.curve = api._clip || (api._clip = makeSoftClip()); api.limiter.oversample = '2x';
         api.master.connect(api.comp); api.comp.connect(api.limiter); api.limiter.connect(listener.getInput());
         api.analyser = c.createAnalyser(); api.analyser.fftSize = 2048; api.analyser.smoothingTimeConstant = 0;
         api.limiter.connect(api.analyser);
         api._ana = new Float32Array(api.analyser.fftSize);
-        // reverb as a parallel path
+        // reverb as a parallel path (the IR was rendered at boot)
         api.reverb = c.createConvolver();
-        api.reverb.buffer = makeImpulse(c, 4.5, 2.8);
+        api.reverb.buffer = api._ir || (api._ir = makeImpulse(c, 4.5, 2.8));
         api.reverbHP = c.createBiquadFilter(); api.reverbHP.type = 'highpass'; api.reverbHP.frequency.value = 120;
         api.reverbReturn = c.createGain(); api.reverbReturn.gain.value = 0.45;
         api.reverb.connect(api.reverbHP); api.reverbHP.connect(api.reverbReturn); api.reverbReturn.connect(api.master);
@@ -59,41 +82,27 @@ export function createAudio(ctx) {
         c.onstatechange = () => {
           api.running = c.state === 'running';
           if (c.state === 'suspended' && ctx.mode !== 'landing') c.resume().catch(() => {});
+          api.maybeStart();
         };
         // if the browser refused (no gesture), try again on the next pointer/touch
         const retry = () => { c.resume().then(() => { api.running = c.state === 'running'; if (api.running) { document.removeEventListener('pointerdown', retry); api.maybeStart(); } }).catch(() => {}); };
         if (!api.running) document.addEventListener('pointerdown', retry);
       } catch (err) { console.warn('[audio] unlock failed', err); }
     },
-
-    /** Async: decode the sample buffers (wind first), then start the subsystems. */
-    async load() {
-      if (api.loaded || !api.context) return;
-      api.loaded = true;
-      const bytes = ctx.assets?.audio?.bytes || {};
-      const names = Object.keys(bytes).sort((a, b) => (a.startsWith('wind') ? -1 : b.startsWith('wind') ? 1 : 0));
-      for (const file of names) {
-        try { api.buffers[file.replace(/\.ogg$/, '')] = await api.context.decodeAudioData(bytes[file].slice(0)); }
-        catch (err) { console.warn('[audio] decode failed', file, err); }
-        await new Promise((r) => setTimeout(r, 0));
-      }
-      api.decoded = true;
-      api.maybeStart();
-    },
-    maybeStart() { if (api.running && api.decoded && !api.started) api.start(); },
+    maybeStart() { if (api.running && api.unlocked && !api.started && (api.windReady || api.decoded || ctx.harness)) api.start(); },
     start() {
       if (api.started) return; api.started = true;
-      const t = api.context.currentTime;
-      api.master.gain.cancelScheduledValues(t);
-      api.master.gain.setValueAtTime(0, t); api.master.gain.linearRampToValueAtTime(api.masterLevel, t + 6);
+      api.fadeMaster(api.masterLevel, 3);
       for (const s of api.subsystems) { try { s.start?.(api, ctx); } catch (e) { console.error('[audio] subsystem start failed', e); } }
       ctx.events.emit('audiostart');
     },
     fadeMaster(level, seconds) {
       if (!api.master) return;
-      const t = api.context.currentTime;
-      api.master.gain.cancelScheduledValues(t);
-      api.master.gain.setTargetAtTime(level, t, Math.max(0.01, seconds / 3));
+      const t = context.currentTime;
+      const g = api.master.gain;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(Math.max(0.0001, g.value), t);
+      g.linearRampToValueAtTime(Math.max(0.0001, level), t + Math.max(0.02, seconds));
     },
     update(dt) {
       if (!api.started) return;
@@ -103,7 +112,7 @@ export function createAudio(ctx) {
 
     // ---- helpers used by subsystems
     buffer(name) { return api.buffers[name] || null; },
-    now() { return api.context ? api.context.currentTime : 0; },
+    now() { return context.currentTime; },
     /** Loudness of what reaches the listener (post-limiter): { rms, peak, rmsDb, peakDb } over the last ~46 ms. */
     stats() {
       if (!api.analyser) return { rms: 0, peak: 0, rmsDb: -Infinity, peakDb: -Infinity };
@@ -118,20 +127,25 @@ export function createAudio(ctx) {
     info(name) { return api.manifest.find((m) => m.file === name + '.ogg') || null; },
     /**
      * Measured pitch of a sample from the manifest: { midi (fractional, cents folded in), hz, reliable } or null
-     * when the sample is untuned. `reliable` is false when the analyser's harmonic score is weak, in which case
-     * callers should treat the sample as texture and not pitch-shift it.
+     * when the sample is untuned. `reliable` is false when the analyser's harmonic score is weak OR when the
+     * strongest audible partial is far from the reported fundamental (inharmonic bells): then the sample is
+     * texture and must not be pitch-shifted.
      */
     pitch(name) {
       const m = api.info(name);
       if (!m || m.pitchHz == null || m.midi == null) return null;
-      const score = m.analysis?.pitch?.harmonicScore;
-      return { midi: m.midi + (m.cents || 0) / 100, hz: m.pitchHz, reliable: score == null || score >= 0.9 };
+      const a = m.analysis?.pitch || {};
+      const score = a.harmonicScore;
+      let reliable = score == null || score >= 0.9;
+      const strongest = a.strongestPartialHz ?? m.strongestPartialHz;
+      if (reliable && strongest && m.pitchHz) { const r = strongest / m.pitchHz; reliable = r >= 0.48 && r <= 2.1; }
+      return { midi: m.midi + (m.cents || 0) / 100, hz: m.pitchHz, reliable };
     },
     /** Cached deterministic mono noise buffer ('white' | 'pink'), `seconds` long. Shared by every subsystem. */
     noise(kind = 'white', seconds = 2) {
       const key = kind + ':' + seconds;
       if (api._noise[key]) return api._noise[key];
-      const c = api.context;
+      const c = context;
       const n = Math.floor(c.sampleRate * seconds);
       const buf = c.createBuffer(1, n, c.sampleRate);
       const d = buf.getChannelData(0);
@@ -158,7 +172,7 @@ export function createAudio(ctx) {
      * Returns the PositionalAudio with .input (connect your graph here) and .dispose().
      */
     spatial({ pos = null, refDistance = 1.5, rolloff = 1.2, hrtf = false, maxDistance = 60, out = null } = {}) {
-      const c = api.context;
+      const c = context;
       const input = c.createGain();
       const pa = new THREE.PositionalAudio(listener);
       pa.setNodeSource(input);
@@ -174,10 +188,10 @@ export function createAudio(ctx) {
       return pa;
     },
     /** Plays a decoded buffer at a world position (or 2D if pos is null). Returns the source. */
-    play(name, { pos = null, gain = 1, rate = 1, detune = 0, loop = false, refDistance = 1.5, rolloff = 1.2, wet = null, out = null } = {}) {
+    play(name, { pos = null, gain = 1, rate = 1, detune = 0, loop = false, refDistance = 1.5, rolloff = 1.2, hrtf = false, out = null } = {}) {
       const buf = api.buffers[name];
-      if (!buf || !api.running) return null;
-      const c = api.context;
+      if (!buf || !api.running || !api.bus) return null;
+      const c = context;
       const dest = out || api.bus;
       const src = c.createBufferSource(); src.buffer = buf; src.loop = loop; src.playbackRate.value = rate;
       if (detune) src.detune.value = detune;
@@ -187,6 +201,7 @@ export function createAudio(ctx) {
         const pa = new THREE.PositionalAudio(listener);
         pa.setNodeSource(g);
         pa.setRefDistance(refDistance); pa.setRolloffFactor(rolloff); pa.setDistanceModel('inverse');
+        pa.panner.panningModel = hrtf ? 'HRTF' : 'equalpower'; // three defaults to HRTF, which is costly per event
         pa.panner.disconnect?.();
         pa.panner.connect(dest);
         pa.position.copy(pos);
@@ -203,16 +218,24 @@ export function createAudio(ctx) {
     },
   };
 
+  // prepare the expensive buffers now, not inside the click
+  try { api._ir = makeImpulse(context, 4.5, 2.8); api._clip = makeSoftClip(); } catch (err) { console.warn('[audio] prepare failed', err); }
+
+  // the engine owns the master fader
   ctx.events.on('xrblur', () => api.fadeMaster(0, 0.1));
-  ctx.events.on('xrfocus', () => { if (api.context) api.context.resume().catch(() => {}); api.fadeMaster(api.masterLevel, 1.0); });
-  ctx.events.on('xrend', () => api.fadeMaster(api.masterLevel * 0.85, 0.3));
+  ctx.events.on('xrfocus', () => { context.resume().catch(() => {}); api.fadeMaster(api.masterLevel, 1.0); });
+  ctx.events.on('xrstart', () => { if (api.started) api.fadeMaster(api.masterLevel, 2.0); });
+  ctx.events.on('desktopstart', () => { if (api.started) api.fadeMaster(api.masterLevel, 2.0); });
+  // a doffed headset ends the session: don't keep playing through the speakers on the landing page
+  ctx.events.on('xrend', () => { if (ctx.mode !== 'desktop') api.fadeMaster(api.landingLevel, 1.5); });
   return api;
 }
 
-// tanh-style soft clip so stacked events never reach 0 dBFS
-function makeSoftClip(k) {
+// Soft clip with unity gain for small signals (tanh(x)): the ceiling is tanh(1) ≈ 0.76 (−2.3 dBFS) for
+// full-scale input, so stacked events squash instead of clipping. No hidden makeup gain.
+function makeSoftClip() {
   const n = 1024, curve = new Float32Array(n);
-  for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; curve[i] = Math.tanh(k * x) / Math.tanh(k); }
+  for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; curve[i] = Math.tanh(x); }
   return curve;
 }
 

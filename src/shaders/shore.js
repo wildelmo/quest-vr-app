@@ -78,6 +78,13 @@ void main() {
 // position; drift with the wind, wrapping around the player, the slow bob and the billboard
 // itself all happen here so nothing is uploaded per frame. aSize = (width, height),
 // aAlpha = peak opacity, aSeed = per-sprite random in [0,1).
+// The near fade is by HORIZONTAL distance from the eye and scales with the card's width (a 5 m card
+// fades in over 5–9 m, a 14 m one over 9–14 m) so a card never fills the view at full alpha, and a
+// card drifting over the player's head fades like one drifting through them. A card whose alpha
+// would be invisible (< 0.004, i.e. inside the near fade or out in the far one) is pushed out of the
+// clip volume instead of being rasterised as a huge transparent quad over both eyes.
+// The quad is front-face only (see mist.js): with camRight = the eye's right vector and +y up, the
+// plane's CCW winding faces the eye whenever the card is in front of it.
 export const MIST_VERT = /* glsl */`
 attribute float aSeed;
 attribute vec2 aSize;
@@ -103,12 +110,14 @@ void main() {
   camRight = normalize(camRight + vec3(1e-4, 0.0, 0.0));
   vec3 wp = c + camRight * (position.x * aSize.x) + vec3(0.0, position.y * aSize.y, 0.0);
   float d = distance(c, cameraPosition);
-  float near = smoothstep(5.0, 9.0, d);
+  float dh = distance(c.xz, cameraPosition.xz);
+  float near = smoothstep(max(5.0, aSize.x * 0.65), max(9.0, aSize.x), dh);
   float far = 1.0 - smoothstep(uRange * 0.55, uRange * 0.95, length(rel));
   vA = aAlpha * near * far;
   vUv = uv;
   vSeed = aSeed;
   vDist = d;
+  if (vA < 0.004) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; } // invisible: cull the whole card
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }`;
 

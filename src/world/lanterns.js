@@ -11,8 +11,8 @@ import {
  * Paper lanterns. Up to MAX of them float on the lake, can be pinched and carried, and rise into the
  * sky when released above the water, becoming a new star (the 'lanternstar' event, handled by sky.js).
  *
- * Draw calls: 4 — one InstancedMesh (bodies), one Points (glows, renderOrder 4), one Points (mirrored
- * glows under the water, renderOrder 1) and one Points (flames). Everything is in world space.
+ * Draw calls: 4 — one InstancedMesh (bodies) and three instanced billboard-quad meshes (glows, renderOrder 4;
+ * mirrored glows drawn on the surface after the water, renderOrder 3; flames). Everything is in world space.
  *
  * States: 'floating' | 'held' | 'rising'.
  *  - floating: sits on the swell, drifts with a per-lantern wind + random walk; arrivals home in from
@@ -120,19 +120,28 @@ export const lanterns = {
     bodies.name = 'lanternBodies';
     ctx.scene.add(bodies);
 
-    // ---- points: one geometry shared by the glow, the mirrored glow and the flames
-    const pGeo = new THREE.BufferGeometry();
+    // ---- glow / mirrored glow / flames: instanced billboard quads sharing the same per-lantern arrays
+    // (quads, not point sprites: a point is dropped whole when its centre leaves one eye's frustum)
+    const quad = new THREE.PlaneGeometry(1, 1);
     const pPos = new Float32Array(MAX * 3), pBright = new Float32Array(MAX), pSeed = new Float32Array(MAX), pFlame = new Float32Array(MAX).fill(1);
-    pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3).setUsage(THREE.DynamicDrawUsage));
-    pGeo.setAttribute('aBright', new THREE.BufferAttribute(pBright, 1).setUsage(THREE.DynamicDrawUsage));
-    pGeo.setAttribute('aFlame', new THREE.BufferAttribute(pFlame, 1).setUsage(THREE.DynamicDrawUsage));
-    pGeo.setAttribute('aSeed', new THREE.BufferAttribute(pSeed, 1));
-    pGeo.setDrawRange(0, 0);
+    const instGeos = [];
+    const makeInstGeo = () => {
+      const g = new THREE.InstancedBufferGeometry();
+      g.setIndex(quad.index);
+      g.setAttribute('position', quad.attributes.position);
+      g.setAttribute('uv', quad.attributes.uv);
+      g.setAttribute('aCenter', new THREE.InstancedBufferAttribute(pPos, 3).setUsage(THREE.DynamicDrawUsage));
+      g.setAttribute('aBright', new THREE.InstancedBufferAttribute(pBright, 1).setUsage(THREE.DynamicDrawUsage));
+      g.setAttribute('aFlame', new THREE.InstancedBufferAttribute(pFlame, 1).setUsage(THREE.DynamicDrawUsage));
+      g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(pSeed, 1));
+      g.instanceCount = 0;
+      instGeos.push(g);
+      return g;
+    };
     const glowUniforms = (gain) => ({
       uMap: { value: tex.glowSoft },
       uColor: { value: new THREE.Color(CONFIG.colors.lantern) },
       uColorHot: { value: new THREE.Color(CONFIG.colors.lanternHot) },
-      uPixelScale: { value: 500 },
       uSize: { value: 0.55 },
       uWaterLevel: { value: level },
       uTime: { value: 0 },
@@ -141,29 +150,31 @@ export const lanterns = {
     });
     const glowMat = new THREE.ShaderMaterial({
       uniforms: glowUniforms(1.0), vertexShader: LANTERN_GLOW_VERT, fragmentShader: LANTERN_GLOW_FRAG,
-      transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, fog: false,
+      transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide,
     });
     const mirrorMat = new THREE.ShaderMaterial({
       uniforms: glowUniforms(0.45), vertexShader: LANTERN_MIRROR_VERT, fragmentShader: LANTERN_GLOW_FRAG,
-      transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, fog: false,
+      transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide,
     });
     const flameMat = new THREE.ShaderMaterial({
-      uniforms: { uMap: { value: tex.glowFirefly }, uPixelScale: { value: 500 }, uTime: { value: 0 }, uPull: { value: 0.11 } },
+      uniforms: { uMap: { value: tex.glowFirefly }, uTime: { value: 0 }, uPull: { value: 0.11 } },
       vertexShader: LANTERN_FLAME_VERT, fragmentShader: LANTERN_FLAME_FRAG,
-      transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, fog: false,
+      transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide,
     });
-    const glow = new THREE.Points(pGeo, glowMat); glow.renderOrder = 4; glow.frustumCulled = false; glow.name = 'lanternGlow';
-    // the reflection sprite sits on the surface, so it goes just after the water (see LANTERN_MIRROR_VERT)
-    const mirror = new THREE.Points(pGeo, mirrorMat); mirror.renderOrder = 3; mirror.frustumCulled = false; mirror.name = 'lanternGlowMirror';
-    const flames = new THREE.Points(pGeo, flameMat); flames.renderOrder = 4; flames.frustumCulled = false; flames.name = 'lanternFlames';
+    const glow = new THREE.Mesh(makeInstGeo(), glowMat); glow.renderOrder = 4; glow.frustumCulled = false; glow.name = 'lanternGlow';
+    // the reflection sits on the surface, so it goes just after the water (see LANTERN_MIRROR_VERT)
+    const mirror = new THREE.Mesh(makeInstGeo(), mirrorMat); mirror.renderOrder = 3; mirror.frustumCulled = false; mirror.name = 'lanternGlowMirror';
+    const flames = new THREE.Mesh(makeInstGeo(), flameMat); flames.renderOrder = 4; flames.frustumCulled = false; flames.name = 'lanternFlames';
     ctx.scene.add(glow, mirror, flames);
+    const setInstanceCount = (n) => { for (const g of instGeos) g.instanceCount = n; };
+    const markInstDirty = () => { for (const g of instGeos) { g.attributes.aCenter.needsUpdate = true; g.attributes.aBright.needsUpdate = true; g.attributes.aFlame.needsUpdate = true; } };
 
     // ---- lantern records
     const list = [];
-    ctx.lanterns = { list, count: 0, MAX };
+    ctx.lanterns = { list, count: 0, MAX, nearestDistance: Infinity };
     const s = this._ = {
-      ctx, rng, list, bodies, bodyMat, glowMat, mirrorMat, flameMat, pGeo, pPos, pBright, pFlame, seedArr, brightArr, heldArr, aSeed, aBright, aHeld,
-      spawnTimer: SPAWN_INTERVAL,
+      ctx, rng, list, bodies, bodyMat, glowMat, mirrorMat, flameMat, instGeos, setInstanceCount, markInstDirty, pPos, pBright, pFlame, pSeed, seedArr, brightArr, heldArr, aSeed, aBright, aHeld,
+      spawnTimer: SPAWN_INTERVAL, lastNearT: 0,
       tmp: { v: new THREE.Vector3(), v2: new THREE.Vector3(), v3: new THREE.Vector3(), a0: new THREE.Vector3(), q: new THREE.Quaternion(), q2: new THREE.Quaternion(), m: new THREE.Matrix4(), axis: new THREE.Vector3(), one: new THREE.Vector3(1, 1, 1) },
     };
 
@@ -203,8 +214,8 @@ export const lanterns = {
       list.push(L);
       ctx.grabbables.push(L.grab);
       seedArr[i] = seed; pSeed[i] = seed;
-      aSeed.needsUpdate = true; pGeo.attributes.aSeed.needsUpdate = true;
-      bodies.count = list.length; pGeo.setDrawRange(0, list.length);
+      aSeed.needsUpdate = true; for (const g of instGeos) g.attributes.aSeed.needsUpdate = true;
+      bodies.count = list.length; setInstanceCount(list.length);
       ctx.lanterns.count = list.length;
       return L;
     }
@@ -275,12 +286,19 @@ export const lanterns = {
       respawnFar(L);
     }
 
-    // ---- initial placement: around the player but out of the front sector (-40..+40 deg about -Z)
+    // ---- initial placement: two within arm's reach (front-right and back-left, just outside the body's
+    // avoidance radius, inside the hand-tracking cone), the rest around the player out of the front sector
+    // (-40..+40 deg about -Z) so the Milky Way stays clear
     {
       const p = rigPos();
-      const arc = 280, start = 40;
-      for (let k = 0; k < INITIAL_NEAR; k++) {
-        const az = THREE.MathUtils.degToRad(start + (k + 0.5) * (arc / INITIAL_NEAR) + (rng() - 0.5) * 16);
+      for (const azDeg of [55, -120]) {
+        const az = THREE.MathUtils.degToRad(azDeg + (rng() - 0.5) * 8);
+        const r = 0.52 + rng() * 0.16;
+        spawn(p.x + Math.sin(az) * r, p.z - Math.cos(az) * r, false);
+      }
+      const arc = 280, start = 40, nRing = INITIAL_NEAR - 2;
+      for (let k = 0; k < nRing; k++) {
+        const az = THREE.MathUtils.degToRad(start + (k + 0.5) * (arc / nRing) + (rng() - 0.5) * 16);
         const r = 1.3 + rng() * 1.9;
         spawn(p.x + Math.sin(az) * r, p.z - Math.cos(az) * r, false);
       }
@@ -309,9 +327,21 @@ export const lanterns = {
     s.spawnTimer -= dt;
     if (s.spawnTimer <= 0) { s.spawnTimer = SPAWN_INTERVAL; if (list.length < MAX) s.spawnFar(); }
 
-    // how many are already within reach (scarcity: arrivals wait at a distance while >= NEAR_LIMIT)
-    let nearCount = 0;
-    for (const L of list) { if (L.state !== 'rising' && Math.hypot(L.position.x - rig.x, L.position.z - rig.z) < NEAR_RADIUS) nearCount++; }
+    // how many are already within reach (scarcity: arrivals wait at a distance while >= NEAR_LIMIT), and
+    // whether anything floats within an arm's length; if nothing has for 30 s the nearest one drifts over
+    let nearCount = 0, inReach = 0, nearest = null, nearestD = Infinity;
+    for (const L of list) {
+      if (L.state === 'rising') continue;
+      const d = Math.hypot(L.position.x - head.x, L.position.z - head.z);
+      if (d < NEAR_RADIUS) nearCount++;
+      if (L.state === 'floating') {
+        if (d < 1.0) inReach++;
+        if (d < nearestD) { nearestD = d; nearest = L; }
+      }
+    }
+    ctx.lanterns.nearestDistance = nearestD;
+    if (nearestD < 0.9) s.lastNearT = t;
+    const summon = nearest && t - s.lastNearT > 30 && nearestD > 0.6 ? nearest : null;
     const crowded = nearCount >= NEAR_LIMIT;
 
     for (let i = 0; i < list.length; i++) {
@@ -376,12 +406,17 @@ export const lanterns = {
         const dxp = rig.x - P.x, dzp = rig.z - P.z;
         const dp = Math.hypot(dxp, dzp);
         if (L.incoming) {
-          if (dp < 2.5) L.incoming = false;
+          // arrivals come all the way in while nothing floats within reach; otherwise they stop at 2.5 m
+          const stopAt = inReach === 0 ? 0.8 : 2.5;
+          if (dp < stopAt) L.incoming = false;
           else {
             let sp = 0.12 + 0.35 * THREE.MathUtils.smoothstep(dp, 5, 25);
             if (crowded) sp *= THREE.MathUtils.smoothstep(dp, L.loiterR, L.loiterR + 1.5); // wait out here
             vx += dxp / dp * sp; vz += dzp / dp * sp;
           }
+        } else if (L === summon && dp > 1e-3) {
+          // nothing has been within reach for a while: the nearest lantern drifts over, slowly
+          vx += dxp / dp * 0.08; vz += dzp / dp * 0.08;
         }
         // near-miss help: a gentle pull toward an open, visible hand above the water
         let attracted = false;
@@ -402,7 +437,7 @@ export const lanterns = {
         // don't drift into the player's body
         const dxh = P.x - head.x, dzh = P.z - head.z;
         const dh = Math.hypot(dxh, dzh);
-        if (dh < 0.5 && dh > 1e-4) { const k = (0.5 - dh) * 2.5; vx += dxh / dh * k; vz += dzh / dh * k; }
+        if (dh < 0.42 && dh > 1e-4) { const k = (0.42 - dh) * 2.5; vx += dxh / dh * k; vz += dzh / dh * k; }
         // keep lanterns from overlapping
         for (let j = 0; j < list.length; j++) {
           if (j === i) continue;
@@ -468,15 +503,13 @@ export const lanterns = {
 
     s.bodies.instanceMatrix.needsUpdate = true;
     s.aBright.needsUpdate = true; s.aHeld.needsUpdate = true;
-    s.pGeo.attributes.position.needsUpdate = true; s.pGeo.attributes.aBright.needsUpdate = true; s.pGeo.attributes.aFlame.needsUpdate = true;
+    s.markInstDirty();
 
     // uniforms
-    const r = ctx.renderer;
-    const pixelScale = r.xr.isPresenting ? 1700 / 2 : r.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(ctx.camera.fov) * 0.5));
     s.bodyMat.uniforms.uTime.value = t;
     if (ctx.scene.fog) { s.bodyMat.uniforms.uFogColor.value.copy(ctx.scene.fog.color); s.bodyMat.uniforms.uFogDensity.value = ctx.scene.fog.density; }
-    for (const m of [s.glowMat, s.mirrorMat]) { m.uniforms.uTime.value = t; m.uniforms.uPixelScale.value = pixelScale; m.uniforms.uWaterLevel.value = level; }
-    s.flameMat.uniforms.uTime.value = t; s.flameMat.uniforms.uPixelScale.value = pixelScale;
+    for (const m of [s.glowMat, s.mirrorMat]) { m.uniforms.uTime.value = t; m.uniforms.uWaterLevel.value = level; }
+    s.flameMat.uniforms.uTime.value = t;
   },
 };
 

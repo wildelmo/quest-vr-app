@@ -17,7 +17,7 @@ const FINGERS = ['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger']
 const FINGER_CHAIN = ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'];
 
 const H = CONFIG.hands;
-const RING = 36; // ~0.5 s at 72 Hz
+const RING = 64; // samples kept for the stillness window (covers 0.5 s up to 120 Hz)
 
 function makeState(handedness) {
   const joints = {};
@@ -32,7 +32,7 @@ function makeState(handedness) {
     pinch: { active: false, justStarted: false, justReleased: false, point: new THREE.Vector3(), strength: 0, distance: 1, os: false, onFrames: 0, offFrames: 0, kind: 'none' },
     stillDisp: 1, still: false, stillFor: 0, openStill: false, attraction: 0,
     grabbed: null, source: 'none', // 'xr' | 'desktop'
-    _ring: Array.from({ length: RING }, () => new THREE.Vector3()), _ringI: 0, _ringN: 0, _prevSubmerged: false,
+    _ring: Array.from({ length: RING }, () => new THREE.Vector3()), _ringT: new Float64Array(RING), _ringI: 0, _ringN: 0, _prevSubmerged: false,
   };
 }
 
@@ -157,6 +157,9 @@ export function createHands(ctx) {
       if (hs && byHandedness[hs]) byHandedness[hs].tracked = false;
       xrHand.userData.handedness = null;
       xrHand.userData.osPinch = false;
+      // the factory clears its mesh and reloads a fresh (stock-material) one on the next connect
+      const mm = meshModels.find((m) => m.xrHand === xrHand);
+      if (mm) { mm.styled = false; mm.mesh = null; }
     });
     // Meta's ML pinch arrives as select events on the controller object of the same input source.
     const ctl = renderer.xr.getController(i);
@@ -191,7 +194,8 @@ export function createHands(ctx) {
     vertexShader: /* glsl */`
       attribute float aAlpha; attribute float aSize; varying float vA; varying float vUnder; uniform float uScale; uniform float uWaterLevel;
       void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vA = aAlpha; vUnder = smoothstep(uWaterLevel + 0.01, uWaterLevel - 0.03, position.y);
-        gl_PointSize = (0.022 + 0.02 * vUnder) * aSize * uScale / max(-mv.z, 0.05); gl_Position = projectionMatrix * mv; }`,
+        // kept small (≤ 48 px): a point primitive is dropped whole when its centre leaves one eye's frustum
+        gl_PointSize = clamp((0.022 + 0.02 * vUnder) * aSize * uScale / max(-mv.z, 0.05), 0.0, 48.0); gl_Position = projectionMatrix * mv; }`,
     fragmentShader: /* glsl */`
       uniform sampler2D uMap; uniform vec3 uColor; varying float vA; varying float vUnder;
       void main(){ vec4 t = texture2D(uMap, gl_PointCoord); vec3 c = mix(uColor, vec3(0.45, 1.0, 0.95), vUnder);
@@ -349,14 +353,20 @@ export function createHands(ctx) {
     st.palm.velocity.copy(palmJ.velocity).applyQuaternion(player.quaternion).add(ctx.playerCtl?.velocity || _v2.set(0, 0, 0));
     st.palm.speed = palmJ.velocity.length();
     st.palm.speedH = Math.hypot(palmJ.velocity.x, palmJ.velocity.z);
-    // filtered palm position (tau 120 ms) and a 0.5 s ring buffer → stillness as max displacement
+    // filtered palm position (tau 120 ms) and a 0.5 s time window → stillness as max displacement
     if (fresh) { st.palm.filtered.copy(palmJ.local); st._ringN = 0; st._ringI = 0; }
     else st.palm.filtered.lerp(palmJ.local, Math.min(1, dt / 0.12));
-    st._ring[st._ringI].copy(st.palm.filtered); st._ringI = (st._ringI + 1) % RING; st._ringN = Math.min(RING, st._ringN + 1);
-    let disp = 0;
-    for (let i = 0; i < st._ringN; i++) { const d = st._ring[i].distanceTo(st.palm.filtered); if (d > disp) disp = d; }
+    const now = ctx.time.t;
+    st._ring[st._ringI].copy(st.palm.filtered); st._ringT[st._ringI] = now; st._ringI = (st._ringI + 1) % RING; st._ringN = Math.min(RING, st._ringN + 1);
+    let disp = 0, oldest = now, counted = 0;
+    for (let i = 0; i < st._ringN; i++) {
+      if (now - st._ringT[i] > H.stillWindow) continue;
+      counted++;
+      if (st._ringT[i] < oldest) oldest = st._ringT[i];
+      const d = st._ring[i].distanceTo(st.palm.filtered); if (d > disp) disp = d;
+    }
     st.stillDisp = disp;
-    st.still = st._ringN >= RING / 2 && disp < H.stillDisp;
+    st.still = counted >= 6 && now - oldest >= H.stillWindow * 0.6 && disp < H.stillDisp;
     // tips
     for (let i = 0; i < TIP_NAMES.length; i++) st.tips[i].copy(st.joints[TIP_NAMES[i]].position);
     // finger curl / open / grasp
@@ -385,11 +395,16 @@ export function createHands(ctx) {
     const tipStrength = THREE.MathUtils.clamp((H.pinchOff - d) / (H.pinchOff - H.pinchOn), 0, 1);
     st.pinch.strength = Math.max(tipStrength, st.grasp ? 1 : 0, st.pinch.os ? 1 : 0);
     if (d < H.pinchOn) { st.pinch.onFrames++; st.pinch.offFrames = 0; } else if (d > H.pinchOff) { st.pinch.offFrames++; st.pinch.onFrames = 0; }
-    const wantOn = st.pinch.os || st.pinch.onFrames >= 2 || st.grasp;
-    const wantOff = !st.pinch.os && st.pinch.offFrames >= 3 && !st.grasp;
-    if (st.grasp) st.pinch.point.copy(st.palm.position).addScaledVector(st.palm.normal, 0.035);
+    // a whole-hand grasp only counts as a grab when something is actually within reach of the palm
+    // (a cupped paddling hand must not spark, tick, or block the stroke)
+    const tipPinch = st.pinch.os || st.pinch.onFrames >= 2;
+    const graspNear = st.grasp && !tipPinch && ctx.grabbables.some((g) => g.active !== false && !g.held && g.position.distanceTo(st.palm.position) < (g.radius || 0) + H.grabRadius + 0.05);
+    const graspHold = st.grasp && st.pinch.kind === 'grasp' && st.grabbed;
+    const wantOn = tipPinch || graspNear;
+    const wantOff = !st.pinch.os && st.pinch.offFrames >= 3 && !graspHold;
+    if (st.grasp && !tipPinch) st.pinch.point.copy(st.palm.position).addScaledVector(st.palm.normal, 0.035);
     else st.pinch.point.addVectors(it.position, tt.position).multiplyScalar(0.5);
-    if (!st.pinch.active && wantOn && st.active) { st.pinch.active = true; st.pinch.justStarted = true; st.pinch.kind = st.grasp && d > H.pinchOff ? 'grasp' : 'pinch'; }
+    if (!st.pinch.active && wantOn && st.active) { st.pinch.active = true; st.pinch.justStarted = true; st.pinch.kind = tipPinch ? 'pinch' : 'grasp'; }
     else if (st.pinch.active && wantOff) { st.pinch.active = false; st.pinch.justReleased = true; }
     // stillness / openness → firefly attraction
     if (st.still && !st.submerged) st.stillFor += dt; else st.stillFor = 0;
@@ -407,7 +422,7 @@ export function createHands(ctx) {
         if (d < bestD) { bestD = d; best = g; }
       }
       if (best) { st.grabbed = best; best.held = st; try { best.onGrab?.(st); } catch (e) { console.error(e); } ctx.events.emit('grab', { hand: st, grabbable: best }); }
-      else { const sp = sparks[st.handedness === 'left' ? 0 : 1]; sp.t = ctx.time.t; sp.pos.copy(st.pinch.point); ctx.events.emit('pinchmiss', { hand: st, point: st.pinch.point }); }
+      else if (st.pinch.kind === 'pinch') { const sp = sparks[st.handedness === 'left' ? 0 : 1]; sp.t = ctx.time.t; sp.pos.copy(st.pinch.point); ctx.events.emit('pinchmiss', { hand: st, point: st.pinch.point }); }
       ctx.events.emit('pinchstart', { hand: st, grabbed: !!best, kind: st.pinch.kind });
     }
     if (st.pinch.justReleased) {
@@ -419,12 +434,14 @@ export function createHands(ctx) {
 
   const _m = new THREE.Matrix4();
   function updateVisuals(dt) {
+    // (re)style the GLB hand whenever the factory has (re)built it — it reloads after every reconnect
     for (const mm of meshModels) {
-      if (mm.styled) continue;
+      const hs = mm.xrHand.userData.handedness;
+      if (!hs) continue;
       let sm = null;
       mm.model.traverse((o) => { if (!sm && o.isSkinnedMesh) sm = o; });
-      if (sm) {
-        const hs = mm.xrHand.userData.handedness || 'right';
+      if (!sm) { mm.styled = false; mm.mesh = null; continue; }
+      if (sm !== mm.mesh || sm.material !== mats[hs]) {
         sm.material = mats[hs];
         sm.frustumCulled = false; sm.renderOrder = 3; sm.castShadow = false; sm.receiveShadow = false;
         mm.styled = true; mm.mesh = sm;
@@ -477,7 +494,7 @@ export function createHands(ctx) {
     tipGeo.attributes.aAlpha.needsUpdate = true;
     tipGeo.attributes.aSize.needsUpdate = true;
     tipMat.uniforms.uWaterLevel.value = ctx.water.level;
-    tipMat.uniforms.uScale.value = (renderer.xr.isPresenting ? 1900 : renderer.domElement.height) * 0.55;
+    tipMat.uniforms.uScale.value = ctx.view?.pixelScale || renderer.domElement.height * 0.55;
   }
 
   const headLocal = new THREE.Vector3();

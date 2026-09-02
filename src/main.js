@@ -30,6 +30,9 @@ const ctx = {
   water: { level: CONFIG.water.level, tileSize: CONFIG.water.tileSize, simTexture: null, swell: null },
   hands: null, energy: 0, events: new Events(), audio: null, assets: null, grabbables: [],
   quality: detectQuality(), harness: HARNESS, debug: params.has('debug'), xr: null, errors: [],
+  // per-eye view metrics, refreshed every frame: pixelScale = 0.5 * viewportHeight * projection[1][1], so a
+  // point/quad of world size S at depth d spans S * pixelScale / d pixels on this headset/frame buffer
+  view: { pixelScale: 500, eyeHeightPx: 1000 },
   mode: 'landing', // 'landing' | 'desktop' | 'xr'
 };
 window.__nocturneCtx = ctx;
@@ -81,6 +84,7 @@ async function boot() {
 
   ctx.audio = createAudio(ctx);
   try { registerAudio(ctx); } catch (err) { showError(`[audio] register failed: ${err?.stack || err}`); }
+  ctx.audio.load().catch((e) => console.warn('[audio] decode failed', e)); // decoding needs no gesture
   // event log for the harness / debugging
   ctx.eventLog = [];
   for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'starborn', 'lotusbloom', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart']) {
@@ -126,16 +130,20 @@ async function boot() {
     else { ui.enter.disabled = true; ui.enter.textContent = 'VR not available here'; }
     ui.enter.addEventListener('click', () => enterXR().catch(showError));
   }
-  ui.desktop?.addEventListener('click', () => enterDesktop());
+  if (ui.desktop) { ui.desktop.disabled = false; ui.desktop.addEventListener('click', () => enterDesktop()); }
 
-  let sessionStartT = 0;
-  ctx.events.on('xrstart', () => { ctx.mode = 'xr'; sessionStartT = ctx.time.t; ui.landing?.classList.add('hidden'); ui.hud?.classList.remove('show'); });
+  let sessionStartT = 0, starsThisSession = 0;
+  ctx.events.on('starborn', () => { starsThisSession++; });
+  ctx.events.on('xrstart', () => { ctx.mode = 'xr'; sessionStartT = ctx.time.t; starsThisSession = 0; ui.landing?.classList.add('hidden'); ui.hud?.classList.remove('show'); });
   ctx.events.on('xrend', () => {
     if (ctx.mode !== 'xr') return;
     // back on the landing page: a small note about the night that was
     const minutes = Math.max(1, Math.round((ctx.time.t - sessionStartT) / 60));
-    const stars = ctx.sky?.lanternStarCount?.() || 0;
-    if (ui.status) ui.status.textContent = `You spent ${minutes} minute${minutes === 1 ? '' : 's'} on the water` + (stars ? ` and left ${stars} star${stars === 1 ? '' : 's'} in the sky.` : '.');
+    const total = ctx.sky?.lanternStarCount?.() || 0;
+    let msg = `You spent ${minutes} minute${minutes === 1 ? '' : 's'} on the water`;
+    if (starsThisSession) msg += ` and left ${starsThisSession} star${starsThisSession === 1 ? '' : 's'} in the sky.`; else msg += '.';
+    if (total > starsThisSession) msg += ` The sky holds ${total} of your stars.`;
+    if (ui.status) ui.status.textContent = msg;
     if (ui.enter) ui.enter.textContent = 'Return to the water';
     ctx.mode = 'landing';
     ui.landing?.classList.remove('hidden');
@@ -152,15 +160,22 @@ async function boot() {
     const dt = dtRaw;
     ctx.time.dt = dt; ctx.time.t += dt; ctx.time.frame++; ctx.time.now = now / 1000;
 
-    try {
-      ctx.hands.update(frame, dt);
-      ctx.playerCtl.update(dt);
-      for (const m of modules) m.update(ctx, dt);
-      ctx.energy = Math.max(0, ctx.energy - CONFIG.energy.decay * dt);
-      ctx.audio.update(dt);
-    } catch (err) {
-      if (!ctx._loopErr) { ctx._loopErr = true; showError(err?.stack || err); }
+    // per-eye view metrics (three's ArrayCamera sub-cameras carry the XR viewports)
+    {
+      const cams = renderer.xr.isPresenting ? renderer.xr.getCamera().cameras : null;
+      const cam0 = cams && cams[0];
+      const h = cam0 && cam0.viewport && cam0.viewport.w > 0 ? cam0.viewport.w : renderer.domElement.height;
+      const p11 = (cam0 || camera).projectionMatrix.elements[5] || 1;
+      ctx.view.pixelScale = 0.5 * h * p11;
+      ctx.view.eyeHeightPx = h;
     }
+    // each stage is isolated: one broken module must not freeze the others or the audio
+    const guard = (owner, fn) => { if (owner._err) return; try { fn(); } catch (err) { owner._err = true; showError(`[${owner.name || 'core'}] ${err?.stack || err}`); } };
+    guard(ctx.hands, () => ctx.hands.update(frame, dt));
+    guard(ctx.playerCtl, () => ctx.playerCtl.update(dt));
+    for (const m of modules) guard(m, () => m.update(ctx, dt));
+    ctx.energy = Math.max(0, ctx.energy - CONFIG.energy.decay * dt);
+    guard(ctx.audio, () => ctx.audio.update(dt));
     renderer.render(scene, camera);
 
     fpsAcc += dt; fpsN++;
@@ -206,14 +221,12 @@ async function boot() {
   async function enterXR() {
     ctx.audio.unlock();           // synchronous, inside the click: keeps the transient activation for requestSession
     await ctx.xr.start();
-    ctx.audio.load().catch((e) => console.warn('[audio] load failed', e));
   }
   function enterDesktop(quiet) {
     ctx.mode = 'desktop';
     ui.landing?.classList.add('hidden');
     if (!quiet) { ui.hud?.classList.add('show'); setTimeout(() => ui.hud?.classList.remove('show'), 12000); }
     ctx.audio.unlock();
-    ctx.audio.load().catch((e) => console.warn('[audio] load failed', e));
     ctx.playerCtl.enableDesktop();
     ctx.hands.enableDesktop();
     ctx.events.emit('desktopstart');

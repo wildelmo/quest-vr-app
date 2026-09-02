@@ -9,6 +9,7 @@ import { WATER_JOINTS } from '../core/hands.js';
  * Anything can push a disturbance with ctx.water.disturb(x, z, radiusMetres, strength).
  */
 const MAX_DISTURB = 16;
+const _wv = new THREE.Vector3();
 
 export const wavesim = {
   name: 'wavesim',
@@ -73,11 +74,12 @@ export const wavesim = {
     const simScene = new THREE.Scene(); simScene.add(quad);
     const simCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-    // clear both targets
+    // clear both targets (restore whatever target was bound — inside an XR frame that is the XR layer)
     const clearMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
     quad.material = clearMat;
+    const prevRT = renderer.getRenderTarget();
     for (const rt of [rtA, rtB]) { renderer.setRenderTarget(rt); renderer.render(simScene, simCam); }
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(prevRT);
     quad.material = mat;
 
     const queue = [];
@@ -110,9 +112,10 @@ export const wavesim = {
     }
     s.snapMat.uniforms.uTex.value = s.cur.texture;
     const xrWas = renderer.xr.enabled; renderer.xr.enabled = false;
+    const prevRT = renderer.getRenderTarget();
     renderer.setRenderTarget(s.snapRT); renderer.render(s.snapScene, s.simCam);
     renderer.readRenderTargetPixels(s.snapRT, 0, 0, size, size, s.snapPixels);
-    renderer.setRenderTarget(null); renderer.xr.enabled = xrWas;
+    renderer.setRenderTarget(prevRT); renderer.xr.enabled = xrWas;
     const px = s.snapPixels;
     let maxH = 0, sumGlow = 0, glowAbove = 0, energyAbove = 0;
     for (let i = 0; i < size * size; i++) {
@@ -150,7 +153,9 @@ export const wavesim = {
         if (!j.valid) continue;
         const depth = ctx.water.level - j.position.y;
         if (depth <= 0) continue;
-        const sp = Math.min(j.velocity.length(), 2.0);
+        // world-space speed: a hand held still while the player glides still moves through the water
+        _wv.copy(j.velocity).applyQuaternion(ctx.player.quaternion).add(ctx.playerCtl.velocity);
+        const sp = Math.min(_wv.length(), 2.0);
         if (sp < 0.04) continue;
         const near = 1 - THREE.MathUtils.smoothstep(depth, 0.02, 0.35); // strongest right at the surface
         const strength = sp * 0.05 * (0.35 + 0.65 * near) * stepScale;
@@ -173,8 +178,12 @@ export const wavesim = {
     // The sim is tuned for one step per 72 Hz frame. Long frames (desktop at 30 fps, the test harness)
     // take extra substeps so ripples travel and decay at the same rate; injection happens once.
     const substeps = THREE.MathUtils.clamp(Math.round(dt * 72), 1, 3);
+    // Inside an XR frame three has already bound the XR layer's framebuffer as the "current" target, so we
+    // must restore exactly that (getRenderTarget), never null — null would leave the headset drawing into the
+    // hidden canvas. xr.enabled is switched off so render() keeps our ortho camera instead of the XR one.
+    const prevRT = renderer.getRenderTarget();
     const xrWas = renderer.xr.enabled;
-    renderer.xr.enabled = false; // otherwise render() would swap in the XR camera
+    renderer.xr.enabled = false;
     for (let i = 0; i < substeps; i++) {
       s.mat.uniforms.uCount.value = i === 0 ? n : 0;
       s.mat.uniforms.uPrev.value = s.cur.texture;
@@ -182,7 +191,7 @@ export const wavesim = {
       renderer.render(s.simScene, s.simCam);
       const t = s.cur; s.cur = s.next; s.next = t;
     }
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(prevRT);
     renderer.xr.enabled = xrWas;
     ctx.water.simTexture = s.cur.texture;
   },

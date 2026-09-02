@@ -8,7 +8,10 @@ import { MIST_VERT, MIST_FRAG } from '../shaders/shore.js';
  * the wind drift (wrapped around the player), the billboarding, the slow turn and the near/far
  * fades all happen on the GPU, so the per-frame CPU cost is a handful of uniforms.
  * renderOrder 3 (after the water, which writes depth: the part of a sprite under the surface is
- * clipped away), depthWrite off, normal blending, alpha 0.06–0.12.
+ * clipped away), depthWrite off, normal blending, alpha 0.06–0.12. Front faces only: the billboard
+ * always faces the eye, so DoubleSide would only double the edge-on raster work; cards whose alpha
+ * would be invisible (near the player, overhead, or out in the far fade) are culled in the vertex
+ * shader rather than rasterised full size.
  */
 export const mist = {
   name: 'mist',
@@ -43,7 +46,7 @@ export const mist = {
     };
     const mat = new THREE.ShaderMaterial({
       uniforms, vertexShader: MIST_VERT, fragmentShader: MIST_FRAG,
-      transparent: true, depthWrite: false, depthTest: true, blending: THREE.NormalBlending, side: THREE.DoubleSide, fog: false,
+      transparent: true, depthWrite: false, depthTest: true, blending: THREE.NormalBlending, side: THREE.FrontSide, fog: false,
     });
     const mesh = new THREE.InstancedMesh(geo, mat, N);
     const m = new THREE.Matrix4();

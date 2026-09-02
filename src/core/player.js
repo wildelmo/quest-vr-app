@@ -7,9 +7,9 @@ import { CONFIG } from '../config.js';
  *  - height calibration (water at the waist standing, chest seated; the world never moves)
  *  - wading: a deliberate paddle stroke with a submerged, aligned palm glides you the other way;
  *    seated users get yaw from lateral strokes
- *  - the comfort vignette, the opening fade and foveation while moving
+ *  - the comfort vignette (per-eye, in clip space), the opening fade and foveation while moving
  *  - ctx.calm (stillness of the whole body) for the modules that reward it
- *  - desktop mouse-look / WASD fallback
+ *  - desktop mouse-look (right button / Q,E) and WASD fallback
  */
 export function createPlayer(ctx) {
   const { player, camera, renderer } = ctx;
@@ -31,21 +31,22 @@ export function createPlayer(ctx) {
   const calibSamples = [];
   let calibStart = 0;
   let eyeHeight = P.eyeHeightDesktop, seated = false, eyeEMA = 0, driftFor = 0, rigTargetY = 0;
-  let speedSmooth = 0;
-  let fade = 0, fadeStart = -1, fadeDur = 4, fadeDelay = 1.5;
+  let speedSmooth = 0, yawSmooth = 0, yawRate = 0;
+  let fade = 1, fadeStart = -1, fadeDur = 4, fadeDelay = 1.5; // black until a session or the desktop preview starts
   let foveation = 0.5;
   let calm = 0;
   const strokes = { left: makeStroke(), right: makeStroke() };
   function makeStroke() { return { active: false, path: 0, time: 0 }; }
 
-  // ---- comfort vignette + opening fade (camera-attached quad)
+  // ---- comfort vignette + opening fade (camera-attached quad; the radius is measured in clip space so it is
+  // centred per eye and independent of the field of view)
   const vignette = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.2, 3.2),
+    new THREE.PlaneGeometry(4, 4),
     new THREE.ShaderMaterial({
       uniforms: { uStrength: { value: 0 }, uFull: { value: 1 } },
-      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `uniform float uStrength; uniform float uFull; varying vec2 vUv;
-        void main(){ float r = length(vUv - 0.5) * 2.0; float a = smoothstep(0.55, 1.05, r) * uStrength; a = max(a, uFull); gl_FragColor = vec4(0.0, 0.0, 0.0, a); }`,
+      vertexShader: `varying vec2 vNdc; void main(){ vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); vNdc = p.xy / p.w; gl_Position = p; }`,
+      fragmentShader: `uniform float uStrength; uniform float uFull; varying vec2 vNdc;
+        void main(){ float r = length(vNdc); float a = smoothstep(0.5, 1.15, r) * uStrength; a = max(a, uFull); gl_FragColor = vec4(0.0, 0.0, 0.0, a); }`,
       transparent: true, depthTest: false, depthWrite: false, fog: false,
     })
   );
@@ -56,7 +57,12 @@ export function createPlayer(ctx) {
 
   function beginFade(delay, dur) { if (ctx.harness) { delay = 0; dur = 0.05; } fadeStart = ctx.time.t; fadeDelay = delay; fadeDur = dur; fade = 1; }
   ctx.events.on('xrstart', () => { calibrated = false; calibSamples.length = 0; calibStart = ctx.time.t; vel.set(0, 0, 0); player.position.y = 0; player.rotation.set(0, 0, 0); beginFade(1.5, 4); });
-  ctx.events.on('xrend', () => { player.position.y = 0; player.rotation.set(0, 0, 0); camera.position.set(0, P.eyeHeightDesktop, 0); applyLook(); });
+  ctx.events.on('xrend', () => {
+    player.position.y = 0; player.rotation.set(0, 0, 0);
+    camera.position.set(0, P.eyeHeightDesktop, 0);
+    camera.fov = 75; camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+    applyLook();
+  });
   ctx.events.on('desktopstart', () => beginFade(0.3, 2.2));
 
   function enableDesktop() {
@@ -66,7 +72,9 @@ export function createPlayer(ctx) {
     camera.position.set(0, P.eyeHeightDesktop, 0);
     applyLook();
     const canvas = renderer.domElement;
-    canvas.addEventListener('pointerdown', (e) => { if (e.button !== 0 || e.shiftKey) return; dragging = true; lastX = e.clientX; lastY = e.clientY; canvas.setPointerCapture?.(e.pointerId); });
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    // look: right/middle button drag (the left button is the hand's pinch), or Q/E
+    canvas.addEventListener('pointerdown', (e) => { if (e.button !== 2 && e.button !== 1) return; dragging = true; lastX = e.clientX; lastY = e.clientY; canvas.setPointerCapture?.(e.pointerId); e.preventDefault(); });
     window.addEventListener('pointerup', () => { dragging = false; });
     window.addEventListener('pointermove', (e) => {
       if (!dragging) return;
@@ -127,11 +135,13 @@ export function createPlayer(ctx) {
     rightV.set(-fwd.z, 0, fwd.x);
     camera.getWorldPosition(headWorld);
     const cosCone = Math.cos(THREE.MathUtils.degToRad(P.wadeConeDeg));
+    yawRate = 0;
     for (const h of ctx.hands.list) {
       const s = strokes[h.handedness];
       const v = h.palm.velocityLocal;
       const speedH = Math.hypot(v.x, v.z);
-      let ok = h.active && h.submergedDepth > P.strokeMinDepth && !h.pinch.active && !h.grasp && h.meanCurl < 0.5;
+      // a cupped paddling hand is fine; only a real pinch (holding something / pinching) disqualifies
+      let ok = h.active && h.submergedDepth > P.strokeMinDepth && !(h.pinch.active && h.pinch.kind === 'pinch');
       let align = 0;
       if (ok && speedH > 0.05) {
         // palm must push the water: normal roughly along the (horizontal) motion; compare in world space
@@ -149,9 +159,10 @@ export function createPlayer(ctx) {
         _v.set(v.x, 0, v.z).applyQuaternion(player.quaternion); // world-space hand velocity (rig-relative)
         const lateral = Math.abs(_v.x * rightV.x + _v.z * rightV.z) / Math.max(speedH, 1e-3);
         if (seated && lateral > 0.7) {
-          // seated: a lateral stroke turns you instead of strafing
+          // seated: a lateral stroke turns you instead of strafing (comfort: vignette follows yaw rate below)
           const rate = THREE.MathUtils.clamp(speedH * 0.6, 0, P.seatedYawRate) * Math.sign(_v.x * rightV.x + _v.z * rightV.z);
           rotateRigAboutHead(rate * dt);
+          yawRate += rate;
         } else {
           const gain = P.wadeGain * THREE.MathUtils.clamp((speedH - P.wadeMinSpeed) / 0.6 + 0.4, 0.4, 1.2);
           vel.x -= _v.x * gain * dt;
@@ -172,6 +183,8 @@ export function createPlayer(ctx) {
     if (keys.has('KeyS') || keys.has('ArrowDown')) mz -= 1;
     if (keys.has('KeyD') || keys.has('ArrowRight')) mx += 1;
     if (keys.has('KeyA') || keys.has('ArrowLeft')) mx -= 1;
+    if (keys.has('KeyQ')) { yaw += 1.4 * dt; applyLook(); }
+    if (keys.has('KeyE')) { yaw -= 1.4 * dt; applyLook(); }
     if (mx || mz) {
       const n = Math.hypot(mx, mz);
       vel.x += (fwd.x * mz + right.x * mx) / n * P.desktopSpeed * 3 * dt;
@@ -222,19 +235,21 @@ export function createPlayer(ctx) {
 
     const speed = Math.hypot(vel.x, vel.z);
     speedSmooth += (speed - speedSmooth) * Math.min(1, dt * 6);
-    const strength = THREE.MathUtils.clamp(speedSmooth / P.maxSpeed, 0, 1) * 0.85;
+    yawSmooth += (Math.abs(yawRate) - yawSmooth) * Math.min(1, dt * 6);
+    const motion = Math.max(speedSmooth / P.maxSpeed, yawSmooth / P.seatedYawRate);
+    const strength = THREE.MathUtils.clamp(motion, 0, 1) * 0.85;
     // opening fade
     if (fadeStart >= 0) {
       const a = ctx.time.t - fadeStart - fadeDelay;
       fade = a < 0 ? 1 : THREE.MathUtils.clamp(1 - a / fadeDur, 0, 1);
       fade = fade * fade * (3 - 2 * fade);
-      if (a > fadeDur) fadeStart = -1;
-    } else fade = 0;
+      if (a > fadeDur) { fadeStart = -1; fade = 0; }
+    }
     vignette.material.uniforms.uStrength.value = strength;
     vignette.material.uniforms.uFull.value = fade;
     vignette.visible = strength > 0.01 || fade > 0.001;
     // foveation: relaxed at rest, full while gliding under the vignette
-    const fov = speedSmooth > 0.2 ? 1.0 : 0.5;
+    const fov = motion > 0.25 ? 1.0 : 0.5;
     if (presenting && fov !== foveation) { foveation = fov; try { renderer.xr.setFoveation(fov); } catch { /* */ } }
 
     updateCalm(dt);

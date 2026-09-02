@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
-import { FIREFLY_VERT, FIREFLY_FRAG } from '../shaders/fireflies.js';
+import { FIREFLY_VERT, FIREFLY_MIRROR_VERT, FIREFLY_FRAG } from '../shaders/fireflies.js';
 
 /**
- * Fireflies: N additive point sprites (one draw call) plus a mirrored, dimmer copy drawn below the
- * water (one more draw call, same geometry). All behaviour runs on the CPU over typed arrays:
+ * Fireflies: N additive point sprites (one draw call) plus a mirrored, dimmer copy drawn as a glint
+ * on the water surface, after the water (one more draw call, same geometry; the mirror vertex shader
+ * slides each virtual image to where its view ray meets the surface). All behaviour runs on the CPU
+ * over typed arrays:
  *  - three "home" clouds a few metres from the player; each firefly wanders with sum-of-sines
  *    steering, softly pulled toward its own spot in its cloud, kept above the water
  *  - the homes drift after the player when the player wades far away
@@ -33,7 +35,7 @@ const P = {
   stayMin: 8, stayMax: 18, cooldown: 5, abortCooldown: 3,
   followFar: 12, followNear: 6, followRate: 0.25,
   recruitInterval: 0.35, recruitRange: 14,
-  size: 0.04, maxPx: 80, mirrorDim: 0.4, gain: 1.7,
+  size: 0.04, maxPx: 80, mirrorDim: 0.3, gain: 1.7,   // mirrorDim: the surface no longer attenuates the reflection
 };
 
 function mulberry32(a) {
@@ -105,22 +107,23 @@ export const fireflies = {
         uColor: { value: new THREE.Color(CONFIG.colors.firefly) },
         uPixelScale: { value: 800 },
         uSize: { value: P.size },
-        uMirror: { value: mirror ? 1 : 0 },
         uLevel: { value: level },
+        uTime: { value: 0 },
         uFogDensity: { value: ctx.scene.fog ? ctx.scene.fog.density : CONFIG.fog.density },
         uMaxPx: { value: P.maxPx },
         uDim: { value: mirror ? P.mirrorDim : 1 },
         uGain: { value: P.gain },
       },
-      vertexShader: FIREFLY_VERT,
+      vertexShader: mirror ? FIREFLY_MIRROR_VERT : FIREFLY_VERT,
       fragmentShader: FIREFLY_FRAG,
       transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, fog: false,
     });
     const matMain = makeMaterial(false), matMirror = makeMaterial(true);
     const points = new THREE.Points(geo, matMain);
     points.renderOrder = 3; points.frustumCulled = false; points.matrixAutoUpdate = false; points.name = 'fireflies';
+    // the reflection sits on the surface, so it goes just after the water (renderOrder 2), depth-tested against it
     const mirror = new THREE.Points(geo, matMirror);
-    mirror.renderOrder = 1; mirror.frustumCulled = false; mirror.matrixAutoUpdate = false; mirror.name = 'firefliesMirror';
+    mirror.renderOrder = 3; mirror.frustumCulled = false; mirror.matrixAutoUpdate = false; mirror.name = 'firefliesMirror';
     ctx.scene.add(points); ctx.scene.add(mirror);
 
     // ---- hand slots: which firefly is heading for / sitting on which joint of which hand
@@ -153,20 +156,26 @@ export const fireflies = {
     const { renderer, camera } = ctx;
     const hands = ctx.hands.list;
 
-    // ---- uniforms: perspective point scale = H * proj[5] / 2 (== H / (2 tan(fov/2)); also right for asymmetric XR frusta)
-    let h = 0, m5 = 0;
-    if (renderer.xr.isPresenting) {
-      const cams = renderer.xr.getCamera().cameras;
-      if (cams && cams.length && cams[0].viewport && cams[0].viewport.w > 0) { h = cams[0].viewport.w; m5 = cams[0].projectionMatrix.elements[5]; }
-      if (!(h > 0) || !(m5 > 0)) { h = 1700; m5 = 1; } // Quest-ish default: ~1700 px, 90° fov
-    } else {
-      h = renderer.domElement.height || 1000; m5 = camera.projectionMatrix.elements[5] || 1;
+    // ---- uniforms: perspective point scale = 0.5 * viewportHeight * proj[1][1] (== H / (2 tan(fov/2)); also
+    // right for asymmetric XR frusta). main.js publishes it per frame as ctx.view.pixelScale; derive it here only
+    // when that is missing (fixtures / older hosts).
+    let pixelScale = ctx.view && ctx.view.pixelScale > 0 ? ctx.view.pixelScale : 0;
+    if (!(pixelScale > 0)) {
+      let h = 0, m5 = 0;
+      if (renderer.xr.isPresenting) {
+        const cams = renderer.xr.getCamera().cameras;
+        if (cams && cams.length && cams[0].viewport && cams[0].viewport.w > 0) { h = cams[0].viewport.w; m5 = cams[0].projectionMatrix.elements[5]; }
+        if (!(h > 0) || !(m5 > 0)) { h = 1700; m5 = 1; } // Quest-ish default: ~1700 px, 90° fov
+      } else {
+        h = renderer.domElement.height || 1000; m5 = camera.projectionMatrix.elements[5] || 1;
+      }
+      pixelScale = h * m5 * 0.5;
     }
-    const pixelScale = h * m5 * 0.5;
     const fogDensity = ctx.scene.fog ? ctx.scene.fog.density : CONFIG.fog.density;
     for (const mat of [S.matMain, S.matMirror]) {
       mat.uniforms.uPixelScale.value = pixelScale;
       mat.uniforms.uLevel.value = level;
+      mat.uniforms.uTime.value = t;
       mat.uniforms.uFogDensity.value = fogDensity;
     }
 

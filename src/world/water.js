@@ -76,11 +76,10 @@ export const water = {
           float simFade = 1.0 - smoothstep(6.0, 8.5, dPlayer);
           vec2 suv = fract(p / uTile);
           vec4 sim = texture2D(uSim, suv);
-          float hl = texture2D(uSim, suv + vec2(-uSimTexel, 0.0)).r;
+          // forward differences from the centre tap (2 taps instead of 4; the sim is bilinear so the half-texel bias is invisible)
           float hr = texture2D(uSim, suv + vec2( uSimTexel, 0.0)).r;
-          float hd = texture2D(uSim, suv + vec2(0.0, -uSimTexel)).r;
           float hu = texture2D(uSim, suv + vec2(0.0,  uSimTexel)).r;
-          vec2 grad = vec2(hr - hl, hu - hd) * (0.5 / (uSimTexel * uTile)); // dh/dx in (units/m)
+          vec2 grad = vec2(hr - sim.r, hu - sim.r) * (1.0 / (uSimTexel * uTile)); // dh/dx in (units/m)
           nxy += -grad * 0.06 * simFade;
           vec3 N = normalize(vec3(nxy.x, 1.0, nxy.y));
           // --- reflection of the real sky

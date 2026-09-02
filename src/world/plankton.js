@@ -103,9 +103,7 @@ export const plankton = {
     u.uLevel.value = ctx.water.level;
     u.uCalm.value = ctx.water.calm || 0;
     u.uPlayer.value.copy(ctx.playerCtl.state.headWorld);
-    const r = ctx.renderer;
-    const h = r.xr.isPresenting ? 1700 : r.domElement.height;
-    u.uPixelScale.value = h * 0.55;
+    u.uPixelScale.value = ctx.view?.pixelScale || ctx.renderer.domElement.height * 0.55;
     ctx.hands.list.forEach((hs, i) => {
       const on = hs.visible && hs.submerged ? 1 : 0;
       u.uHandOn.value[i] = on;

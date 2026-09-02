@@ -9,8 +9,9 @@ import { LOTUS_FLOWER_VERT, LOTUS_FLOWER_FRAG, LOTUS_GLOW_VERT, LOTUS_GLOW_FRAG 
  * It closes again after a minute. When all six are open at once, 'lotuschord' fires once.
  *
  * Four draw calls: one InstancedMesh of pads (MeshLambert, lit by the moon + hemisphere light), one
- * InstancedMesh of flowers (custom ShaderMaterial, per-instance aBloom/aColor), one additive Points
- * for the glows (renderOrder 4) and a mirrored copy under the water (renderOrder 1).
+ * InstancedMesh of flowers (custom ShaderMaterial, per-instance aBloom/aColor), one instanced set of
+ * additive billboard quads for the glows (renderOrder 4) and their reflection drawn on the surface just
+ * after the water (renderOrder 3).
  *
  * Public surface: ctx.lotus = { flowers: [{ index, position, bud, bloom, color, note, open }], open(i), clusters }
  * Events: 'lotusbloom' { index, note, pos, color }, 'lotuschord' {}
@@ -24,7 +25,7 @@ const PREF_SEP = 1.3, MIN_SEP = 0.9;
 const TOUCH_RADIUS = 0.08, TOUCH_MAX_BLOOM = 0.25;
 const OPEN_SECONDS = 1.6, CLOSE_SECONDS = 6, STAY_MIN = 55, STAY_MAX = 75;
 const PAD_LIFT = 0.004, FLOWER_LIFT = 0.006, BUD_HEIGHT = 0.045;
-const GLOW_SIZE = 0.35, MIRROR_GAIN = 0.45, SURGE_SECONDS = 3.0;
+const GLOW_SIZE = 0.35, MIRROR_GAIN = 0.3, SURGE_SECONDS = 3.0; // the reflection is drawn on the surface, so it needs less gain
 const GLOW_GAIN_CLOSED = 0.08, GLOW_GAIN_OPEN = 0.40; // additive halo brightness (the petals carry their own glow)
 const PAD_COLOR = 0x0f2a1c, PAD_EMISSIVE = 0x02110a;
 
@@ -45,11 +46,19 @@ const smooth = (u) => u * u * (3 - 2 * u);
 // Layout (seeded, deterministic)
 function layoutClusters(rnd) {
   const out = [];
-  const slot = (360 - 2 * FRONT_HALF_DEG) / CLUSTERS;
-  for (let i = 0; i < CLUSTERS; i++) {
+  // cluster 0 is within arm's reach from the start (front-left, 0.55–0.75 m; the near lanterns sit
+  // front-right and back-left), the others are scenery 1.4–3.8 m out around the player
+  {
+    const azDeg = -55 + (rnd() - 0.5) * 8;
+    const az = THREE.MathUtils.degToRad(azDeg);
+    const r = 0.55 + rnd() * 0.2;
+    out.push({ x: Math.sin(az) * r, z: -Math.cos(az) * r, azDeg, r });
+  }
+  const slot = (360 - 2 * FRONT_HALF_DEG) / (CLUSTERS - 1);
+  for (let i = 1; i < CLUSTERS; i++) {
     let best = null, bestScore = -1;
     for (let k = 0; k < 60; k++) {
-      const azDeg = FRONT_HALF_DEG + slot * (i + 0.5) + (rnd() - 0.5) * slot * 0.8;
+      const azDeg = FRONT_HALF_DEG + slot * (i - 0.5) + (rnd() - 0.5) * slot * 0.8;
       const az = THREE.MathUtils.degToRad(azDeg);
       const r = R_MIN + (R_MAX - R_MIN) * rnd();
       const x = Math.sin(az) * r, z = -Math.cos(az) * r;
@@ -259,35 +268,43 @@ export const lotus = {
     flowerMesh.renderOrder = 3; flowerMesh.frustumCulled = false; flowerMesh.name = 'lotusFlowers';
     ctx.scene.add(flowerMesh);
 
-    // ---- glow points + mirrored copy (same geometry, second material)
-    const glowGeo = new THREE.BufferGeometry();
-    const glowPos = new THREE.BufferAttribute(new Float32Array(CLUSTERS * 3), 3).setUsage(THREE.DynamicDrawUsage);
-    const glowSize = new THREE.BufferAttribute(new Float32Array(CLUSTERS), 1).setUsage(THREE.DynamicDrawUsage);
-    const glowGain = new THREE.BufferAttribute(new Float32Array(CLUSTERS), 1).setUsage(THREE.DynamicDrawUsage);
-    const glowCol = new THREE.BufferAttribute(new Float32Array(CLUSTERS * 3), 3);
-    flowers.forEach((f, i) => { glowCol.setXYZ(i, f.color.r, f.color.g, f.color.b); glowPos.setXYZ(i, f.bud.x, f.bud.y, f.bud.z); });
-    glowGeo.setAttribute('position', glowPos);
-    glowGeo.setAttribute('aSize', glowSize);
-    glowGeo.setAttribute('aGain', glowGain);
-    glowGeo.setAttribute('aColor', glowCol);
-    // The mirrored copy must be painted *before* the opaque pads/flowers and then be covered by the water,
-    // so it lives in the opaque list (transparent: false keeps renderOrder meaningful against opaque
-    // objects; additive blending still applies). The halo is a transparent overlay drawn after everything.
+    // ---- glow halos + their reflection: instanced billboard quads sharing the per-flower arrays
+    const quad = new THREE.PlaneGeometry(1, 1);
+    const glowPosArr = new Float32Array(CLUSTERS * 3), glowSizeArr = new Float32Array(CLUSTERS), glowGainArr = new Float32Array(CLUSTERS), glowColArr = new Float32Array(CLUSTERS * 3);
+    flowers.forEach((f, i) => { glowColArr.set([f.color.r, f.color.g, f.color.b], i * 3); glowPosArr.set([f.bud.x, f.bud.y, f.bud.z], i * 3); });
+    const glowGeos = [];
+    const makeGlowGeo = () => {
+      const g = new THREE.InstancedBufferGeometry();
+      g.setIndex(quad.index);
+      g.setAttribute('position', quad.attributes.position);
+      g.setAttribute('uv', quad.attributes.uv);
+      g.setAttribute('aCenter', new THREE.InstancedBufferAttribute(glowPosArr, 3).setUsage(THREE.DynamicDrawUsage));
+      g.setAttribute('aSize', new THREE.InstancedBufferAttribute(glowSizeArr, 1).setUsage(THREE.DynamicDrawUsage));
+      g.setAttribute('aGain', new THREE.InstancedBufferAttribute(glowGainArr, 1).setUsage(THREE.DynamicDrawUsage));
+      g.setAttribute('aColor', new THREE.InstancedBufferAttribute(glowColArr, 3));
+      g.instanceCount = CLUSTERS;
+      glowGeos.push(g);
+      return g;
+    };
     const makeGlowMat = (mirror, gainMul) => new THREE.ShaderMaterial({
       uniforms: {
         uMap: { value: ctx.assets.tex.glowSoft }, uMirror: { value: mirror }, uLevel: { value: ctx.water.level },
-        uViewportH: { value: 800 }, uGainMul: { value: gainMul },
+        uGainMul: { value: gainMul },
       },
       vertexShader: LOTUS_GLOW_VERT, fragmentShader: LOTUS_GLOW_FRAG,
-      transparent: !mirror, depthWrite: false, depthTest: !!mirror, blending: THREE.AdditiveBlending, fog: false,
+      transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide,
     });
     const glowMat = makeGlowMat(0, 1);
     const mirrorMat = makeGlowMat(1, MIRROR_GAIN);
-    const glowPoints = new THREE.Points(glowGeo, glowMat);
+    const glowPoints = new THREE.Mesh(makeGlowGeo(), glowMat);
     glowPoints.renderOrder = 4; glowPoints.frustumCulled = false; glowPoints.name = 'lotusGlow';
-    const mirrorPoints = new THREE.Points(glowGeo, mirrorMat);
-    mirrorPoints.renderOrder = 1; mirrorPoints.frustumCulled = false; mirrorPoints.name = 'lotusGlowMirror';
+    // the reflection sits on the surface, so it is drawn just after the water (renderOrder 3), depth-tested
+    const mirrorPoints = new THREE.Mesh(makeGlowGeo(), mirrorMat);
+    mirrorPoints.renderOrder = 3; mirrorPoints.frustumCulled = false; mirrorPoints.name = 'lotusGlowMirror';
     ctx.scene.add(glowPoints); ctx.scene.add(mirrorPoints);
+    const glowPos = { setXYZ: (i, x, y, z) => { glowPosArr[i * 3] = x; glowPosArr[i * 3 + 1] = y; glowPosArr[i * 3 + 2] = z; }, set needsUpdate(v) { for (const g of glowGeos) g.attributes.aCenter.needsUpdate = v; } };
+    const glowSize = { setX: (i, v) => { glowSizeArr[i] = v; }, set needsUpdate(v) { for (const g of glowGeos) g.attributes.aSize.needsUpdate = v; } };
+    const glowGain = { setX: (i, v) => { glowGainArr[i] = v; }, set needsUpdate(v) { for (const g of glowGeos) g.attributes.aGain.needsUpdate = v; } };
 
     // ---- interaction helpers
     const openFlower = (i) => {
@@ -306,6 +323,7 @@ export const lotus = {
       /** Bloom flower i as if it had been touched (returns false if it is already open). */
       open: (i) => openFlower(i),
       chordCount: 0,
+      nearestBudDistance: Infinity, // horizontal distance from the head to the nearest closed bud
     };
 
     this._ = {
@@ -370,6 +388,14 @@ export const lotus = {
       f.bud.set(f.position.x, y + BUD_HEIGHT * f.scale, f.position.z);
     }
 
+    // ---- nearest closed bud (for the hints)
+    {
+      const head = ctx.playerCtl ? ctx.playerCtl.state.headWorld : null;
+      let best = Infinity;
+      if (head) for (const f of S.flowers) { if (f.open) continue; const d = Math.hypot(f.bud.x - head.x, f.bud.z - head.z); if (d < best) best = d; }
+      ctx.lotus.nearestBudDistance = best;
+    }
+
     // ---- touch: any fingertip of a visible hand near a closed bud
     if (ctx.hands && ctx.hands.list) {
       const r2 = TOUCH_RADIUS * TOUCH_RADIUS;
@@ -423,12 +449,6 @@ export const lotus = {
     const fog = ctx.scene.fog;
     if (fog) { U.uFogColor.value.copy(fog.color); if (fog.isFogExp2) U.uFogDensity.value = fog.density; }
 
-    const xr = ctx.renderer.xr;
-    let viewportH = ctx.renderer.domElement.height || 800;
-    if (xr.isPresenting) {
-      const layer = typeof xr.getBaseLayer === 'function' ? xr.getBaseLayer() : null;
-      viewportH = (layer && (layer.framebufferHeight || layer.textureHeight)) || 1900;
-    }
-    for (const m of [S.glowMat, S.mirrorMat]) { m.uniforms.uViewportH.value = viewportH; m.uniforms.uLevel.value = level; }
+    for (const m of [S.glowMat, S.mirrorMat]) m.uniforms.uLevel.value = level;
   },
 };

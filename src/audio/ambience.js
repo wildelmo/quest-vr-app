@@ -58,27 +58,36 @@ export const ambience = {
     this._s = S;
     S.arc = () => clamp((c.currentTime - S.t0) / SESSION_ARC, 0, 1);
 
-    // ---- wind bed: loop → low-pass → gain (6 s fade-in, then a slow random walk ±30 %)
-    const windBuf = api.buffer('wind_loop');
-    if (windBuf) {
-      const src = c.createBufferSource(); src.buffer = windBuf; src.loop = true;
-      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800; lp.Q.value = 0.4;
-      const g = c.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.linearRampToValueAtTime(0.28, now + 6);
-      src.connect(lp); lp.connect(g); g.connect(bed);
-      src.start(now, rng() * Math.max(0, windBuf.duration - 1));
-      S.wind = { src, lp, g, walk: new Walker(rng, 0.7, 1.3, 20, 40, now + 6), base: 0.28, fadeEnd: now + 6 };
-    }
-
-    // ---- water lapping: short loop, low-passed, rising with the player's glide speed
-    const waterBuf = api.buffer('water_loop_1');
-    if (waterBuf) {
-      const src = c.createBufferSource(); src.buffer = waterBuf; src.loop = true;
-      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.5;
-      const g = c.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.linearRampToValueAtTime(0.06, now + 4);
-      src.connect(lp); lp.connect(g); g.connect(bed);
-      src.start(now, rng() * waterBuf.duration * 0.9);
-      S.water = { src, lp, g, fadeEnd: now + 4 };
-    }
+    // ---- wind bed: loop → low-pass → gain (6 s fade-in, then a slow random walk ±30 %). The buffers may
+    // still be decoding when the engine starts; startBeds() is retried from update() until they exist.
+    S.startBeds = () => {
+      const t0 = c.currentTime;
+      if (!S.wind) {
+        const windBuf = api.buffer('wind_loop');
+        if (windBuf) {
+          const src = c.createBufferSource(); src.buffer = windBuf; src.loop = true;
+          const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800; lp.Q.value = 0.4;
+          const g = c.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.28, t0 + 6);
+          src.connect(lp); lp.connect(g); g.connect(bed);
+          src.start(t0, rng() * Math.max(0, windBuf.duration - 1));
+          S.wind = { src, lp, g, walk: new Walker(rng, 0.7, 1.3, 20, 40, t0 + 6), base: 0.28, fadeEnd: t0 + 6 };
+        }
+      }
+      // ---- water lapping: short loop, low-passed, rising with the player's glide speed
+      if (!S.water) {
+        const waterBuf = api.buffer('water_loop_1');
+        if (waterBuf) {
+          const src = c.createBufferSource(); src.buffer = waterBuf; src.loop = true;
+          const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.5;
+          const g = c.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.06, t0 + 4);
+          src.connect(lp); lp.connect(g); g.connect(bed);
+          src.start(t0, rng() * waterBuf.duration * 0.9);
+          S.water = { src, lp, g, fadeEnd: t0 + 4 };
+        }
+      }
+    };
+    S.startBeds();
+    S.bedRetry = 0;
     // synthesized swell: band-passed noise breathing slowly (fills in under the loop)
     {
       const src = c.createBufferSource(); src.buffer = api.noise('white', 4); src.loop = true;
@@ -132,26 +141,12 @@ export const ambience = {
     S.startle = startle;
     S.offs.push(ctx.events.on('lanternsplash', () => startle(6, 12)));
     S.offs.push(ctx.events.on('lotuschord', () => startle(4, 6)));
-    // headset taken off / session blurred: fade the master out fast, bring it back gently on focus
-    S.offs.push(ctx.events.on('xrblur', () => {
-      if (!api.master) return;
-      const t = api.now();
-      api.master.gain.cancelScheduledValues(t); api.master.gain.setValueAtTime(Math.max(0.0001, api.master.gain.value), t);
-      api.master.gain.linearRampToValueAtTime(0.0001, t + 0.1);
-    }));
-    S.offs.push(ctx.events.on('xrfocus', () => {
-      if (!api.master) return;
-      const resume = () => {
-        const t = api.now();
-        api.master.gain.cancelScheduledValues(t); api.master.gain.setValueAtTime(Math.max(0.0001, api.master.gain.value), t);
-        api.master.gain.linearRampToValueAtTime(api.masterLevel ?? 0.9, t + 1.0);
-      };
-      try { const p = c.resume(); if (p && p.then) p.then(resume, resume); else resume(); } catch { resume(); }
-    }));
+    // (blur/focus fades of the master bus are owned by the engine — see engine.js)
   },
 
   update(api, ctx, dt) {
     const S = this._s;
+    if (S && (!S.wind || !S.water)) { S.bedRetry += dt; if (S.bedRetry > 0.5) { S.bedRetry = 0; S.startBeds(); } }
     if (!S || !api.context) return;
     const c = api.context;
     const now = c.currentTime;

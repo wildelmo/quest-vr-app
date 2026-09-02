@@ -19,7 +19,7 @@ import { fmBell } from './sfx.js';
 const LOOKAHEAD = 0.15;
 const ROOT = CONFIG.music?.rootMidi ?? 62;
 const PENTA = [0, 3, 5, 7, 10]; // minor pentatonic relative to the root
-const POOL = 7;
+const POOL = 10; // 5 new notes never have to steal from a voice that is still releasing
 const LO = 38, HI = 74, UPPER_LO = 72, UPPER_HI = 84;
 const VOICE_LEVEL = 0.05, UPPER_LEVEL = 0.03;
 const SESSION_ARC = 1200; // seconds over which the session slowly settles
@@ -305,7 +305,7 @@ function changeChord(S, t, energy) {
       want.delete(v.midi);
     } else noteOff(v, t, release);
   }
-  for (const [midi, lvl] of want) noteOn(S, pickFree(S, t), midi, lvl, t, attack);
+  for (const [midi, lvl] of want) { const pk = pickFree(S, t); noteOn(S, pk.v, midi, lvl, pk.at, attack, pk.at === t); }
 
   S.prevIdx = S.chordIdx; S.chordIdx = idx; S.chord = chord;
   S.voicing = voicing; S.upper = upper;
@@ -314,24 +314,36 @@ function changeChord(S, t, energy) {
   S.nextChordAt = t + dur;
 }
 
+/**
+ * Picks a voice for a new note: a fully released one if any; otherwise the one whose release ends soonest,
+ * shortened to end within 0.3 s, and the new note starts exactly when that fade reaches silence (no pitch
+ * jump at full level). Returns { v, at } — `at` is when the note may start.
+ */
 function pickFree(S, t) {
-  let best = null;
+  let free = null, soonest = null;
   for (const v of S.voices) {
     if (v.on) continue;
-    if (!best || v.offAt < best.offAt) best = v;
+    if (v.offAt <= t) { if (!free || v.offAt < free.offAt) free = v; }
+    else if (!soonest || v.offAt < soonest.offAt) soonest = v;
   }
-  if (best) return best;
-  // every voice is sounding (cannot happen with POOL > 5): steal the quietest
-  best = S.voices[0];
+  if (free) return { v: free, at: t };
+  if (soonest) {
+    const at = Math.min(soonest.offAt, t + 0.3);
+    if (soonest.offAt > at) { holdAt(soonest.g.gain, t); soonest.g.gain.linearRampToValueAtTime(0.0001, at); soonest.offAt = at; }
+    return { v: soonest, at };
+  }
+  // every voice is sounding (cannot happen with POOL > 5): steal the quietest with a short fade
+  let best = S.voices[0];
   for (const v of S.voices) if (v.level < best.level) best = v;
   noteOff(best, t, 0.3);
-  return best;
+  return { v: best, at: t + 0.3 };
 }
 
-function noteOn(S, v, midi, level, t, attack) {
+function noteOn(S, v, midi, level, t, attack, fresh = true) {
   const f = mtof(midi);
   v.oscA.frequency.setValueAtTime(f, t); v.oscB.frequency.setValueAtTime(f, t);
-  holdAt(v.g.gain, t);
+  if (fresh) holdAt(v.g.gain, t);
+  else v.g.gain.setValueAtTime(0.0001, t); // the previous release ends exactly here; append, don't cancel it
   v.g.gain.linearRampToValueAtTime(level, t + attack);
   v.midi = midi; v.on = true; v.level = level; v.freq = f;
 }
