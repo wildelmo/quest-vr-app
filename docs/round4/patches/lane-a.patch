@@ -1648,10 +1648,10 @@ index 00b1c5e..c60faca 100644
      s.mat.uniforms.uPrev.value = s.cur.texture;
  
 diff --git a/tools/harness/scenario.mjs b/tools/harness/scenario.mjs
-index 2412be0..bc3d30f 100644
+index 2412be0..c06d42a 100644
 --- a/tools/harness/scenario.mjs
 +++ b/tools/harness/scenario.mjs
-@@ -1,6 +1,10 @@
+@@ -1,6 +1,11 @@
  // End-to-end interaction scenario on the fake WebXR device:
 -//   1. calibrate, 2. grab the nearest lantern, lift it, let go above the water → it rises → a star is born,
 -//   3. touch the nearest lotus bud → it blooms, 4. hold a hand open and still → a firefly lands,
@@ -1659,12 +1659,13 @@ index 2412be0..bc3d30f 100644
 +//      hand sideways through the next floating lantern → it is nudged away (no grab, no pull),
 +//   3. hold a fingertip still above the nearest lotus bud → it leans, whispers and opens by itself; hovering too high does
 +//      nothing; touch the next bud → it blooms; set a lantern down among the next closed cluster's pads → it warms the bud open,
-+//   4. hold a hand open and still → a firefly lands, 4b. move an open hand slowly → fireflies follow it in a ribbon and hand off
-+//      to a still hand, 4c. a palm resting flat on the water hushes it,
++//   4. hold a hand open and still → a firefly lands, 4a. carry them to a lantern and let it go → they escort it up, spill and
++//      kick their cloud into step; its star sends a wave of flashes across the lake, 4b. move an open hand slowly → fireflies
++//      follow it in a ribbon and hand off to a still hand, 4c. a palm resting flat on the water hushes it,
  //   5. locomotion: a stroke does nothing, a missed pinch does nothing, pinch-and-pull moves, two hands turn, 6. palms together → leave.
  // Prints a JSON report and exits 1 if any step fails. Usage: node tools/harness/scenario.mjs [--out dir]
  import { chromium } from 'playwright';
-@@ -82,7 +86,79 @@ try {
+@@ -82,7 +87,79 @@ try {
      await page.evaluate(() => { window.__fakeXR.clock.step = 1 / 36; });
    }
  
@@ -1745,7 +1746,7 @@ index 2412be0..bc3d30f 100644
    w = await world();
    const buds = w.lotus.filter((f) => !f.open);
    buds.sort((a, b) => Math.hypot(a.x - head[0], a.z - head[2]) - Math.hypot(b.x - head[0], b.z - head[2]));
-@@ -100,6 +176,54 @@ try {
+@@ -100,6 +177,54 @@ try {
      await shot('lotus.png');
    }
  
@@ -1800,10 +1801,94 @@ index 2412be0..bc3d30f 100644
    // ---- fireflies: open hand, palm up, still for ~4 s
    await setHand('right', [0.3, 1.3, -0.45], 0, { pitchDeg: 0, rollDeg: 180 });
    await setHand('left', [-0.3, 1.3, -0.45], 0, { pitchDeg: 0, rollDeg: -180 });
-@@ -109,6 +233,91 @@ try {
+@@ -109,6 +234,175 @@ try {
    step('firefly-landed', ev.some((e) => e.type === 'fireflyland') || (s.fireflyLanded || 0) > 0, { fireflyLanded: s.fireflyLanded, stillL: await page.evaluate(() => { const h = window.__nocturneCtx.hands.right; return { still: h.still, stillFor: +h.stillFor.toFixed(2), open: h.open, attraction: +h.attraction.toFixed(2), disp: +h.stillDisp.toFixed(3) }; }) });
    await shot('fireflies.png');
  
++  // ---- the escort, and the lake passes it on: carry the fireflies resting on the palm-up hand to the nearest floating
++  // lantern, lift it and let it go: they lift off with it ('fireflyescort'), spill ~4 s up ('fireflyspill') and kick their
++  // cloud into step; when that lantern becomes a star, a wave of flashes crosses the lake from the player ('lakewave')
++  {
++    w = await world();
++    const hd = w.head;
++    const fl = w.lanterns.map((l, index) => ({ ...l, index })).filter((l) => l.state === 'floating');
++    fl.sort((a, b) => Math.hypot(a.x - hd[0], a.z - hd[2]) - Math.hypot(b.x - hd[0], b.z - hd[2]));
++    const L2 = fl[0];
++    step('escort-lantern-ready', !!L2 && (s.fireflyLanded || 0) > 0, { lantern: L2, fireflyLanded: s.fireflyLanded });
++    if (L2) {
++      const up = { pitchDeg: 0, rollDeg: 180, curl: 0.02 };
++      const live = async () => { const l = (await world()).lanterns[L2.index]; return [l.x, l.y + 0.15, l.z + 0.10]; };
++      // glide the wrist over (<= 0.3 m/s so the landed fireflies stay), then correct for the lantern's drift on the way
++      const from = [0.3, 1.3, -0.45];
++      let to = [L2.x, L2.y + 0.15, L2.z + 0.10];
++      let dist = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
++      let n = Math.max(144, Math.ceil(dist / 0.28 * 36));
++      for (let i = 1; i <= n; i++) { const k = i / n; await setHand('right', [from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k, from[2] + (to[2] - from[2]) * k], 0, up); await frame(); }
++      const at = to, now = await live();
++      dist = Math.hypot(now[0] - at[0], now[1] - at[1], now[2] - at[2]);
++      if (dist > 0.02) { n = Math.max(6, Math.ceil(dist / 0.25 * 36)); for (let i = 1; i <= n; i++) { const k = i / n; await setHand('right', [at[0] + (now[0] - at[0]) * k, at[1] + (now[1] - at[1]) * k, at[2] + (now[2] - at[2]) * k], 0, up); await frame(); } to = now; }
++      const landedBefore = (await stats()).fireflyLanded;
++      const grabs0 = (await events()).filter((e) => e.type === 'grab').length;
++      for (let i = 1; i <= 24; i++) { await setHand('right', to, i / 24, up); await frame(); }
++      await frames(4);
++      let ev = await events();
++      s = await stats();
++      step('escort-lantern-grabbed', ev.filter((e) => e.type === 'grab').length > grabs0 && (s.fireflyLanded || 0) > 0,
++        { landedBefore, fireflyLanded: s.fireflyLanded, events: ev.filter((e) => e.type === 'grab' || e.type === 'pinchmiss' || e.type === 'lanterngrab').slice(-3) });
++      const n0 = ev.length;
++      // lift it 0.40 m over 1.5 s and let go at the top
++      for (let i = 1; i <= 54; i++) { await setHand('right', [to[0], to[1] + 0.40 * i / 54, to[2]], 1, up); await frame(); }
++      await setHand('right', [to[0], to[1] + 0.40, to[2]], 0, up);
++      await frames(4);
++      ev = await events(); s = await stats();
++      const esc = ev.slice(n0).find((e) => e.type === 'fireflyescort');
++      const lw0 = (await world()).lanterns[L2.index];
++      step('firefly-escort', !!esc && esc.detail?.count >= 1 && (s.fireflyEscorting || 0) >= 1, { escort: esc?.detail, escorting: s.fireflyEscorting, lantern: lw0, released: ev.slice(n0).some((e) => e.type === 'lanternrelease') });
++      await shot('escort.png');
++      // park the hand; ~4.2 s up the escort spills
++      await setHand('right', [0.25, 1.25, -0.4], 0, { curl: 0.6 });
++      await frames(180);
++      ev = await events(); s = await stats();
++      const spill = ev.slice(n0).find((e) => e.type === 'fireflyspill');
++      const kicked = await page.evaluate(() => window.__nocturneCtx.fireflies.kickedCloud);
++      step('firefly-spill', !!spill && s.fireflyEscorting === 0, { spill: spill?.detail, escorting: s.fireflyEscorting, kickedCloud: kicked, lantern: (await world()).lanterns[L2.index] });
++      // the kicked cloud locks into a common flash within a few seconds (fast clock)
++      await page.evaluate(() => { window.__fakeXR.clock.step = 0.1; });
++      let cohMax = 0;
++      for (let i = 0; i < 80; i++) {
++        await frame();
++        const coh = await page.evaluate(() => { const f = window.__nocturneCtx.fireflies; return f.kickedCloud >= 0 ? f.coherence[f.kickedCloud] : 0; });
++        cohMax = Math.max(cohMax, coh);
++        if (coh > 0.5) break;
++      }
++      step('spill-kicks-the-cloud', cohMax > 0.5, { coherence: +cohMax.toFixed(3), kickedCloud: kicked });
++      // keep stepping until that lantern becomes a star; the lake answers 0.8 s later
++      const stars0 = ev.filter((e) => e.type === 'lanternstar').length;
++      const tBefore = await page.evaluate(() => window.__nocturneCtx.time.t);
++      let starred = false;
++      for (let i = 0; i < 320 && !starred; i++) { await frame(); if (i % 4 === 3) starred = (await events()).filter((e) => e.type === 'lanternstar').length > stars0; }
++      await page.evaluate(() => { window.__fakeXR.clock.step = 1 / 36; });
++      let fired = false;
++      for (let i = 0; i < 40 && !fired; i++) { await frame(); fired = await page.evaluate((tb) => { const wv = window.__nocturneCtx.fireflies.wave; return wv.fired && wv.t0 > tb; }, tBefore); }
++      const wv = await page.evaluate(() => { const x = window.__nocturneCtx.fireflies.wave; return { count: x.count, t0: +x.t0.toFixed(2), sample: Array.from(x.sample), sampleT: Array.from(x.sampleT) }; });
++      // every sampled firefly of cloud 0 should peak (> 0.6) within 0.12 s of the moment the 2.5 m/s front reaches it
++      const peaks = new Array(wv.sample.length).fill(-1);
++      for (let i = 0; i < 150; i++) {
++        await frame();
++        const r = await page.evaluate((st) => { const c = window.__nocturneCtx; const t = c.time.t, b = c.fireflies.brightness; return st.sample.map((idx, k) => (idx >= 0 && Math.abs(t - st.sampleT[k]) <= 0.12 ? b[idx] : -1)); }, wv);
++        for (let k = 0; k < r.length; k++) if (r[k] > peaks[k]) peaks[k] = r[k];
++      }
++      const nSamples = wv.sample.filter((i) => i >= 0).length;
++      const peaked = peaks.filter((v) => v > 0.6).length;
++      ev = await events();
++      const lwEv = ev.slice(n0).find((e) => e.type === 'lakewave' && e.t > tBefore);
++      const lotusWave = await page.evaluate(() => { const f = window.__nocturneCtx.lotus.flowers; return { anyOpen: f.some((x) => x.open), anyWave: f.some((x) => x.waveAt > 0), waveAt: f.map((x) => +x.waveAt.toFixed(2)) }; });
++      step('lake-wave', starred && fired && !!lwEv && lwEv.detail?.count >= 100 && nSamples > 0 && peaked >= 0.75 * nSamples && (lotusWave.anyOpen ? lotusWave.anyWave : true),
++        { starred, fired, wave: lwEv?.detail, count: wv.count, t0: wv.t0, samples: nSamples, peaked, peaks: peaks.map((v) => +v.toFixed(2)), lotus: lotusWave });
++      await shot('lake_wave.png');
++    }
++  }
++
 +  // ---- the ribbon: an open hand carried slowly sideways, palm up, gathers a strand of fireflies behind it; stopping hands them over
 +  {
 +    await setHand('right', [0.2, 1.25, -0.45], 0, { curl: 0.6 });                            // close the hand: the landed fireflies leave
