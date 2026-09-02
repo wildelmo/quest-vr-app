@@ -45,7 +45,7 @@ npm install                 # only needed for the test harness (Playwright)
 npm run serve               # http://localhost:8787
 ```
 
-Open it in a desktop browser for a mouse-and-keyboard preview (right-drag or Q/E to look, WASD to wade,
+Open it in a desktop browser for a mouse-and-keyboard preview (right-drag or Q/E to look, WASD to move,
 the mouse is your right hand, click to pinch — and pinch-drag with nothing in reach to pull yourself
 along — hold Shift to dip the hand into the water). To try it on a headset from
 a local server you need HTTPS or the Chrome remote-debugging port forward to the Quest.
@@ -79,5 +79,6 @@ One 384²/512² wave-sim pass, 58 draw calls, ~115k triangles and ~28k points wi
 72 Hz target. Quest 2 gets the 2k panorama and fewer particles; Quest 3 and desktop get the 4k panorama.
 
 `npm run scenario` drives the fake headset through the whole interaction loop (grab a lantern, let it go,
-watch it become a star; touch a lotus; hold still for a firefly; paddle; pinch and pull the world) and
-fails if any step does not happen.
+watch it become a star; touch a lotus; hold still for a firefly; check that a stroke and a missed pinch do
+not move you, that pinch-and-pull does, that two hands turn the world, and that palms together ends the
+session) and fails if any step does not happen.

@@ -126,6 +126,7 @@ export const sfx = {
     on('lanternstar', (e) => onLanternStar(S, e));
     on('handenter', (e) => onHandEnter(S, e));
     on('handexit', (e) => onHandExit(S, e));
+    on('drip', (e) => onDrip(S, e));
     on('pinchmiss', (e) => { const p = hasXYZ(e.point) ? e.point : e.hand?.pinch?.point; if (hasXYZ(p)) noiseBurst(S, { pos: p, dur: 0.02, gain: 0.05, type: 'bandpass', freq: 2000, q: 3 }); });
   },
 
@@ -209,7 +210,7 @@ export const sfx = {
     kill(S.noiseWhite); kill(S.noisePink);
   },
 
-  /** bell({ midi, pos, gain, dur, kind, index, when, wet, detune, refDistance }) → pool voice or null. */
+  /** bell({ midi, pos, gain, dur, kind, index, when, wet, detune, refDistance, attack }) → pool voice or null. */
   bell(opts) { return this._s ? triggerBell(this._s, opts) : null; },
 };
 
@@ -223,7 +224,7 @@ function nearAtten(pos, head) {
 
 // ---------------------------------------------------------------------------------------------
 // FM bell pool
-function triggerBell(S, { midi = 74, pos = null, gain = 0.3, dur = 1.8, kind = 'glass', index = null, when = 0, wet = 0, detune = 0, refDistance = 2, tag = '' } = {}) {
+function triggerBell(S, { midi = 74, pos = null, gain = 0.3, dur = 1.8, kind = 'glass', index = null, when = 0, wet = 0, detune = 0, refDistance = 2, tag = '', attack = 0.005 } = {}) {
   const c = S.c;
   const now = c.currentTime;
   let t = Math.max(when || 0, now + 0.005);
@@ -256,7 +257,7 @@ function triggerBell(S, { midi = 74, pos = null, gain = 0.3, dur = 1.8, kind = '
   v.mg.gain.exponentialRampToValueAtTime(Math.max(0.001, f * idx * 0.04), t + dur * 0.55);
   holdAt(v.env.gain, t);
   v.env.gain.setValueAtTime(0.0001, t);
-  v.env.gain.linearRampToValueAtTime(Math.max(0.0002, g), t + 0.005);
+  v.env.gain.linearRampToValueAtTime(Math.max(0.0002, g), t + Math.max(0.005, attack));
   v.env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   v.send.gain.setValueAtTime(clamp(wet, 0, 1), t);
   if (pos) v.pa.position.set(pos.x, pos.y, pos.z); else v.pa.position.copy(head);
@@ -334,7 +335,8 @@ function onLanternRelease(S, e) {
   const pos = hasXYZ(e.pos) ? e.pos : (hasXYZ(e.hand?.palm?.position) ? e.hand.palm.position : S.head());
   playAt(S, 'whoosh_gentle', pos, { gain: 0.25, rate: 1.05, refDistance: 1.5, out: S.out.world });
   const root = S.ctx.music?.currentChord?.root ?? mod12(ROOT);
-  triggerBell(S, { midi: 48 + mod12(root), pos, gain: 0.3, dur: 4, kind: 'ceramic', when: S.c.currentTime + 0.4, tag: 'lantern' });
+  // a low ceramic bell on the chord root, struck softly (40 ms attack) so it blooms under the pads instead of hitting them
+  triggerBell(S, { midi: 48 + mod12(root), pos, gain: 0.3, dur: 4, kind: 'ceramic', when: S.c.currentTime + 0.4, attack: 0.04, tag: 'lantern' });
 }
 
 function onLanternStar(S, e) {
@@ -362,6 +364,16 @@ function onHandEnter(S, e) {
   const sp = clamp(speed / 1.5, 0, 1);
   noiseBurst(S, { pos, dur: 0.12, gain: 0.08 + 0.18 * sp, type: 'bandpass', freq: 1200, sweepTo: 300, q: 2 });
   if (speed > 0.5) playAt(S, SPLASHES[Math.floor(S.rng() * 4)], pos, { gain: 0.2, refDistance: 1.5, out: S.out.world });
+}
+
+// a droplet from a lifted hand meeting the surface: a very quiet, very short high plip, pitch scattered so a
+// run of drips reads as water and not as a metronome (rate-limited to 8/s by the drips module)
+function onDrip(S, e) {
+  const pos = hasXYZ(e.pos) ? e.pos : null;
+  if (!pos) return;
+  const b = clamp(typeof e.bright === 'number' ? e.bright : 0.6, 0.2, 1.2);
+  const f = 2600 + S.rng() * 1800;
+  noiseBurst(S, { pos, dur: 0.028, gain: 0.012 + 0.018 * b, type: 'bandpass', freq: f, sweepTo: f * 0.55, q: 6, refDistance: 0.8 });
 }
 
 function onHandExit(S, e) {

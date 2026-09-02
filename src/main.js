@@ -87,7 +87,7 @@ async function boot() {
   ctx.audio.load().catch((e) => console.warn('[audio] decode failed', e)); // decoding needs no gesture
   // event log for the harness / debugging
   ctx.eventLog = [];
-  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'starborn', 'lotusbloom', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart']) {
+  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'starborn', 'lotusbloom', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart', 'leave', 'drip']) {
     ctx.events.on(type, (e) => { if (ctx.eventLog.length < 500) ctx.eventLog.push({ type, t: +ctx.time.t.toFixed(2), detail: summarize(e) }); });
   }
   function summarize(e) {

@@ -9,11 +9,16 @@ import * as THREE from 'three';
  * activation is still valid for requestSession(). Subsystems start as soon as the context runs (they null-
  * check buffers and pick them up lazily), so the wind and crickets are there when the picture fades in.
  *
- * Graph:  buses.bed / world / music / chimes  →  master  →  compressor  →  soft limiter  →  output
+ * Graph:  buses.bed / world / chimes (+ reverb return)  →  compIn  →  compressor  ┐
+ *         buses.music (level-matched, uncompressed)  ────────────────────────────┴→  master  →  soft limiter  →  output
  *         each bus also sends to a parallel convolution reverb (bed: none, world: light, music/chimes: full)
+ *         The pads join after the compressor so a bell, a splash or a swell can never pump them; the world
+ *         layer is still glued by it and the tanh limiter still catches the sum.
  *
  * Sub-systems (ambience, music, sfx) attach through add(); see src/audio/index.js.
  */
+const MUSIC_LEVEL = 1.5; // +3.5 dB: the music bus skips the compressor's makeup gain, see unlock()
+
 export function createAudio(ctx) {
   const listener = new THREE.AudioListener();
   ctx.camera.add(listener);
@@ -24,6 +29,7 @@ export function createAudio(ctx) {
     subsystems: [], buses: null, bus: null,
     masterLevel: 0.9,
     landingLevel: 0.0,
+    _fade: { t0: 0, v0: 0, t1: 0, v1: 0 }, // the master fader's last ramp, see fadeMaster()
 
     /** Async, called at boot: decode the sample buffers (wind first, then everything in parallel). */
     async load() {
@@ -52,12 +58,13 @@ export function createAudio(ctx) {
       api.unlocked = true;
       try {
         const c = context;
-        // output chain
+        // output chain: compIn → compressor → master (fader) → limiter; the music bus joins at master
         api.master = c.createGain(); api.master.gain.value = 0.0;
+        api.compIn = c.createGain(); api.compIn.gain.value = 1.0;
         api.comp = c.createDynamicsCompressor();
         api.comp.threshold.value = -12; api.comp.knee.value = 6; api.comp.ratio.value = 3.5; api.comp.attack.value = 0.005; api.comp.release.value = 0.25;
         api.limiter = c.createWaveShaper(); api.limiter.curve = api._clip || (api._clip = makeSoftClip()); api.limiter.oversample = '2x';
-        api.master.connect(api.comp); api.comp.connect(api.limiter); api.limiter.connect(listener.getInput());
+        api.compIn.connect(api.comp); api.comp.connect(api.master); api.master.connect(api.limiter); api.limiter.connect(listener.getInput());
         api.analyser = c.createAnalyser(); api.analyser.fftSize = 2048; api.analyser.smoothingTimeConstant = 0;
         api.limiter.connect(api.analyser);
         api._ana = new Float32Array(api.analyser.fftSize);
@@ -66,14 +73,17 @@ export function createAudio(ctx) {
         api.reverb.buffer = api._ir || (api._ir = makeImpulse(c, 4.5, 2.8));
         api.reverbHP = c.createBiquadFilter(); api.reverbHP.type = 'highpass'; api.reverbHP.frequency.value = 120;
         api.reverbReturn = c.createGain(); api.reverbReturn.gain.value = 0.45;
-        api.reverb.connect(api.reverbHP); api.reverbHP.connect(api.reverbReturn); api.reverbReturn.connect(api.master);
-        // layer buses with their own reverb sends
-        const mk = (level, send) => {
-          const g = c.createGain(); g.gain.value = level; g.connect(api.master);
+        api.reverb.connect(api.reverbHP); api.reverbHP.connect(api.reverbReturn); api.reverbReturn.connect(api.compIn);
+        // layer buses with their own reverb sends (the send is fed after the bus level)
+        const mk = (level, send, dest) => {
+          const g = c.createGain(); g.gain.value = level; g.connect(dest);
           const s = c.createGain(); s.gain.value = send; g.connect(s); s.connect(api.reverb);
           g.send = s; return g;
         };
-        api.buses = { bed: mk(1.0, 0.0), world: mk(1.0, 0.18), music: mk(1.0, 0.7), chimes: mk(1.0, 0.8) };
+        // The music bypasses the compressor and so misses its fixed makeup gain (+4.5 dB for these settings);
+        // MUSIC_LEVEL restores the balance (makeup less the ~1 dB of reduction the pads used to sit under) and
+        // the send is divided by it so the pads' reverb amount is unchanged.
+        api.buses = { bed: mk(1.0, 0.0, api.compIn), world: mk(1.0, 0.18, api.compIn), music: mk(MUSIC_LEVEL, 0.7 / MUSIC_LEVEL, api.master), chimes: mk(1.0, 0.8, api.compIn) };
         api.bus = api.buses.world; // default for anything that doesn't pick a layer
         api.dry = api.master; api.wet = api.reverb;
         const p = c.resume();
@@ -96,13 +106,20 @@ export function createAudio(ctx) {
       for (const s of api.subsystems) { try { s.start?.(api, ctx); } catch (e) { console.error('[audio] subsystem start failed', e); } }
       ctx.events.emit('audiostart');
     },
+    /**
+     * Master fade. The value to hold at `t` comes from our own record of the last ramp (api._fade): reading
+     * .value lags the audio clock, and cancelAndHoldAtTime() inserts no hold point once the previous ramp has
+     * finished — a ramp scheduled after it would start from that stale event and the level would jump.
+     */
     fadeMaster(level, seconds) {
       if (!api.master) return;
-      const t = context.currentTime;
-      const g = api.master.gain;
-      g.cancelScheduledValues(t);
-      g.setValueAtTime(Math.max(0.0001, g.value), t);
-      g.linearRampToValueAtTime(Math.max(0.0001, level), t + Math.max(0.02, seconds));
+      const t = context.currentTime, dur = Math.max(0.02, seconds);
+      const g = api.master.gain, f = api._fade;
+      const from = Math.max(0.0001, t >= f.t1 ? f.v1 : t <= f.t0 ? f.v0 : f.v0 + (f.v1 - f.v0) * (t - f.t0) / (f.t1 - f.t0));
+      if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(t); else g.cancelScheduledValues(t);
+      g.setValueAtTime(from, t);
+      g.linearRampToValueAtTime(Math.max(0.0001, level), t + dur);
+      f.t0 = t; f.v0 = from; f.t1 = t + dur; f.v1 = Math.max(0.0001, level);
     },
     update(dt) {
       if (!api.started) return;

@@ -66,8 +66,7 @@ player sits down or stands up later the rig re-baselines over 15 s so the water 
 | Gesture | Detection | Response |
 |---|---|---|
 | Hand in water | any tracked joint below water level (1 cm hysteresis) | real rings: every submerged joint pushes the wave simulation with a zero-mean kernel (a crest and a trough, so the water is displaced, never piled up) and the 12 m patch of surface around the player is vertex-displaced by the result; the plankton glow sits where the hand actually shears the water and trails behind it, and the nearest lanterns break into orange glints on the ripples; cyan tint and a meniscus line on the hand, water swish (volume ∝ speed), a "plip" on entry |
-| Pinch and pull (locomotion) | a pinch with nothing grabbable within 13 cm, either hand, above or below the water | the hand holds the world: the rig moves so the pinch point stays under the fingers (≤ 8 cm per frame); let go and you keep gliding with the hand's release velocity (≤ 1.6 m/s, drag 2/s). Both hands pulling average. The paddle stroke is suspended while a hand pulls. |
-| Paddle stroke (wading) | palm submerged > 3 cm, moving > 0.35 m/s, palm normal aligned with the motion (dot > 0.5), no pinch/grasp, hand in front of the body; after 15 cm / 0.2 s of stroke | rig glides opposite to the stroke (gain 2/s), drag 2/s, max 0.8 m/s, the drag rises to a cushion near the 48 m boundary, vignette ∝ speed, foveation 1.0 while gliding. Seated users get yaw from lateral strokes (≤ 30°/s) instead of strafing. |
+| Pinch-and-pull (the only locomotion) | thumb–index pinch with nothing within 13 cm, held ≥ 0.12 s, palm moved ≥ 6 cm (the dead zone: a pinch that merely missed a lantern never moves you) | the rig follows the palm one-to-one so the pinched spot stays under the fingers, above or below the water, seated or standing; letting go carries the momentum into a glide (drag 2/s, ≤ 1.6 m/s, a cushion of drag near the 48 m boundary); taking hold again eases a glide out; vignette ∝ pull speed, foveation 1.0 while moving. Both hands pinched: the midpoint pulls and, after a 4° dead zone, the world turns with the line between the hands (about the head). Reaching, stroking or paddling through the water never moves you. |
 | Pinch / grasp | Meta's pinch event OR index↔thumb < 2 cm for 2 frames (release: > 3.5 cm for 3 frames and no OS pinch), OR a whole-hand grasp (mean finger curl > 0.55) | grab nearest grabbable within 13 cm; a pinch with nothing in reach still answers with a spark and a soft tick |
 | Release lantern | pinch ends while the lantern is above water | it hangs on an 8 cm string while held; released it rises (0.25→0.5 m/s), the aurora brightens once it is ~3 m up, a swell plays; ~25 s later it fades into fog and becomes a permanent star (persisted in localStorage) |
 | Release lantern in water / tracking lost while holding | pinch ends below water, or the hand is lost for > 1 s | it floats again (never rises) |
@@ -75,6 +74,7 @@ player sits down or stands up later the rig re-baselines over 15 s so the water 
 | Touch lotus bud | any fingertip within reach of a closed bud | bloom over 1.6 s + a pentatonic note made consonant with the current chord + glow + a ring on the water; all six open → a chord swell |
 | Calm | head and hands still, not wading (ctx.calm rises 0.25/s); both palms submerged and still is a bonus | ripples damp faster, the plankton breathe softly around you, a low drone fades in |
 | Tracking loss | wrist or index tip pose missing | hands dissolve over 350 ms instead of freezing; velocities are zeroed for 3 frames on reacquire; the Quest system menu (visible-blurred) freezes gestures and fades the audio |
+| Leave | both palms pressed together (palms within 9 cm, each facing the other), above the water, no pinch; one hand may drop out for 0.5 s | after 15% of the hold the water writes "keep your palms together to leave"; the view darkens from a third of the way in; at 2.5 s the session ends and the landing page says how long you stayed and how many stars you left. Letting go undoes it in under a second. |
 
 Reach: the player cannot move until they discover pulling, so one lantern
 (front-right, ~0.55 m) and one lotus cluster (front-left, ~0.65 m) start within
@@ -146,7 +146,17 @@ lantern amber (#ffb257 → #ff7a1a), aurora green→teal→magenta (#42ff9c, #35
   streaks, green→teal→magenta gradient, additive, intensity driven by `energy`.
 - **Lanterns**: instanced paper cylinders with emissive gradient + flame flicker,
   additive glow sprite, mirrored glow. ≤ 24 active.
-- **Fireflies**: 300 additive points, wander + attraction, mirrored copy.
+- **Fireflies**: 300 additive points, wander + attraction, mirrored copy. Each sprite is
+  a light, not an insect: a Lorentzian halo (0.12 m) around a small saturated core that never
+  clips to white, warming toward amber at the peak. Flashes are Photinus-shaped (0.15 s rise,
+  0.5 s decay, a faint ember between) and each home cloud drifts into and out of near-synchrony
+  over 26–41 s via a cheap mean-field phase nudge; landed fireflies glow steadily.
+- **Drips**: when a hand comes up out of the water, plankton-lit droplets fall from the wet
+  fingertips and knuckles for about a second (a 256-slot point pool, one draw call only while
+  any droplet lives); each one that lands pushes a tiny ring into the wave sim and emits
+  `drip` (rate-limited) for a faint plip.
+- **Leave**: no menu; pressing both palms together and holding for 2.5 s darkens the view and
+  ends the session (see the interaction table).
 - **Lotus**: instanced pads + buds; petals open via a per-instance `bloom` attribute
   in the vertex shader; glow sprite.
 - **Shore**: ring heightfield (noise) r 60–140 m, dark material with rim from the
@@ -204,7 +214,7 @@ src/core/player.js       rig (Group), desktop controls, wading, vignette
 src/core/hands.js        joints, pinch, open-still detection, custom hand material, mouse hand
 src/core/assets.js       loaders + manifest
 src/core/events.js       tiny emitter
-src/world/sky.js  wavesim.js  water.js  aurora.js  plankton.js  fireflies.js
+src/world/sky.js  wavesim.js  water.js  aurora.js  plankton.js  drips.js  fireflies.js  leave.js
           lanterns.js  lotus.js  shore.js  mist.js  hints.js
 src/audio/engine.js  ambience.js  music.js  sfx.js
 src/shaders/*.js         GLSL as template strings

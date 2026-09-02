@@ -16,7 +16,9 @@ const HINTS = [
   { id: 'lotus', text: 'the buds open when you touch them', after: 75, done: (ctx, s) => s.bloomed, ready: (ctx, s) => s.touchedWater && nearestLotus(ctx) < REACH + 0.15 },
   { id: 'still', text: 'hold a hand open and still', after: 95, done: (ctx, s) => s.fireflyLanded, ready: (ctx, s) => s.touchedWater },
   { id: 'wade', text: 'pinch the water and pull it toward you', after: 60, done: (ctx, s) => s.moved, ready: (ctx, s) => s.touchedWater && (nearestLantern(ctx) > REACH + 0.2 || nearestLotus(ctx) > REACH + 0.2) },
+  { id: 'turn', text: 'pinch with both hands and turn them to look around', after: 150, done: (ctx, s) => s.turned, ready: (ctx, s) => s.moved && ctx.playerCtl.state.seated },
 ];
+const LEAVE = { id: 'leave', text: 'keep your palms together to leave', repeat: true };
 const SHOW_HANDS = { id: 'hands', text: 'show your hands to the headset', repeat: true };
 const NO_TRACKING = { id: 'notracking', text: 'turn on hand tracking · settings → movement tracking', repeat: true };
 const CONTROLLERS = { id: 'controllers', text: 'put the controllers down and show your hands', repeat: true };
@@ -61,7 +63,7 @@ export const hints = {
     mesh.renderOrder = 1; mesh.frustumCulled = false; mesh.visible = false; mesh.name = 'hint';
     ctx.scene.add(mesh);
 
-    const s = { handsSeen: false, touchedWater: false, grabbed: false, fireflyLanded: false, moved: false, bloomed: false, sessionStart: -1, handsLostSince: -1, noTracking: false, shows: {} };
+    const s = { handsSeen: false, touchedWater: false, grabbed: false, fireflyLanded: false, moved: false, turned: false, bloomed: false, sessionStart: -1, handsLostSince: -1, noTracking: false, shows: {} };
     ctx.events.on('handenter', () => { s.touchedWater = true; });
     ctx.events.on('grab', () => { s.grabbed = true; });
     ctx.events.on('fireflyland', () => { s.fireflyLanded = true; });
@@ -101,6 +103,7 @@ export const hints = {
     const elapsed = t - s.sessionStart;
     if (!s.handsSeen && ctx.hands.list.some((h) => h.tracked)) s.handsSeen = true;
     if (!s.moved && (ctx.playerCtl.state.speed > 0.25 || (ctx.playerCtl.state.pullSpeed || 0) > 0.2)) s.moved = true;
+    if (!s.turned && Math.abs(ctx.playerCtl.state.turnRate || 0) > 0.15) s.turned = true;
     const anyTracked = ctx.hands.list.some((h) => h.tracked);
     const presenting = ctx.renderer.xr.isPresenting;
     if (presenting && s.handsSeen) { if (!anyTracked) { if (s.handsLostSince < 0) s.handsLostSince = t; } else s.handsLostSince = -1; }
@@ -108,7 +111,8 @@ export const hints = {
 
     // choose what to show
     let want = null;
-    if (controllersHeld && elapsed > 4) want = CONTROLLERS;
+    if (presenting && ctx.leave && ctx.leave.progress > 0.15) want = LEAVE;
+    else if (controllersHeld && elapsed > 4) want = CONTROLLERS;
     else if (presenting && !s.handsSeen && (s.noTracking || elapsed > 12)) want = s.noTracking ? NO_TRACKING : SHOW_HANDS;
     else if (presenting && s.handsLostSince >= 0 && t - s.handsLostSince > 8) want = SHOW_HANDS;
     else if (t > st.cooldownUntil) {

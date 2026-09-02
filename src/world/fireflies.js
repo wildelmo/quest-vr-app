@@ -14,8 +14,13 @@ import { FIREFLY_VERT, FIREFLY_MIRROR_VERT, FIREFLY_FRAG } from '../shaders/fire
  *    last, then the middle knuckle); they ease in and land on the tip, glow steadily, then leave
  *    with an upward burst when the hand moves, dips, disappears, or after 8–18 s
  *  - a fast hand scatters everything within 0.6 m
- * Per-firefly blink: a smooth pulse (period 1.4–3.2 s, ~35% duty); 30% glow steadily but dimmer.
- * Seeded PRNG so a run is reproducible. Exposes ctx.fireflies for the audio module.
+ * Per-firefly flash, shaped like a Photinus flash: a fast rise (~0.15 s), a slower decay (~0.5 s) and a
+ * dim ember in between, repeating every 1.4–3.2 s; ~15% are long-glowers that breathe slowly instead.
+ * Loose synchrony: every SYNC.dt each home cloud's flashers are nudged toward the cloud's mean phase
+ * (a mean-field Kuramoto step, O(N) per pass, no pair terms) with a coupling that swells and relaxes
+ * over ~26–41 s per cloud, so a cloud drifts into waves of near-synchronous flashing and back out again.
+ * Landed fireflies glow steadily. Seeded PRNG so a run is reproducible. Exposes ctx.fireflies for the
+ * audio module (positions, brightness, states, homes, per-cloud coherence).
  */
 
 const WANDER = 0, APPROACH = 1, LANDED = 2, SCATTER = 3;
@@ -36,8 +41,13 @@ const P = {
   stayMin: 8, stayMax: 18, cooldown: 5, abortCooldown: 3,
   followFar: 12, followNear: 6, followRate: 0.25,
   recruitInterval: 0.35, recruitRange: 14,
-  size: 0.04, maxPx: 80, mirrorDim: 0.3, gain: 1.7,   // mirrorDim: the surface no longer attenuates the reflection
+  size: 0.12, maxPx: 72, mirrorDim: 0.3, gain: 0.8,   // size: halo diameter; gain < 1 keeps the core below the tone mapper's knee
 };
+// flash envelope (seconds): rise to the peak, then decay; ember = the dim glow between flashes
+const FLASH = { rise: 0.15, decay: 0.5, ember: 0.035 };
+// synchrony: pass interval, peak coupling (rad/s; the clouds' natural rates spread over ~2–4.5 rad/s, so
+// this locks most of a cloud at its peak and none of it near zero), and the swell period per cloud
+const SYNC = { dt: 0.25, kMax: 2.4, swell: [26, 34, 41] };
 
 function mulberry32(a) {
   return function () {
@@ -89,9 +99,9 @@ export const fireflies = {
       seed[i] = rnd();
       period[i] = 1.4 + rnd() * 1.8;
       phase[i] = rnd() * period[i];
-      steady[i] = rnd() < 0.3 ? 1 : 0;
+      steady[i] = rnd() < 0.15 ? 1 : 0;
       state[i] = WANDER;
-      bright[i] = steady[i] ? 0.25 : 0.05;
+      bright[i] = steady[i] ? 0.12 : FLASH.ember;
     }
 
     // ---- geometry + the two layers
@@ -141,11 +151,17 @@ export const fireflies = {
       }
     });
 
-    ctx.fireflies = { count: N, landedCount: 0, positions: pos, brightness: bright, states: state, homes };
+    // ---- synchrony scratch: per cloud the mean phase vector (cos, sin, count), then mean phase and nudge gain
+    const syncAcc = new Float32Array(HOME_SPECS.length * 3);
+    const syncPsi = new Float32Array(HOME_SPECS.length), syncGain = new Float32Array(HOME_SPECS.length);
+    const coherence = new Float32Array(HOME_SPECS.length);   // Kuramoto order parameter R per cloud, 0..1
+
+    ctx.fireflies = { count: N, landedCount: 0, positions: pos, brightness: bright, states: state, homes, coherence };
 
     this._ = {
       N, rnd, pos, vel, bright, seed, homeIdx, homeOff, state, slotHand, slotIdx, timer, stay, cooldown, period, phase, steady,
       homes, homeRel, following: false, geo, posAttr, brightAttr, matMain, matMirror, points, mirror, slots, recruitT, hf,
+      syncT: SYNC.dt, syncAcc, syncPsi, syncGain, coherence,
     };
   },
 
@@ -246,13 +262,55 @@ export const fireflies = {
       vel[i * 3 + 2] = (az / l) * sp + (rnd() - 0.5) * 0.4;
       state[i] = SCATTER; timer[i] = t + 0.8 + rnd() * 0.6; cooldown[i] = P.cooldown;
     };
+    // flash level 0..1: a smooth ~0.15 s rise to the peak, a cubic ~0.5 s tail, an ember in between
     const blink = (i) => {
-      const s1 = seed[i] * 97;
-      if (steady[i]) return 0.22 + 0.08 * Math.sin(t * 1.7 + s1);
-      const ph = ((t + phase[i]) / period[i]) % 1;
-      const x = ph / 0.35;
-      return x < 1 ? 0.03 + Math.pow(Math.sin(x * Math.PI), 1.6) : 0.03;
+      if (steady[i]) return 0.11 + 0.06 * Math.sin(t * 0.9 + seed[i] * 97);   // the long-glowers breathe slowly
+      const pd = period[i];
+      let tau = (t + phase[i]) % pd;   // seconds since this flash began
+      if (tau < 0) tau += pd;
+      const rise = FLASH.rise * (0.85 + 0.3 * seed[i]);
+      let env;
+      if (tau < rise) { const x = tau / rise; env = x * x * (3 - 2 * x); }
+      else { const d = 1 - (tau - rise) / (FLASH.decay * (0.9 + 0.25 * seed[i])); env = d > 0 ? d * d * d : 0; }
+      return FLASH.ember + (1 - FLASH.ember) * env;
     };
+
+    // ---- loose synchrony, at SYNC.dt: each cloud's flashers are pulled toward the cloud's mean phase by
+    // K(t) * R * sin(psi - theta), K swelling and relaxing over the cloud's own period (peak: most of the
+    // cloud locks within a few seconds; trough: their different rates pull them apart again)
+    S.syncT -= dt;
+    if (S.syncT <= 0) {
+      S.syncT += SYNC.dt;
+      if (S.syncT < 0) S.syncT = SYNC.dt;   // a long stall: one pass, not a burst of catch-up passes
+      const acc = S.syncAcc, psi = S.syncPsi, kg = S.syncGain, coh = S.coherence;
+      acc.fill(0);
+      const TAU = Math.PI * 2;
+      for (let i = 0; i < N; i++) {
+        if (steady[i] || (state[i] !== WANDER && state[i] !== SCATTER)) continue;
+        const th = TAU * (((t + phase[i]) / period[i]) % 1);
+        const k3 = homeIdx[i] * 3;
+        acc[k3] += Math.cos(th); acc[k3 + 1] += Math.sin(th); acc[k3 + 2] += 1;
+      }
+      for (let k = 0; k < HOME_SPECS.length; k++) {
+        const n = acc[k * 3 + 2];
+        if (n < 2) { coh[k] = 0; kg[k] = 0; continue; }
+        const cx = acc[k * 3] / n, cy = acc[k * 3 + 1] / n;
+        const R = Math.sqrt(cx * cx + cy * cy);
+        coh[k] = R; psi[k] = Math.atan2(cy, cx);
+        const w = 0.5 + 0.5 * Math.sin(t * TAU / SYNC.swell[k] + k * 2.1);
+        kg[k] = SYNC.kMax * w * w * R * SYNC.dt;
+      }
+      for (let i = 0; i < N; i++) {
+        if (steady[i] || (state[i] !== WANDER && state[i] !== SCATTER)) continue;
+        const k = homeIdx[i];
+        if (kg[k] <= 0) continue;
+        const pd = period[i];
+        const th = TAU * (((t + phase[i]) / pd) % 1);
+        let p = phase[i] + kg[k] * Math.sin(psi[k] - th) / TAU * pd;
+        p %= pd; if (p < 0) p += pd;
+        phase[i] = p;
+      }
+    }
 
     const yMin = level + P.yMin, yMax = level + P.yMax, ySoftMin = level + P.ySoftMin, ySoftMax = level + P.ySoftMax;
     const repelR2 = P.repelRadius * P.repelRadius;

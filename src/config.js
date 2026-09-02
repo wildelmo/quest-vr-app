@@ -19,20 +19,16 @@ export const CONFIG = {
     headAboveWaterStanding: 0.60,
     headAboveWaterSeated: 0.45,
     seatedEyeHeight: 1.35,   // measured eye height below this → seated
-    wadeGain: 2.0,           // rig Δv per (m/s of hand stroke) per second
-    wadeMinSpeed: 0.35,      // palm must move faster than this (horizontal) to start a stroke
-    strokeExitSpeed: 0.2,
-    strokeAlignOn: 0.5,      // dot(palm normal, motion) to start a stroke ("push the water")
-    strokeAlignOff: 0.2,
-    strokeMinPath: 0.15,     // metres of stroke before it moves you
-    strokeMinTime: 0.2,
-    strokeMinDepth: 0.03,
-    wadeConeDeg: 80,         // hand must be within this half-angle in front of the head (horizontal)
-    seatedYawRate: 0.52,     // rad/s (≈30°/s) from lateral strokes when seated
-    drag: 2.0,               // per second
-    maxSpeed: 0.8,
+    // locomotion is pinch-and-pull only: a pinch with nothing in reach holds the world
+    pullDeadZone: 0.06,      // metres the palm must travel while pinched before the world starts to move (a missed grab never moves you)
+    pullHoldTime: 0.12,      // seconds the pinch must be held before it can move you
     pullMaxStep: 0.08,       // metres the rig may move per frame while a hand pulls the world
     pullMaxSpeed: 1.6,       // glide speed after letting go
+    turnDeadZoneDeg: 4,      // both hands pinched: the line between them must turn this much before the world turns
+    turnRate: 0.9,           // rad/s that counts as full motion for the comfort vignette
+    leaveHoldTime: 2.5,      // seconds of holding both palms together before the session ends
+    drag: 2.0,               // per second
+    maxSpeed: 0.8,           // glide speed that counts as full motion for the comfort vignette
     radiusLimit: 48,         // keep the player inside this radius (shore starts ~60 m)
     desktopSpeed: 1.6,
     eyeHeightDesktop: 1.73,

@@ -1,6 +1,7 @@
 // End-to-end interaction scenario on the fake WebXR device:
 //   1. calibrate, 2. grab the nearest lantern, lift it, let go above the water → it rises → a star is born,
-//   3. touch the nearest lotus bud → it blooms, 4. hold a hand open and still → a firefly lands.
+//   3. touch the nearest lotus bud → it blooms, 4. hold a hand open and still → a firefly lands,
+//   5. locomotion: a stroke does nothing, a missed pinch does nothing, pinch-and-pull moves, two hands turn, 6. palms together → leave.
 // Prints a JSON report and exits 1 if any step fails. Usage: node tools/harness/scenario.mjs [--out dir]
 import { chromium } from 'playwright';
 import { startServer } from './serve.mjs';
@@ -108,34 +109,88 @@ try {
   step('firefly-landed', ev.some((e) => e.type === 'fireflyland') || (s.fireflyLanded || 0) > 0, { fireflyLanded: s.fireflyLanded, stillL: await page.evaluate(() => { const h = window.__nocturneCtx.hands.right; return { still: h.still, stillFor: +h.stillFor.toFixed(2), open: h.open, attraction: +h.attraction.toFixed(2), disp: +h.stillDisp.toFixed(3) }; }) });
   await shot('fireflies.png');
 
-  // ---- wading: a palm-aligned stroke under water should move the rig
-  const before = (await world()).rig;
-  await page.evaluate(() => window.__fakeXR.clearOverrides?.());
-  await setHand('right', [0.3, 0.7, -0.45], 0, { pitchDeg: 0, rollDeg: -90 }); // palm facing -x
-  await frames(6);
-  for (let i = 1; i <= 30; i++) { await setHand('right', [0.3 - 0.6 * i / 30, 0.7, -0.45], 0, { pitchDeg: 0, rollDeg: -90 }); await frame(); }
-  await frames(30);
-  const after = (await world()).rig;
-  const moved = Math.hypot(after.x - before.x, after.z - before.z);
-  step('wading-moves-rig', moved > 0.05, { moved: +moved.toFixed(3), before: [before.x, before.z].map((v) => +v.toFixed(2)), after: [after.x, after.z].map((v) => +v.toFixed(2)) });
+  // ---- a palm stroke under water is not locomotion any more (reaching through the water must never move you)
+  {
+    const before = (await world()).rig;
+    await page.evaluate(() => window.__fakeXR.clearOverrides?.());
+    await setHand('right', [0.3, 0.7, -0.45], 0, { pitchDeg: 0, rollDeg: -90 }); // palm facing -x
+    await frames(6);
+    for (let i = 1; i <= 30; i++) { await setHand('right', [0.3 - 0.6 * i / 30, 0.7, -0.45], 0, { pitchDeg: 0, rollDeg: -90 }); await frame(); }
+    await frames(30);
+    const after = (await world()).rig;
+    const moved = Math.hypot(after.x - before.x, after.z - before.z);
+    step('stroke-does-not-move', moved < 0.02, { moved: +moved.toFixed(3) });
+  }
 
-  // ---- pinch-and-pull: an empty pinch grabs the world; pulling the hand toward the body moves you forward.
-  // The hand is driven in reference-space (rig-local) coordinates here, like a real hand: it moves with the body.
+  // hands are driven in reference-space (rig-local) coordinates from here on, like a real hand: they move with the body
+  const local = (hs, p, pinch, extra = {}) => page.evaluate(({ hs, p, pinch, extra }) => window.__fakeXR.setHandPose(hs, { position: p, pinch, ...extra }), { hs, p, pinch, extra });
+
+  // ---- a pinch that misses a lantern and moves a little must not move you (dead zone)
+  {
+    await local('right', [0.1, 1.25, -0.55], 0);
+    await frames(8);
+    const b0 = (await world()).rig;
+    await local('right', [0.1, 1.25, -0.55], 1);
+    for (let i = 1; i <= 8; i++) { await local('right', [0.1, 1.25, -0.55 + 0.04 * i / 8], 1); await frame(); }
+    await local('right', [0.1, 1.25, -0.51], 0);
+    await frames(12);
+    const b1 = (await world()).rig;
+    const moved = Math.hypot(b1.x - b0.x, b1.z - b0.z);
+    step('missed-pinch-does-not-move', moved < 0.01, { moved: +moved.toFixed(3) });
+  }
+
+  // ---- pinch-and-pull: an empty pinch grabs the world; pulling the hand toward the body moves you forward
   {
     const b0 = (await world()).rig;
-    await page.evaluate(() => window.__fakeXR.clearOverrides?.());
-    const local = (z, pinch) => page.evaluate(({ z, pinch }) => window.__fakeXR.setHandPose('right', { position: [0.1, 1.25, z], pinch }), { z, pinch });
-    await local(-0.55, 0);
+    await local('right', [0.1, 1.25, -0.55], 0);
     await frames(8);
-    await local(-0.55, 1);
+    await local('right', [0.1, 1.25, -0.55], 1);
     await frames(6);
-    for (let i = 1; i <= 24; i++) { await local(-0.55 + 0.4 * i / 24, 1); await frame(); }
-    await local(-0.15, 0);
+    for (let i = 1; i <= 24; i++) { await local('right', [0.1, 1.25, -0.55 + 0.4 * i / 24], 1); await frame(); }
+    await local('right', [0.1, 1.25, -0.15], 0);
     await frames(20);
     const b1 = (await world()).rig;
     const fwdMoved = b0.z - b1.z; // pulling the world toward you (+z hand motion) carries the rig forward (−z)
-    // 0.4 m of pull one-to-one, plus a short glide from the release momentum — never a runaway
-    step('pinch-pull-moves-rig', fwdMoved > 0.35 && fwdMoved < 1.2, { forward: +fwdMoved.toFixed(3), before: [b0.x, b0.z].map((v) => +v.toFixed(2)), after: [b1.x, b1.z].map((v) => +v.toFixed(2)) });
+    // 0.4 m of pull minus the dead zone, one-to-one, plus a short glide from the release momentum — never a runaway
+    step('pinch-pull-moves-rig', fwdMoved > 0.3 && fwdMoved < 1.2, { forward: +fwdMoved.toFixed(3), before: [b0.x, b0.z].map((v) => +v.toFixed(2)), after: [b1.x, b1.z].map((v) => +v.toFixed(2)) });
+  }
+
+  // ---- two hands pinched: turning the line between them turns the world, and the hands keep hold of it
+  {
+    const r = 0.22, cz = -0.5;
+    const at = (deg) => { const a = deg * Math.PI / 180; return [[-r * Math.cos(a), 1.25, cz - r * Math.sin(a)], [r * Math.cos(a), 1.25, cz + r * Math.sin(a)]]; };
+    let [l0, r0] = at(0);
+    await local('left', l0, 0); await local('right', r0, 0);
+    await frames(8);
+    const w0 = await world();
+    const palmBefore = await page.evaluate(() => window.__nocturneCtx.hands.right.palm.position.toArray());
+    await local('left', l0, 1); await local('right', r0, 1);
+    await frames(6);
+    for (let i = 1; i <= 30; i++) { const [l, rr] = at(35 * i / 30); await local('left', l, 1); await local('right', rr, 1); await frame(); }
+    const palmAfter = await page.evaluate(() => window.__nocturneCtx.hands.right.palm.position.toArray());
+    const [l1, r1] = at(35);
+    await local('left', l1, 0); await local('right', r1, 0);
+    await frames(10);
+    const w1 = await world();
+    const turnedDeg = ((w1.rig.ry - w0.rig.ry) * 180 / Math.PI);
+    const drift = Math.hypot(palmAfter[0] - palmBefore[0], palmAfter[2] - palmBefore[2]);
+    // the hands rotate 35°, the first 4° are the dead zone: the rig should turn ≈31° (the sign keeps the hands on the world)
+    step('two-hand-turn', Math.abs(Math.abs(turnedDeg) - 31) < 8 && drift < 0.08, { turnedDeg: +turnedDeg.toFixed(1), palmDrift: +drift.toFixed(3) });
+  }
+
+  // ---- leaving: both palms pressed together for a few seconds ends the session
+  {
+    await local('left', [-0.035, 1.2, -0.4], 0, { pitchDeg: 0, rollDeg: 90 });   // palm facing +x
+    await local('right', [0.035, 1.2, -0.4], 0, { pitchDeg: 0, rollDeg: -90 });  // palm facing -x
+    let progress = 0, ended = false;
+    for (let i = 0; i < 160; i++) {
+      await frame();
+      const st = await page.evaluate(() => ({ p: window.__nocturneCtx.leave?.progress || 0, xr: window.__nocturne.stats().xr }));
+      progress = Math.max(progress, st.p);
+      if (!st.xr) { ended = true; break; }
+    }
+    const ev = await events();
+    step('leave-gesture-ends-session', ended && ev.some((e) => e.type === 'leave'), { progress: +progress.toFixed(2), ended });
   }
 
   s = await stats();
