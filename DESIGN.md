@@ -75,9 +75,19 @@ player sits down or stands up later the rig re-baselines over 15 s so the water 
 | Calm | head and hands still, not wading (ctx.calm rises 0.25/s); both palms submerged and still is a bonus | ripples damp faster, the plankton breathe softly around you, a low drone fades in |
 | Tracking loss | wrist or index tip pose missing | hands dissolve over 350 ms instead of freezing; velocities are zeroed for 3 frames on reacquire; the Quest system menu (visible-blurred) freezes gestures and fades the audio |
 
-Desktop fallback (also used by the headless test harness): mouse-look + WASD,
-a virtual right hand on a plane 0.55 m in front of the camera that follows the
-mouse; left button = pinch; hold `Shift` to dip the hand into the water.
+Reach: the player cannot move until they discover wading, so one lantern
+(front-right, ~0.55 m) and one lotus cluster (front-left, ~0.65 m) start within
+arm's length, arriving lanterns come all the way in while nothing floats within
+1 m, and if nothing has been in reach for 30 s the nearest lantern drifts over.
+Hints ("put a hand in the water", "pinch a lantern to lift it", …) are written in
+plankton light on the surface only when the player has evidently not found the
+thing, gated on what is actually within reach; a hint counts as learned only when
+the thing is done (persisted for 24 h), otherwise it may return a couple of times.
+Holding controllers, or hand tracking being off, gets its own message.
+
+Desktop fallback (also used by the headless test harness): right-drag / Q,E to
+look + WASD, a virtual right hand on a plane 0.55 m in front of the camera that
+follows the mouse; left button = pinch; hold `Shift` to dip the hand into the water.
 
 ## 4. Visual design
 
