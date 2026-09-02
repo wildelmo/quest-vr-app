@@ -1,0 +1,1064 @@
+{
+  "startedAt": "2026-09-02T00:28:42Z",
+  "steps": [
+    "sky",
+    "textures",
+    "audio",
+    "hands",
+    "fonts"
+  ],
+  "sky": {
+    "panorama": {
+      "source": "/home/user/assets-src/milky-way-skybox-for-unity/Packages/dev.dyrda.milky-way-skybox/Runtime/Textures/eso0932a_highestQuality.tif",
+      "sourceSize": [
+        6000,
+        3000
+      ],
+      "sourceIccProfile": "sRGB IEC61966-2.1",
+      "luminance0_5thPercentile": 0.0,
+      "blackLiftTarget": 0.01568627450980392,
+      "files": {
+        "milkyway_4k.jpg": {
+          "size": [
+            4096,
+            2048
+          ],
+          "bytes": 2690481
+        },
+        "milkyway_2k.jpg": {
+          "size": [
+            2048,
+            1024
+          ],
+          "bytes": 514975
+        }
+      }
+    },
+    "alignment": {
+      "best": "H1",
+      "nStars": 92,
+      "vmagLimit": 2.5,
+      "window": "5x5 px on 6000x3000",
+      "hypotheses": {
+        "H1": {
+          "u": "frac(0.5 - l/360)",
+          "v": "0.5 - b/180",
+          "starMean": 37.38739147911901,
+          "sameLatitudeRandomMean": 29.982376763613328,
+          "uniformRandomMean": 17.8622825987961,
+          "score": 7.405014715505683
+        },
+        "H2": {
+          "u": "frac(0.5 + l/360)",
+          "v": "0.5 - b/180",
+          "starMean": 30.05521746303724,
+          "sameLatitudeRandomMean": 30.306666697280992,
+          "uniformRandomMean": 19.022500026485194,
+          "score": -0.25144923424375065
+        },
+        "H3": {
+          "u": "frac(0.5 - l/360)",
+          "v": "0.5 + b/180",
+          "starMean": 30.415652238804363,
+          "sameLatitudeRandomMean": 29.151043448413628,
+          "uniformRandomMean": 16.574891283460286,
+          "score": 1.264608790390735
+        },
+        "H4": {
+          "u": "frac(0.5 + l/360)",
+          "v": "0.5 + b/180",
+          "starMean": 27.036956502043683,
+          "sameLatitudeRandomMean": 28.602927555726918,
+          "uniformRandomMean": 17.70271738456643,
+          "score": -1.565971053683235
+        },
+        "H5": {
+          "u": "frac(-l/360)",
+          "v": "0.5 - b/180",
+          "starMean": 28.57478276024694,
+          "sameLatitudeRandomMean": 30.67289854495421,
+          "uniformRandomMean": 17.909565179244332,
+          "score": -2.0981157847072716
+        },
+        "H6": {
+          "u": "frac(l/360)",
+          "v": "0.5 - b/180",
+          "starMean": 30.143478274345398,
+          "sameLatitudeRandomMean": 30.797811608729155,
+          "uniformRandomMean": 15.775434746690419,
+          "score": -0.6543333343837574
+        },
+        "H7": {
+          "u": "frac(-l/360)",
+          "v": "0.5 + b/180",
+          "starMean": 28.424347737561103,
+          "sameLatitudeRandomMean": 29.21085506262987,
+          "uniformRandomMean": 18.70826086142789,
+          "score": -0.7865073250687686
+        },
+        "H8": {
+          "u": "frac(l/360)",
+          "v": "0.5 + b/180",
+          "starMean": 29.774347890978273,
+          "sameLatitudeRandomMean": 29.725231863450308,
+          "uniformRandomMean": 14.350942015647888,
+          "score": 0.0491160275279654
+        }
+      },
+      "offsetSearch": {
+        "-4,-4": 35.998792078184046,
+        "-4,-2": 37.55917860632358,
+        "-4,+0": 38.24275359900101,
+        "-4,+2": 37.68478262424469,
+        "-4,+4": 36.39371985974519,
+        "-2,-4": 33.17391334409299,
+        "-2,-2": 34.84903383255005,
+        "-2,+0": 37.64371991675833,
+        "-2,+2": 37.04710159094437,
+        "-2,+4": 35.845410476560176,
+        "+0,-4": 35.69082098421843,
+        "+0,-2": 36.82971017257027,
+        "+0,+0": 37.29710150283316,
+        "+0,+2": 37.37198078632355,
+        "+0,+4": 36.50724660831949,
+        "+2,-4": 37.6316423934439,
+        "+2,-2": 37.010869466740154,
+        "+2,+0": 38.63768109031346,
+        "+2,+2": 37.67512069059455,
+        "+2,+4": 36.93961328527202,
+        "+4,-4": 37.044686058293216,
+        "+4,-2": 35.67149752119313,
+        "+4,+0": 38.595410652782604,
+        "+4,+2": 35.623188303864524,
+        "+4,+4": 35.55193226233773
+      },
+      "bestOffsetPx": "+2,+0",
+      "images": [
+        "/home/user/quest-vr-app/tools/assets/out/alignment_check.jpg",
+        "/home/user/quest-vr-app/tools/assets/out/alignment_crops.jpg"
+      ]
+    },
+    "mapping": {
+      "u": "u = frac(0.5 - l/360)",
+      "v": "v = 0.5 - b/180  (v = 0 is the top row)"
+    },
+    "photoFrame": {
+      "rotationVectorDeg": [
+        -1.0501,
+        -1.715,
+        -3.1862
+      ],
+      "angleDeg": 3.768,
+      "axis": [
+        -0.2787,
+        -0.45518,
+        -0.84566
+      ],
+      "matrix": [
+        [
+          0.9980065,
+          0.0558445,
+          -0.0294013
+        ],
+        [
+          -0.0552962,
+          0.9982864,
+          0.0191458
+        ],
+        [
+          0.0304201,
+          -0.0174819,
+          0.9993843
+        ]
+      ],
+      "starsMeasured": 92,
+      "starsAfterNeighbourCheck": 87,
+      "inliers": 86,
+      "rawMedianOffsetDeg": 3.581,
+      "rawMedianOffsetPx": [
+        44.9,
+        6.8
+      ],
+      "rmsBeforeDeg": 3.301,
+      "medianBeforeDeg": 3.325,
+      "rmsAfterDeg": 0.138,
+      "medianAfterDeg": 0.13,
+      "maxInlierAfterDeg": 0.243,
+      "fractionWithin0_5Deg": 1.0,
+      "checkStars": {
+        "Sirius": {
+          "rawOffsetPx": [
+            48.0,
+            6.0
+          ],
+          "rawOffsetDeg": [
+            2.88,
+            0.36
+          ],
+          "residualAfterCorrectionDeg": 0.08
+        },
+        "Canopus": {
+          "rawOffsetPx": [
+            39.5,
+            -13.5
+          ],
+          "rawOffsetDeg": [
+            2.37,
+            -0.81
+          ],
+          "residualAfterCorrectionDeg": 0.09
+        },
+        "Arcturus": {
+          "rawOffsetPx": [
+            -7.7,
+            -24.2
+          ],
+          "rawOffsetDeg": [
+            -0.46,
+            -1.45
+          ],
+          "residualAfterCorrectionDeg": 0.14
+        },
+        "Rigil Kentaurus": {
+          "rawOffsetPx": [
+            54.0,
+            -34.8
+          ],
+          "rawOffsetDeg": [
+            3.24,
+            -2.09
+          ],
+          "residualAfterCorrectionDeg": 0.15
+        },
+        "Vega": {
+          "rawOffsetPx": [
+            43.0,
+            2.7
+          ],
+          "rawOffsetDeg": [
+            2.58,
+            0.16
+          ],
+          "residualAfterCorrectionDeg": 0.13
+        },
+        "Achernar": {
+          "rawOffsetPx": [
+            22.3,
+            -25.8
+          ],
+          "rawOffsetDeg": [
+            1.34,
+            -1.55
+          ],
+          "residualAfterCorrectionDeg": 0.08
+        }
+      }
+    },
+    "stars": {
+      "count": 9096,
+      "validation": {
+        "nStars": 100,
+        "maxErrLongitudeDeg": 0.0474543263870109,
+        "maxErrLatitudeDeg": 0.029659405190300303,
+        "meanErrLongitudeDeg": 0.004327053315891875,
+        "meanErrLatitudeDeg": 0.0034566680855617478,
+        "note": "longitude error is scaled by cos(b); catalog GLON/GLAT are given to 0.01 deg"
+      },
+      "brightest10": [
+        {
+          "i": 0,
+          "name": "Sirius",
+          "vmag": -1.46,
+          "raDeg": 101.28708,
+          "decDeg": -16.71611,
+          "glon": 227.23,
+          "glat": -8.89,
+          "catalogGlon": 227.22,
+          "catalogGlat": -8.88,
+          "bv": 0.0
+        },
+        {
+          "i": 1,
+          "name": "Canopus",
+          "vmag": -0.72,
+          "raDeg": 95.98792,
+          "decDeg": -52.69583,
+          "glon": 261.212,
+          "glat": -25.292,
+          "catalogGlon": 261.21,
+          "catalogGlat": -25.29,
+          "bv": 0.15
+        },
+        {
+          "i": 2,
+          "name": "Arcturus",
+          "vmag": -0.04,
+          "raDeg": 213.91542,
+          "decDeg": 19.1825,
+          "glon": 15.05,
+          "glat": 69.111,
+          "catalogGlon": 15.14,
+          "catalogGlat": 69.11,
+          "bv": 1.23
+        },
+        {
+          "i": 3,
+          "name": "Rigil Kentaurus",
+          "vmag": -0.01,
+          "raDeg": 219.89958,
+          "decDeg": -60.83528,
+          "glon": 315.733,
+          "glat": -0.68,
+          "catalogGlon": 315.78,
+          "catalogGlat": -0.71,
+          "bv": 0.71
+        },
+        {
+          "i": 4,
+          "name": "Vega",
+          "vmag": 0.03,
+          "raDeg": 279.23458,
+          "decDeg": 38.78361,
+          "glon": 67.448,
+          "glat": 19.237,
+          "catalogGlon": 67.44,
+          "catalogGlat": 19.24,
+          "bv": 0.0
+        },
+        {
+          "i": 5,
+          "name": "Capella",
+          "vmag": 0.08,
+          "raDeg": 79.1725,
+          "decDeg": 45.99806,
+          "glon": 162.588,
+          "glat": 4.567,
+          "catalogGlon": 162.58,
+          "catalogGlat": 4.57,
+          "bv": 0.8
+        },
+        {
+          "i": 6,
+          "name": "Rigel",
+          "vmag": 0.12,
+          "raDeg": 78.63458,
+          "decDeg": -8.20167,
+          "glon": 209.241,
+          "glat": -25.245,
+          "catalogGlon": 209.24,
+          "catalogGlat": -25.25,
+          "bv": -0.03
+        },
+        {
+          "i": 7,
+          "name": "Procyon",
+          "vmag": 0.38,
+          "raDeg": 114.82542,
+          "decDeg": 5.225,
+          "glon": 213.702,
+          "glat": 13.019,
+          "catalogGlon": 213.69,
+          "catalogGlat": 13.03,
+          "bv": 0.42
+        },
+        {
+          "i": 8,
+          "name": "Achernar",
+          "vmag": 0.46,
+          "raDeg": 24.42875,
+          "decDeg": -57.23667,
+          "glon": 290.841,
+          "glat": -58.792,
+          "catalogGlon": 290.84,
+          "catalogGlat": -58.79,
+          "bv": -0.16
+        },
+        {
+          "i": 9,
+          "name": "Betelgeuse",
+          "vmag": 0.5,
+          "raDeg": 88.79292,
+          "decDeg": 7.40694,
+          "glon": 199.787,
+          "glat": -8.959,
+          "catalogGlon": 199.79,
+          "catalogGlat": -8.96,
+          "bv": 1.85
+        }
+      ]
+    }
+  },
+  "textures": {
+    "waternormals.jpg": {
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "bytes": 248813,
+      "from": "three.js examples/textures/waternormals.jpg"
+    },
+    "moon_1024.jpg": {
+      "size": [
+        1024,
+        512
+      ],
+      "mode": "RGB",
+      "bytes": 238093,
+      "from": "three.js examples/textures/planets/moon_1024.jpg"
+    },
+    "spark1.png": {
+      "size": [
+        32,
+        32
+      ],
+      "mode": "RGBA",
+      "bytes": 1608,
+      "from": "three.js examples/textures/sprites/spark1.png"
+    },
+    "disc.png": {
+      "size": [
+        32,
+        32
+      ],
+      "mode": "LA",
+      "bytes": 866,
+      "from": "three.js examples/textures/sprites/disc.png"
+    },
+    "circle.png": {
+      "size": [
+        64,
+        64
+      ],
+      "mode": "RGBA",
+      "bytes": 4158,
+      "from": "three.js examples/textures/sprites/circle.png"
+    },
+    "blossom.png": {
+      "size": [
+        126,
+        126
+      ],
+      "mode": "RGBA",
+      "bytes": 15202,
+      "from": "three.js examples/textures/sprites/blossom.png"
+    },
+    "smoke1.png": {
+      "size": [
+        512,
+        512
+      ],
+      "mode": "P",
+      "bytes": 91231,
+      "from": "three.js examples/textures/opengameart/smoke1.png"
+    },
+    "noise.png": {
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGB",
+      "bytes": 197320,
+      "from": "three.js examples/textures/noise.png"
+    },
+    "moon_512.jpg": {
+      "size": [
+        512,
+        256
+      ],
+      "mode": "RGB",
+      "bytes": 58203,
+      "from": "three.js examples/textures/planets/moon_1024.jpg (Lanczos 1/2)"
+    },
+    "caustic.jpg": {
+      "size": [
+        512,
+        512
+      ],
+      "mode": "L",
+      "bytes": 30988,
+      "from": "three.js examples/textures/opengameart/Caustic_Free.jpg -> grayscale",
+      "sourceMode": "RGB",
+      "sourceChannelDifference": 0.41461181640625
+    },
+    "glow_soft.png": {
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "bytes": 10798,
+      "from": "procedural (textures.py)"
+    },
+    "glow_firefly.png": {
+      "size": [
+        64,
+        64
+      ],
+      "mode": "RGBA",
+      "bytes": 1423,
+      "from": "procedural (textures.py)"
+    },
+    "ripple_ring.png": {
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "bytes": 5072,
+      "from": "procedural (textures.py)"
+    },
+    "moon_halo.png": {
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "bytes": 11004,
+      "from": "procedural (textures.py)"
+    },
+    "paper.png": {
+      "size": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 241102,
+      "from": "procedural (textures.py)",
+      "seamRatio": 1.1166234875987842
+    }
+  },
+  "audio": {
+    "files": 38,
+    "bytes": 2834940,
+    "decisions": {
+      "water_loop_1": {
+        "candidates": {
+          "water_flowing.ogg": {
+            "rmsMismatchDb": 0.5084077766500954,
+            "logSpectralDistance": 0.3389699040600249,
+            "score": 3.8981068172503446
+          },
+          "loop_water_03.ogg": {
+            "rmsMismatchDb": 4.712527367325578,
+            "logSpectralDistance": 0.3162019961454132,
+            "score": 7.87454732877971
+          }
+        },
+        "picked": "water_flowing.ogg"
+      },
+      "bubbles_loop": {
+        "candidates": {
+          "loop_bubbles_1.ogg": {
+            "rmsMismatchDb": 0.07082043104050939,
+            "logSpectralDistance": 0.5842423001632083,
+            "score": 5.9132434326725924
+          },
+          "loop_bubbles_02.ogg": {
+            "rmsMismatchDb": 3.2224020497939314,
+            "logSpectralDistance": 0.387894130514294,
+            "score": 7.101343354936871
+          }
+        },
+        "picked": "loop_bubbles_1.ogg"
+      },
+      "splash_soft": {
+        "method": "rank-sum of crest factor (peak/RMS dB, ascending) and attack time (onset(-20 dB) -> 90% of peak, descending), ties by crest",
+        "table": [
+          {
+            "file": "splash_06.ogg",
+            "crestDb": 21.89,
+            "attackSec": 0.172,
+            "duration": 0.386,
+            "rankCrest": 0,
+            "rankAttack": 2,
+            "rankSum": 2
+          },
+          {
+            "file": "splash_04.ogg",
+            "crestDb": 21.96,
+            "attackSec": 0.207,
+            "duration": 0.913,
+            "rankCrest": 1,
+            "rankAttack": 1,
+            "rankSum": 2
+          },
+          {
+            "file": "splash_13.ogg",
+            "crestDb": 25.11,
+            "attackSec": 0.2238,
+            "duration": 0.699,
+            "rankCrest": 5,
+            "rankAttack": 0,
+            "rankSum": 5
+          },
+          {
+            "file": "splash_08.ogg",
+            "crestDb": 23.07,
+            "attackSec": 0.1023,
+            "duration": 0.585,
+            "rankCrest": 3,
+            "rankAttack": 4,
+            "rankSum": 7
+          },
+          {
+            "file": "splash_15.ogg",
+            "crestDb": 25.68,
+            "attackSec": 0.0245,
+            "duration": 0.392,
+            "rankCrest": 6,
+            "rankAttack": 6,
+            "rankSum": 12
+          },
+          {
+            "file": "splash_09.ogg",
+            "crestDb": 22.28,
+            "attackSec": 0.001,
+            "duration": 0.222,
+            "rankCrest": 2,
+            "rankAttack": 13,
+            "rankSum": 15
+          },
+          {
+            "file": "splash_11.ogg",
+            "crestDb": 27.18,
+            "attackSec": 0.0516,
+            "duration": 1.085,
+            "rankCrest": 10,
+            "rankAttack": 5,
+            "rankSum": 15
+          },
+          {
+            "file": "splash_14.ogg",
+            "crestDb": 26.06,
+            "attackSec": 0.0079,
+            "duration": 0.455,
+            "rankCrest": 7,
+            "rankAttack": 10,
+            "rankSum": 17
+          },
+          {
+            "file": "splash_01.ogg",
+            "crestDb": 33.07,
+            "attackSec": 0.1026,
+            "duration": 1.202,
+            "rankCrest": 14,
+            "rankAttack": 3,
+            "rankSum": 17
+          },
+          {
+            "file": "splash_10.ogg",
+            "crestDb": 23.39,
+            "attackSec": 0.001,
+            "duration": 0.268,
+            "rankCrest": 4,
+            "rankAttack": 14,
+            "rankSum": 18
+          },
+          {
+            "file": "splash_07.ogg",
+            "crestDb": 26.65,
+            "attackSec": 0.0121,
+            "duration": 1.236,
+            "rankCrest": 9,
+            "rankAttack": 9,
+            "rankSum": 18
+          },
+          {
+            "file": "splash_02.ogg",
+            "crestDb": 26.38,
+            "attackSec": 0.0071,
+            "duration": 0.665,
+            "rankCrest": 8,
+            "rankAttack": 11,
+            "rankSum": 19
+          },
+          {
+            "file": "splash_12.ogg",
+            "crestDb": 30.3,
+            "attackSec": 0.0143,
+            "duration": 0.658,
+            "rankCrest": 12,
+            "rankAttack": 8,
+            "rankSum": 20
+          },
+          {
+            "file": "splash_05.ogg",
+            "crestDb": 30.96,
+            "attackSec": 0.0231,
+            "duration": 1.008,
+            "rankCrest": 13,
+            "rankAttack": 7,
+            "rankSum": 20
+          },
+          {
+            "file": "splash_03.ogg",
+            "crestDb": 28.96,
+            "attackSec": 0.0033,
+            "duration": 0.56,
+            "rankCrest": 11,
+            "rankAttack": 12,
+            "rankSum": 23
+          }
+        ]
+      },
+      "outside_wav": "bb - Fans and Drones (Jul 2021)/Outside.wav rejected: 53 s stereo recording whose spectrum is a stationary 72 Hz hum with 51% of the energy below 200 Hz and only 2% above 2 kHz (no insects, leaves or water); it reads as distant machinery/traffic rumble, not nature."
+    },
+    "pitch": [
+      {
+        "file": "pad_bioluminescence.ogg",
+        "pitchHz": 714.17,
+        "midi": 77,
+        "note": "F5",
+        "cents": 38.5,
+        "key": "D# major"
+      },
+      {
+        "file": "pad_northern_swell.ogg",
+        "pitchHz": 587.63,
+        "midi": 74,
+        "note": "D5",
+        "cents": 0.9,
+        "key": "G minor"
+      },
+      {
+        "file": "pad_northern_brilliant.ogg",
+        "pitchHz": 116.28,
+        "midi": 46,
+        "note": "A#2",
+        "cents": -3.8,
+        "key": "G minor"
+      },
+      {
+        "file": "pad_seafoam_waves.ogg",
+        "pitchHz": 204.01,
+        "midi": 56,
+        "note": "G#3",
+        "cents": -30.6,
+        "key": "G# minor"
+      },
+      {
+        "file": "bowl_1.ogg",
+        "pitchHz": 2427.32,
+        "midi": 99,
+        "note": "D#7",
+        "cents": -43.5,
+        "key": null
+      },
+      {
+        "file": "bowl_2.ogg",
+        "pitchHz": 1151.57,
+        "midi": 86,
+        "note": "D6",
+        "cents": -34.4,
+        "key": null
+      },
+      {
+        "file": "bowl_3.ogg",
+        "pitchHz": 2447.95,
+        "midi": 99,
+        "note": "D#7",
+        "cents": -28.8,
+        "key": null
+      },
+      {
+        "file": "bowl_4.ogg",
+        "pitchHz": 2360.83,
+        "midi": 98,
+        "note": "D7",
+        "cents": 8.5,
+        "key": null
+      },
+      {
+        "file": "bowl_5.ogg",
+        "pitchHz": 115.27,
+        "midi": 46,
+        "note": "A#2",
+        "cents": -19.0,
+        "key": null
+      },
+      {
+        "file": "bowl_6.ogg",
+        "pitchHz": 497.37,
+        "midi": 71,
+        "note": "B4",
+        "cents": 12.2,
+        "key": null
+      },
+      {
+        "file": "bowl_7.ogg",
+        "pitchHz": 65.17,
+        "midi": 36,
+        "note": "C2",
+        "cents": -6.2,
+        "key": null
+      },
+      {
+        "file": "glass_1.ogg",
+        "pitchHz": 381.65,
+        "midi": 67,
+        "note": "G4",
+        "cents": -46.3,
+        "key": null
+      },
+      {
+        "file": "glass_2.ogg",
+        "pitchHz": 2238.84,
+        "midi": 97,
+        "note": "C#7",
+        "cents": 16.6,
+        "key": null
+      },
+      {
+        "file": "bell_1.ogg",
+        "pitchHz": 4708.29,
+        "midi": 110,
+        "note": "D8",
+        "cents": 3.6,
+        "key": null
+      },
+      {
+        "file": "bell_2.ogg",
+        "pitchHz": 2896.87,
+        "midi": 102,
+        "note": "F#7",
+        "cents": -37.3,
+        "key": null
+      },
+      {
+        "file": "bell_3.ogg",
+        "pitchHz": 4549.5,
+        "midi": 109,
+        "note": "C#8",
+        "cents": 44.2,
+        "key": null
+      },
+      {
+        "file": "gong_1.ogg",
+        "pitchHz": 1009.31,
+        "midi": 83,
+        "note": "B5",
+        "cents": 37.4,
+        "key": null
+      },
+      {
+        "file": "gong_2.ogg",
+        "pitchHz": 226.42,
+        "midi": 57,
+        "note": "A3",
+        "cents": 49.8,
+        "key": null
+      },
+      {
+        "file": "pluck_cello_c2.ogg",
+        "pitchHz": 65.13,
+        "midi": 36,
+        "note": "C2",
+        "cents": -7.3,
+        "key": null
+      },
+      {
+        "file": "pluck_cello_g2.ogg",
+        "pitchHz": 97.73,
+        "midi": 43,
+        "note": "G2",
+        "cents": -4.8,
+        "key": null
+      },
+      {
+        "file": "pluck_cello_d3.ogg",
+        "pitchHz": 146.13,
+        "midi": 50,
+        "note": "D3",
+        "cents": -8.3,
+        "key": null
+      },
+      {
+        "file": "pluck_cello_a3.ogg",
+        "pitchHz": 220.2,
+        "midi": 57,
+        "note": "A3",
+        "cents": 1.5,
+        "key": null
+      },
+      {
+        "file": "ting_1.ogg",
+        "pitchHz": 1327.76,
+        "midi": 88,
+        "note": "E6",
+        "cents": 12.1,
+        "key": null
+      },
+      {
+        "file": "ting_2.ogg",
+        "pitchHz": 4459.86,
+        "midi": 109,
+        "note": "C#8",
+        "cents": 9.7,
+        "key": null
+      },
+      {
+        "file": "ting_3.ogg",
+        "pitchHz": 4443.83,
+        "midi": 109,
+        "note": "C#8",
+        "cents": 3.5,
+        "key": null
+      },
+      {
+        "file": "ting_4.ogg",
+        "pitchHz": 886.12,
+        "midi": 81,
+        "note": "A5",
+        "cents": 12.0,
+        "key": null
+      }
+    ]
+  },
+  "hands": {
+    "files": {
+      "left.glb": 94572,
+      "right.glb": 94004,
+      "profile.json": 1942
+    },
+    "license": "MIT License",
+    "version": "1.0.20"
+  },
+  "fonts": {
+    "ok": true,
+    "files": {
+      "cormorant-garamond-latin-italic-1.woff2": {
+        "bytes": 23660,
+        "variable": false,
+        "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3smX5slCNuHLi8bLeY9MK7whWMhyjYrGFEsdtdc62E6zd58jD-iNM8.woff2"
+      },
+      "cormorant-garamond-latin-normal-2.woff2": {
+        "bytes": 37640,
+        "variable": true,
+        "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtK.woff2"
+      },
+      "inter-latin-normal-1.woff2": {
+        "bytes": 48256,
+        "variable": true,
+        "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2"
+      }
+    },
+    "license": "SIL Open Font License 1.1",
+    "faces": [
+      {
+        "family": "Cormorant Garamond",
+        "style": "italic",
+        "weight": 400,
+        "file": "cormorant-garamond-latin-italic-1.woff2"
+      },
+      {
+        "family": "Cormorant Garamond",
+        "style": "normal",
+        "weight": 400,
+        "file": "cormorant-garamond-latin-normal-2.woff2"
+      },
+      {
+        "family": "Cormorant Garamond",
+        "style": "normal",
+        "weight": 600,
+        "file": "cormorant-garamond-latin-normal-2.woff2"
+      },
+      {
+        "family": "Inter",
+        "style": "normal",
+        "weight": 400,
+        "file": "inter-latin-normal-1.woff2"
+      },
+      {
+        "family": "Inter",
+        "style": "normal",
+        "weight": 600,
+        "file": "inter-latin-normal-1.woff2"
+      }
+    ]
+  },
+  "verify": {
+    "problems": []
+  },
+  "sizes": {
+    "files": {
+      "audio/bell_1.ogg": 12723,
+      "audio/bell_2.ogg": 7202,
+      "audio/bell_3.ogg": 14925,
+      "audio/bowl_1.ogg": 13510,
+      "audio/bowl_2.ogg": 10805,
+      "audio/bowl_3.ogg": 19324,
+      "audio/bowl_4.ogg": 21727,
+      "audio/bowl_5.ogg": 12641,
+      "audio/bowl_6.ogg": 30564,
+      "audio/bowl_7.ogg": 12392,
+      "audio/bubbles_loop.ogg": 43139,
+      "audio/glass_1.ogg": 37419,
+      "audio/glass_2.ogg": 7076,
+      "audio/gong_1.ogg": 15368,
+      "audio/gong_2.ogg": 12216,
+      "audio/manifest.json": 36546,
+      "audio/pad_bioluminescence.ogg": 72413,
+      "audio/pad_northern_brilliant.ogg": 230875,
+      "audio/pad_northern_swell.ogg": 298502,
+      "audio/pad_seafoam_waves.ogg": 114608,
+      "audio/plop_airy_1.ogg": 17318,
+      "audio/pluck_cello_a3.ogg": 49026,
+      "audio/pluck_cello_c2.ogg": 27521,
+      "audio/pluck_cello_d3.ogg": 40398,
+      "audio/pluck_cello_g2.ogg": 48517,
+      "audio/splash_soft_1.ogg": 9206,
+      "audio/splash_soft_2.ogg": 12250,
+      "audio/splash_soft_3.ogg": 11297,
+      "audio/splash_soft_4.ogg": 10013,
+      "audio/stream_loop.ogg": 459600,
+      "audio/ting_1.ogg": 9782,
+      "audio/ting_2.ogg": 12394,
+      "audio/ting_3.ogg": 9464,
+      "audio/ting_4.ogg": 9049,
+      "audio/water_loop_1.ogg": 18626,
+      "audio/whoosh_gentle.ogg": 8156,
+      "audio/whoosh_twirl_1.ogg": 12774,
+      "audio/whoosh_twirl_2.ogg": 12819,
+      "audio/wind_loop.ogg": 1069301,
+      "fonts/LICENSE.txt": 247,
+      "fonts/cormorant-garamond-latin-italic-1.woff2": 23660,
+      "fonts/cormorant-garamond-latin-normal-2.woff2": 37640,
+      "fonts/fonts.css": 1539,
+      "fonts/inter-latin-normal-1.woff2": 48256,
+      "hands/LICENSE.md": 1094,
+      "hands/hands.json": 450,
+      "hands/left.glb": 94572,
+      "hands/profile.json": 1942,
+      "hands/right.glb": 94004,
+      "sky/milkyway_2k.jpg": 514975,
+      "sky/milkyway_4k.jpg": 2690481,
+      "sky/sky.json": 4689,
+      "sky/stars.bin": 145536,
+      "sky/stars.json": 68321,
+      "textures/blossom.png": 15202,
+      "textures/caustic.jpg": 30988,
+      "textures/circle.png": 4158,
+      "textures/disc.png": 866,
+      "textures/glow_firefly.png": 1423,
+      "textures/glow_soft.png": 10798,
+      "textures/moon_1024.jpg": 238093,
+      "textures/moon_512.jpg": 58203,
+      "textures/moon_halo.png": 11004,
+      "textures/noise.png": 197320,
+      "textures/paper.png": 241102,
+      "textures/ripple_ring.png": 5072,
+      "textures/smoke1.png": 91231,
+      "textures/spark1.png": 1608,
+      "textures/waternormals.jpg": 248813
+    },
+    "dirs": {
+      "audio": 2871486,
+      "fonts": 111342,
+      "hands": 192062,
+      "sky": 3424002,
+      "textures": 1155881
+    },
+    "total": 7754773
+  }
+}

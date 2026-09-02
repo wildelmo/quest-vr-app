@@ -1,0 +1,13 @@
+{
+  "package": "@webxr-input-profiles/assets",
+  "version": "1.0.20",
+  "profile": "generic-hand",
+  "license": "MIT License (see LICENSE.md; Copyright (c) 2019 Amazon)",
+  "url": "https://github.com/immersive-web/webxr-input-profiles",
+  "files": [
+    "left.glb",
+    "right.glb",
+    "profile.json"
+  ],
+  "usage": "new XRHandModelFactory().setPath('assets/hands/')  -- trailing slash required: XRHandMeshModel loads `${path}${handedness}.glb`"
+}
