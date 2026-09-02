@@ -1,3 +1,15 @@
+diff --git a/src/audio/ambience.js b/src/audio/ambience.js
+index 382f79e..b92d1ac 100644
+--- a/src/audio/ambience.js
++++ b/src/audio/ambience.js
+@@ -141,6 +141,7 @@ export const ambience = {
+     S.startle = startle;
+     S.offs.push(ctx.events.on('lanternsplash', () => startle(6, 12)));
+     S.offs.push(ctx.events.on('lotuschord', () => startle(4, 6)));
++    S.offs.push(ctx.events.on('lakewave', () => startle(2, 4)));   // the crickets pause for a breath as the wave passes
+     // (blur/focus fades of the master bus are owned by the engine — see engine.js)
+   },
+ 
 diff --git a/src/audio/music.js b/src/audio/music.js
 index 6da62e6..f0d5cf5 100644
 --- a/src/audio/music.js
@@ -39,7 +51,7 @@ index 6da62e6..f0d5cf5 100644
  
      // ---- queued swell
 diff --git a/src/audio/sfx.js b/src/audio/sfx.js
-index 1871206..5b2fe86 100644
+index 1871206..f24c30b 100644
 --- a/src/audio/sfx.js
 +++ b/src/audio/sfx.js
 @@ -9,7 +9,7 @@ import { CONFIG } from '../config.js';
@@ -51,7 +63,7 @@ index 1871206..5b2fe86 100644
   */
  const LOOKAHEAD = 0.15;
  const BELL_POOL = 8;
-@@ -116,18 +116,38 @@ export const sfx = {
+@@ -116,18 +116,41 @@ export const sfx = {
        S.calm = { o1, o2, g2, lp, g };
      }
  
@@ -87,10 +99,13 @@ index 1871206..5b2fe86 100644
      on('pinchmiss', (e) => { const p = hasXYZ(e.point) ? e.point : e.hand?.pinch?.point; if (hasXYZ(p)) noiseBurst(S, { pos: p, dur: 0.02, gain: 0.05, type: 'bandpass', freq: 2000, q: 3 }); });
 +    on('hush', (e) => onHush(S, e));
 +    on('fireflyfollow', (e) => onFollow(S, e));
++    on('fireflyescort', (e) => onEscort(S, e));
++    on('fireflyspill', (e) => onSpill(S, e));
++    on('lakewave', (e) => onLakeWave(S, e));
    },
  
    update(api, ctx, dt) {
-@@ -159,14 +179,30 @@ export const sfx = {
+@@ -159,14 +182,30 @@ export const sfx = {
        // glide rush from the player's own wading
        const speed = ctx.playerCtl?.state?.speed || 0;
        S.glide.g.gain.setTargetAtTime(smoothstep(0.2, 1.0, speed) * 0.18, now, 0.15);
@@ -122,7 +137,7 @@ index 1871206..5b2fe86 100644
      }
  
      // ---- lantern crackle: nearest ≤ 3 lanterns re-evaluated every 0.5 s, positions every frame
-@@ -207,6 +243,7 @@ export const sfx = {
+@@ -207,6 +246,7 @@ export const sfx = {
      for (const sw of S.swish) { kill(sw.bp); try { sw.pa.dispose(); } catch { /* */ } }
      kill(S.glide.lp); kill(S.glide.g);
      kill(S.calm.o1); kill(S.calm.o2); kill(S.calm.g2); kill(S.calm.lp); kill(S.calm.g);
@@ -130,7 +145,7 @@ index 1871206..5b2fe86 100644
      kill(S.noiseWhite); kill(S.noisePink);
    },
  
-@@ -314,12 +351,24 @@ function notePlayed(S, midi) { S.playerNotes.push(midi); if (S.playerNotes.lengt
+@@ -314,12 +354,24 @@ function notePlayed(S, midi) { S.playerNotes.push(midi); if (S.playerNotes.lengt
  function onLotus(S, e) {
    const pos = hasXYZ(e.pos) ? e.pos : S.head();
    const midi = pitchFor(S, e.note | 0, 5);
@@ -157,7 +172,7 @@ index 1871206..5b2fe86 100644
  function onFirefly(S, e) {
    const pos = hasXYZ(e.pos) ? e.pos : (hasXYZ(e.hand?.palm?.position) ? e.hand.palm.position : S.head());
    const midi = pitchFor(S, Math.floor(S.rng() * 4), 6); // D6 … A6
-@@ -356,6 +405,25 @@ function onLanternStar(S, e) {
+@@ -356,6 +408,56 @@ function onLanternStar(S, e) {
    S.auroraNotes = S.playerNotes.slice(-4);
  }
  
@@ -180,11 +195,42 @@ index 1871206..5b2fe86 100644
 +  else if (n === 8) triggerBell(S, { midi: pitchFor(S, 4, 6), pos, gain: 0.12, dur: 1.2, kind: 'glass', wet: 0.5, tag: 'ribbon' });
 +}
 +
++// fireflies lift off with a released lantern: a quick run of small glass bells up the scale, one per firefly (five at most)
++function onEscort(S, e) {
++  const pos = hasXYZ(e.pos) ? e.pos : S.head();
++  const now = S.c.currentTime;
++  const n = Math.min(e.count | 0, 5);
++  for (let k = 0; k < n; k++) triggerBell(S, { midi: pitchFor(S, k, 6), pos, gain: 0.07, dur: 0.9, kind: 'glass', when: now + 0.05 + k * 0.09, wet: 0.5, tag: 'escort' });
++}
++
++// the escort spills away as sparks: four falling bells and a brief high hiss
++function onSpill(S, e) {
++  const pos = hasXYZ(e.pos) ? e.pos : S.head();
++  const now = S.c.currentTime;
++  for (let k = 0; k < 4; k++) triggerBell(S, { midi: pitchFor(S, 4 - k, 6), pos, gain: 0.05, dur: 0.9, kind: 'glass', when: now + 0.02 + k * 0.07, wet: 0.5, tag: 'spill' });
++  noiseBurst(S, { pos, type: 'highpass', freq: 4000, q: 0.7, dur: 0.3, gain: 0.03 });
++}
++
++// the lake passes a star on: every open lotus restates its note as the 2.5 m/s front reaches it, under one soft breath
++function onLakeWave(S, e) {
++  const head = S.head();
++  const flowers = S.ctx.lotus?.flowers;
++  const now = S.c.currentTime;
++  if (flowers) {
++    for (const f of flowers) {
++      if (!f.open || !hasXYZ(f.bud)) continue;
++      const when = now + Math.hypot(f.bud.x - head.x, f.bud.z - head.z) / 2.5;
++      triggerBell(S, { midi: pitchFor(S, f.note | 0, 5), pos: f.bud, gain: 0.10, dur: 2.6, kind: 'glass', attack: 0.03, wet: 0.7, when, tag: 'wave' });
++    }
++  }
++  noiseBurst(S, { pos: head, kind: 'pink', type: 'lowpass', freq: 600, q: 0.5, dur: 1.5, gain: 0.05 });
++}
++
  function onHandEnter(S, e) {
    const h = e.hand;
    const pos = hasXYZ(h?.palm?.position) ? h.palm.position : null;
 diff --git a/src/main.js b/src/main.js
-index 390b8e8..caa0a6e 100644
+index 390b8e8..2770026 100644
 --- a/src/main.js
 +++ b/src/main.js
 @@ -87,13 +87,13 @@ async function boot() {
@@ -192,7 +238,7 @@ index 390b8e8..caa0a6e 100644
    // event log for the harness / debugging
    ctx.eventLog = [];
 -  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'starborn', 'lotusbloom', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart', 'leave', 'drip']) {
-+  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'lanterntouch', 'starborn', 'lotusbloom', 'lotusstir', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart', 'leave', 'drip', 'hush', 'hushend', 'fireflyfollow']) {
++  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'lanterntouch', 'starborn', 'lotusbloom', 'lotusstir', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart', 'leave', 'drip', 'hush', 'hushend', 'fireflyfollow', 'fireflyescort', 'fireflyspill', 'lakewave']) {
      ctx.events.on(type, (e) => { if (ctx.eventLog.length < 500) ctx.eventLog.push({ type, t: +ctx.time.t.toFixed(2), detail: summarize(e) }); });
    }
    function summarize(e) {
@@ -214,7 +260,7 @@ index 390b8e8..caa0a6e 100644
        rig: { x: player.position.x, y: player.position.y, z: player.position.z, ry: player.rotation.y },
        head: ctx.playerCtl.state.headWorld.toArray().map((v) => +v.toFixed(3)),
      }),
-@@ -209,9 +209,11 @@ async function boot() {
+@@ -209,9 +209,12 @@ async function boot() {
        hands: { left: ctx.hands.left.visible, right: ctx.hands.right.visible, pinchL: ctx.hands.left.pinch.active, pinchR: ctx.hands.right.pinch.active, submergedR: ctx.hands.right.submerged, debug: ctx.hands.debugInfo?.() },
        calibrated: ctx.playerCtl.state.calibrated, seated: ctx.playerCtl.state.seated, calm: ctx.calm,
        moonAltitudeDeg: ctx.sky?.moonAltitudeDeg, lanternStars: ctx.sky?.lanternStarCount?.(), aurora: ctx.aurora?.intensity,
@@ -222,6 +268,7 @@ index 390b8e8..caa0a6e 100644
 +      lanterns: ctx.lanterns?.count, lanternTouches: ctx.lanterns?.touches, fireflies: ctx.fireflies?.count, fireflyLanded: ctx.fireflies?.landedCount, lotusOpen: ctx.lotus?.flowers?.filter((f) => f.open).length,
 +      fireflyFollowers: ctx.fireflies?.followers ? [ctx.fireflies.followers[0], ctx.fireflies.followers[1]] : [0, 0],
 +      fireflyFollowArrived: ctx.fireflies?.followArrived ? [ctx.fireflies.followArrived[0], ctx.fireflies.followArrived[1]] : [0, 0],
++      fireflyEscorting: ctx.fireflies?.escortCount,
        player: { x: player.position.x, y: player.position.y, z: player.position.z },
 -      water: ctx.water.level,
 +      water: ctx.water.level, hush: ctx.hush?.strength,
@@ -289,10 +336,10 @@ index 54fc601..9217130 100644
    float fog = fogExp2(length(cameraPosition - vWorldPos), uFogDensity);
    col = mix(col, uFogColor, fog);
 diff --git a/src/world/fireflies.js b/src/world/fireflies.js
-index b7ae8cc..6191724 100644
+index b7ae8cc..f33cda4 100644
 --- a/src/world/fireflies.js
 +++ b/src/world/fireflies.js
-@@ -14,6 +14,10 @@ import { FIREFLY_VERT, FIREFLY_MIRROR_VERT, FIREFLY_FRAG } from '../shaders/fire
+@@ -14,16 +14,28 @@ import { FIREFLY_VERT, FIREFLY_MIRROR_VERT, FIREFLY_FRAG } from '../shaders/fire
   *    last, then the middle knuckle); they ease in and land on the tip, glow steadily, then leave
   *    with an upward burst when the hand moves, dips, disappears, or after 8–18 s
   *  - a fast hand scatters everything within 0.6 m
@@ -300,19 +347,30 @@ index b7ae8cc..6191724 100644
 + *    from the nearest cloud; they fly in and then string out along the path the hand has taken (a
 + *    distance-sampled trail, 8 cm apart), so the strand follows every slow curve. Stop, and the hand
 + *    becomes an open still hand: the nearest of them take the landing slots; move fast and they scatter
++ *  - the escort: letting a lantern go takes up to ten nearby fireflies (any resting on the releasing hand first)
++ *    up with it; they spiral round the flame as it rises ('fireflyescort'; lanterns.js reads L.escorts to flare the
++ *    flame) and ~4 s up they spill away as sparks ('fireflyspill') while their home cloud is kicked into step
++ *  - the lake passes it on: 0.8 s after that lantern becomes a star, a wave of flashes rolls out from the player at
++ *    walking pace ('lakewave'; every flash is re-phased to peak as the front reaches it, and the clouds hold that
++ *    phase for a few seconds); lotus.js and the audio answer the same event
   * Per-firefly flash, shaped like a Photinus flash: a fast rise (~0.15 s), a slower decay (~0.5 s) and a
   * dim ember in between, repeating every 1.4–3.2 s; ~15% are long-glowers that breathe slowly instead.
   * Loose synchrony: every SYNC.dt each home cloud's flashers are nudged toward the cloud's mean phase
-@@ -23,7 +27,7 @@ import { FIREFLY_VERT, FIREFLY_MIRROR_VERT, FIREFLY_FRAG } from '../shaders/fire
-  * audio module (positions, brightness, states, homes, per-cloud coherence).
+  * (a mean-field Kuramoto step, O(N) per pass, no pair terms) with a coupling that swells and relaxes
+  * over ~26–41 s per cloud, so a cloud drifts into waves of near-synchronous flashing and back out again.
+  * Landed fireflies glow steadily. Seeded PRNG so a run is reproducible. Exposes ctx.fireflies for the
+- * audio module (positions, brightness, states, homes, per-cloud coherence).
++ * audio module (positions, brightness, states, homes, per-cloud coherence, escortCount, kickedCloud, wave).
++ * Cross-module field: rising lantern records get `escorts` (how many fireflies orbit them this frame) and
++ * `spilled` (the escort has already spilled; lanterns.js resets it on grab and respawn).
   */
  
 -const WANDER = 0, APPROACH = 1, LANDED = 2, SCATTER = 3;
-+const WANDER = 0, APPROACH = 1, LANDED = 2, SCATTER = 3, FOLLOW = 5;   // 4 is reserved for the escort
++const WANDER = 0, APPROACH = 1, LANDED = 2, SCATTER = 3, ESCORT = 4, FOLLOW = 5;
  // landing spots, in the order they fill: fingertips, but also knuckles and the palm so they don't all perch on the tips
  const SLOT_JOINTS = ['index-finger-tip', 'middle-finger-phalanx-proximal', 'ring-finger-tip', 'index-finger-metacarpal', 'thumb-tip', 'pinky-finger-tip', 'middle-finger-tip', 'ring-finger-phalanx-proximal'];
  const SLOTS = SLOT_JOINTS.length;
-@@ -48,6 +52,15 @@ const FLASH = { rise: 0.15, decay: 0.5, ember: 0.035 };
+@@ -48,6 +60,23 @@ const FLASH = { rise: 0.15, decay: 0.5, ember: 0.035 };
  // synchrony: pass interval, peak coupling (rad/s; the clouds' natural rates spread over ~2–4.5 rad/s, so
  // this locks most of a cloud at its peak and none of it near zero), and the swell period per cloud
  const SYNC = { dt: 0.25, kMax: 2.4, swell: [26, 34, 41] };
@@ -325,10 +383,27 @@ index b7ae8cc..6191724 100644
 +  pauseGrace: 0.4, lostGrace: 0.4, recruitAfter: 0.5, recruitEvery: 0.3, max: 16,
 +  sampleStep: 0.02, ring: 256, spacing: 4, lift: 0.09, inbound: 0.3, releaseCooldown: 4,
 +};
++// the escort: up to max fireflies join a released lantern — wanderers within wanderRange of it, and anything on the
++// releasing hand within handRange; they orbit at orbitA rad/s on a radius orbitR (+ jitter) until the lantern has
++// risen spillAt s, then spill as sparks and their cloud is kicked into synchrony for kick s at kickGain × the peak coupling
++export const ESC = { max: 10, wanderRange: 3.0, handRange: 0.6, spillAt: 4.2, orbitA: 2.6, orbitR: 0.14, orbitRJit: 0.12, speedMax: 1.0, kick: 6, kickGain: 2.0 };
++// the lake wave: delay s after a star, a front of flashes spreads from the player at speed m/s; the clouds hold their
++// phases (no synchrony nudges) for hold s so the pattern is not pulled apart at once
++export const WAVE = { speed: 2.5, hold: 6, delay: 0.8 };
++const WAVE_SAMPLES = 32;   // the harness reads the first 32 re-phased fireflies of cloud 0 and their peak times
  
  function mulberry32(a) {
    return function () {
-@@ -156,18 +169,42 @@ export const fireflies = {
+@@ -149,6 +178,8 @@ export const fireflies = {
+         if (state[i] === SCATTER) timer[i] = Math.min(timer[i], nt + 1.4);
+         else if (state[i] === LANDED) timer[i] = Math.min(timer[i], nt);
+       }
++      const S = this._;
++      if (S) { if (S.waveAt > 0) S.waveAt = Math.min(S.waveAt, nt + 1); S.waveHold = Math.min(S.waveHold, 1); }
+     });
+ 
+     // ---- synchrony scratch: per cloud the mean phase vector (cos, sin, count), then mean phase and nudge gain
+@@ -156,19 +187,106 @@ export const fireflies = {
      const syncPsi = new Float32Array(HOME_SPECS.length), syncGain = new Float32Array(HOME_SPECS.length);
      const coherence = new Float32Array(HOME_SPECS.length);   // Kuramoto order parameter R per cloud, 0..1
  
@@ -352,27 +427,91 @@ index b7ae8cc..6191724 100644
 +      cnt: new Int16Array(4), newArr: new Int16Array(2),   // this frame's followers/arrived per hand, arrivals this frame
 +    };
 +
++    // ---- the escort: which lantern (index into ctx.lanterns.list) each firefly orbits, nearest-first recruiting scratch,
++    // per-lantern escort counts, and the synchrony kick a spill gives the cloud it came from
++    const escortL = new Int8Array(N).fill(-1);
++    const escIdx = new Int16Array(ESC.max), escD = new Float32Array(ESC.max);
++    const escPerL = new Int8Array(24), escPerCloud = new Int16Array(HOME_SPECS.length);
++    const syncKick = new Float32Array(HOME_SPECS.length);
++    // the lake wave: fired once per star, and what the harness reads back
++    const wave = { fired: false, t0: 0, ox: 0, oz: 0, speed: WAVE.speed, count: 0, sample: new Int16Array(WAVE_SAMPLES), sampleT: new Float32Array(WAVE_SAMPLES) };
++
 +    ctx.fireflies = {
 +      count: N, landedCount: 0, positions: pos, brightness: bright, states: state, homes, coherence,
 +      followers: rib.followers, followArrived: rib.followArrived, followCentroid: rib.followCentroid,
++      escortCount: 0, kickedCloud: -1, wave,
 +    };
++
++    // free a firefly from any hand slot, ribbon slot or escort it holds (shared by the update paths and the event handlers)
++    const releaseSlot = (i) => {
++      const sh = slotHand[i];
++      if (sh >= 0) { const ss = slotIdx[i]; if (slots[sh][ss] === i) slots[sh][ss] = -1; }
++      slotHand[i] = -1; slotIdx[i] = -1;
++      const fh = followHand[i];
++      if (fh >= 0) { const fk = fh * rib.max + followIdx[i]; if (rib.slots[fk] === i) rib.slots[fk] = -1; }
++      followHand[i] = -1; followIdx[i] = -1;
++      escortL[i] = -1;
++    };
++
++    // a lantern let go above the water: the nearest wanderers within reach and whatever rests on the releasing hand lift off with it
++    ctx.events.on('lanternrelease', (e) => {
++      const L = e && e.lantern;
++      if (!L || !L.position || typeof L.i !== 'number' || L.i >= escPerL.length) return;
++      const lp = L.position;
++      let n = 0;
++      for (let i = 0; i < N; i++) {
++        const st = state[i];
++        let range;
++        if (st === WANDER) { if (cooldown[i] > 0) continue; range = ESC.wanderRange; }
++        else if (st === LANDED || st === APPROACH) range = ESC.handRange;
++        else continue;   // escorts of another lantern, the ribbon's followers and scattering fireflies stay where they are
++        const dx = pos[i * 3] - lp.x, dy = pos[i * 3 + 1] - lp.y, dz = pos[i * 3 + 2] - lp.z;
++        const d2 = dx * dx + dy * dy + dz * dz;
++        if (d2 > range * range) continue;
++        if (n === ESC.max && d2 >= escD[n - 1]) continue;
++        // nearest-first insertion into the fixed slots
++        let k = n < ESC.max ? n : ESC.max - 1;
++        while (k > 0 && escD[k - 1] > d2) { escD[k] = escD[k - 1]; escIdx[k] = escIdx[k - 1]; k--; }
++        escD[k] = d2; escIdx[k] = i;
++        if (n < ESC.max) n++;
++      }
++      L.spilled = false; L.escorts = n;
++      for (let k = 0; k < n; k++) {
++        const i = escIdx[k];
++        releaseSlot(i);
++        state[i] = ESCORT; escortL[i] = L.i; cooldown[i] = 0;
++      }
++      if (n > 0) ctx.events.emit('fireflyescort', { pos: lp.clone(), count: n, lantern: L });
++    });
++
++    // the star's own sparkle strikes first; the lake answers WAVE.delay later, from where the player stands
++    ctx.events.on('lanternstar', () => {
++      const S = this._;
++      if (!S) return;
++      const head = ctx.playerCtl.state.headWorld;
++      S.waveAt = ctx.time.t + WAVE.delay; S.waveOX = head.x; S.waveOZ = head.z;
++    });
  
      this._ = {
        N, rnd, pos, vel, bright, seed, homeIdx, homeOff, state, slotHand, slotIdx, timer, stay, cooldown, period, phase, steady,
        homes, homeRel, following: false, geo, posAttr, brightAttr, matMain, matMirror, points, mirror, slots, recruitT, hf,
        syncT: SYNC.dt, syncAcc, syncPsi, syncGain, coherence,
-+      followHand, followIdx, followPhase, followOff, rib,
++      followHand, followIdx, followPhase, followOff, rib, releaseSlot,
++      escortL, escPerL, escPerCloud, syncKick, kickedCloud: -1, escortCount: 0,
++      waveAt: -1, waveOX: 0, waveOZ: 0, waveHold: 0, wave,
      };
    },
  
    update(ctx, dt) {
      const S = this._;
      const { N, rnd, pos, vel, bright, seed, homeIdx, homeOff, state, slotHand, slotIdx, timer, stay, cooldown, period, phase, steady, homes, homeRel, slots, recruitT, hf } = S;
-+    const { followHand, followIdx, followPhase, followOff, rib } = S;
++    const { followHand, followIdx, followPhase, followOff, rib, releaseSlot, escortL, escPerL, escPerCloud, syncKick } = S;
      const t = ctx.time.t;
++    const lanterns = ctx.lanterns ? ctx.lanterns.list : null;
      const level = ctx.water.level;
      const { renderer, camera } = ctx;
-@@ -225,6 +262,54 @@ export const fireflies = {
+     const hands = ctx.hands.list;
+@@ -225,6 +343,54 @@ export const fireflies = {
        hf.still[hi] = !!hs && (hs.still || hs.speed < stillSpeed);
      }
  
@@ -427,10 +566,15 @@ index b7ae8cc..6191724 100644
      // ---- recruiting: an open still hand pulls one wandering firefly per slot, staggered in time
      for (let hi = 0; hi < 2; hi++) {
        recruitT[hi] -= dt;
-@@ -247,11 +332,61 @@ export const fireflies = {
+@@ -247,11 +413,52 @@ export const fireflies = {
        }
      }
  
+-    const releaseSlot = (i) => {
+-      const sh = slotHand[i];
+-      if (sh >= 0) { const ss = slotIdx[i]; if (slots[sh][ss] === i) slots[sh][ss] = -1; }
+-      slotHand[i] = -1; slotIdx[i] = -1;
+-    };
 +    // ---- ribbon recruiting: once the hand has drifted for recruitAfter s, the nearest free wanderer joins every recruitEvery s
 +    for (let hi = 0; hi < 2; hi++) {
 +      if (!rib.hold[hi] || rib.slowFor[hi] <= RIB.recruitAfter || rib.followT[hi] > 0) continue;
@@ -451,15 +595,6 @@ index b7ae8cc..6191724 100644
 +        rib.followT[hi] = RIB.recruitEvery;
 +      }
 +    }
-+
-     const releaseSlot = (i) => {
-       const sh = slotHand[i];
-       if (sh >= 0) { const ss = slotIdx[i]; if (slots[sh][ss] === i) slots[sh][ss] = -1; }
-       slotHand[i] = -1; slotIdx[i] = -1;
-+      const fh = followHand[i];
-+      if (fh >= 0) { const fk = fh * rib.max + followIdx[i]; if (rib.slots[fk] === i) rib.slots[fk] = -1; }
-+      followHand[i] = -1; followIdx[i] = -1;
-     };
 +
 +    // ---- hand-off: a hand with followers that is open and still gives its free landing slots to the nearest of them; they
 +    // land through the ordinary approach path (the rest keep hovering on their samples and step in as slots free up)
@@ -489,10 +624,123 @@ index b7ae8cc..6191724 100644
      // burst away along (ax, ay, az) with an upward bias; enters SCATTER for ~1 s
      const burst = (i, ax, ay, az, strength) => {
        let l = Math.hypot(ax, ay, az);
-@@ -334,6 +469,63 @@ export const fireflies = {
+@@ -275,6 +482,30 @@ export const fireflies = {
+       return FLASH.ember + (1 - FLASH.ember) * env;
+     };
+ 
++    // ---- the lake passes it on: once per star, every free flasher is re-phased so its flash peaks exactly as a front
++    // travelling at WAVE.speed from the player reaches it; the clouds then hold that phase for WAVE.hold s
++    if (S.waveAt > 0 && t >= S.waveAt) {
++      S.waveAt = -1;
++      const ox = S.waveOX, oz = S.waveOZ, wv = S.wave;
++      let count = 0, ns = 0;
++      for (let i = 0; i < N; i++) {
++        const st = state[i];
++        if (steady[i] || (st !== WANDER && st !== SCATTER)) continue;   // hand-resting, escorting and following fireflies keep their own light
++        const d = Math.hypot(pos[i * 3] - ox, pos[i * 3 + 2] - oz);
++        const tPeak = t + d / WAVE.speed;
++        const rise = FLASH.rise * (0.85 + 0.3 * seed[i]);
++        const pd = period[i];
++        phase[i] = ((rise - tPeak) % pd + pd) % pd;
++        count++;
++        if (ns < WAVE_SAMPLES && homeIdx[i] === 0) { wv.sample[ns] = i; wv.sampleT[ns] = tPeak; ns++; }
++      }
++      for (let k = ns; k < WAVE_SAMPLES; k++) { wv.sample[k] = -1; wv.sampleT[k] = 0; }
++      wv.fired = true; wv.t0 = t; wv.ox = ox; wv.oz = oz; wv.speed = WAVE.speed; wv.count = count;
++      S.waveHold = WAVE.hold;
++      ctx.events.emit('lakewave', { pos: new THREE.Vector3(ox, level, oz), count });
++    }
++    if (S.waveHold > 0) S.waveHold -= dt;
++
+     // ---- loose synchrony, at SYNC.dt: each cloud's flashers are pulled toward the cloud's mean phase by
+     // K(t) * R * sin(psi - theta), K swelling and relaxing over the cloud's own period (peak: most of the
+     // cloud locks within a few seconds; trough: their different rates pull them apart again)
+@@ -292,6 +523,8 @@ export const fireflies = {
+         acc[k3] += Math.cos(th); acc[k3 + 1] += Math.sin(th); acc[k3 + 2] += 1;
+       }
+       for (let k = 0; k < HOME_SPECS.length; k++) {
++        const kicked = syncKick[k] > 0;   // a spill kicks its cloud: strong coupling for a few seconds locks it into a common flash
++        if (kicked) syncKick[k] -= SYNC.dt;
+         const n = acc[k * 3 + 2];
+         if (n < 2) { coh[k] = 0; kg[k] = 0; continue; }
+         const cx = acc[k * 3] / n, cy = acc[k * 3 + 1] / n;
+@@ -299,6 +532,8 @@ export const fireflies = {
+         coh[k] = R; psi[k] = Math.atan2(cy, cx);
+         const w = 0.5 + 0.5 * Math.sin(t * TAU / SYNC.swell[k] + k * 2.1);
+         kg[k] = SYNC.kMax * w * w * R * SYNC.dt;
++        if (kicked) kg[k] = Math.max(kg[k], ESC.kickGain * SYNC.kMax * R * SYNC.dt);
++        if (S.waveHold > 0) kg[k] = 0;   // the lake wave's hold wins over a kick: the pattern it laid down is left alone
+       }
+       for (let i = 0; i < N; i++) {
+         if (steady[i] || (state[i] !== WANDER && state[i] !== SCATTER)) continue;
+@@ -314,7 +549,32 @@ export const fireflies = {
+ 
+     const yMin = level + P.yMin, yMax = level + P.yMax, ySoftMin = level + P.ySoftMin, ySoftMax = level + P.ySoftMax;
+     const repelR2 = P.repelRadius * P.repelRadius;
+-    let landed = 0;
++    let landed = 0, escorting = 0;
++    escPerL.fill(0);
++    // the spill: every escort of lantern L bursts outward and down as a spark and its home cloud is kicked into step
++    const spill = (L) => {
++      escPerCloud.fill(0);
++      let n = 0, sx = 0, sz = 0;
++      const lp = L.position;
++      for (let j = 0; j < N; j++) {
++        if (state[j] !== ESCORT || escortL[j] !== L.i) continue;
++        const j3 = j * 3;
++        let ox = pos[j3] - lp.x, oz = pos[j3 + 2] - lp.z;
++        let l = Math.hypot(ox, oz);
++        if (l < 1e-3) { const a = rnd() * Math.PI * 2; ox = Math.cos(a); oz = Math.sin(a); l = 1; }
++        vel[j3] = ox / l * 0.9 + (rnd() - 0.5) * 0.3;
++        vel[j3 + 1] = -0.25 + rnd() * 0.3;
++        vel[j3 + 2] = oz / l * 0.9 + (rnd() - 0.5) * 0.3;
++        state[j] = SCATTER; timer[j] = t + 1.0 + rnd() * 0.6; cooldown[j] = 4; bright[j] = 1; escortL[j] = -1;
++        escPerCloud[homeIdx[j]]++; sx += pos[j3]; sz += pos[j3 + 2]; n++;
++      }
++      L.spilled = true; L.escorts = 0;
++      if (n === 0) return;
++      let k = 0;
++      for (let c = 1; c < HOME_SPECS.length; c++) if (escPerCloud[c] > escPerCloud[k]) k = c;
++      syncKick[k] = ESC.kick; S.kickedCloud = k; ctx.fireflies.kickedCloud = k;
++      ctx.events.emit('fireflyspill', { pos: new THREE.Vector3(sx / n, lp.y, sz / n), count: n, lantern: L });
++    };
+ 
+     for (let i = 0; i < N; i++) {
+       const i3 = i * 3;
+@@ -334,6 +594,93 @@ export const fireflies = {
          }
        }
  
++      if (st === ESCORT) {
++        const li = escortL[i];
++        const L = li >= 0 && lanterns ? lanterns[li] : null;
++        if (!L || L.state !== 'rising' || L.riseTime > ESC.spillAt) {
++          // the lantern is high enough, was caught again, or fell: the whole escort spills at once
++          if (L && !L.spilled) spill(L);
++          else { escortL[i] = -1; state[i] = WANDER; cooldown[i] = 4; }
++          st = state[i]; vx = vel[i3]; vy = vel[i3 + 1]; vz = vel[i3 + 2];
++        } else {
++          // spiral round the flame: a point on a jittered ring about the body, a little above its centre
++          const lp = L.position;
++          const a = t * ESC.orbitA + seed[i] * 6.283, r = ESC.orbitR + ESC.orbitRJit * seed[i];
++          const tx = lp.x + Math.cos(a) * r, ty = lp.y + 0.05 + (seed[i] - 0.5) * 0.25, tz = lp.z + Math.sin(a) * r;
++          const dx = tx - x, dy = ty - y, dz = tz - z;
++          const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
++          const sp = Math.min(ESC.speedMax, 0.15 + d * 3);
++          const inv = d > 1e-5 ? sp / d : 0;
++          const k = Math.min(1, dt * 5);
++          vx += (dx * inv - vx) * k; vy += (dy * inv - vy) * k; vz += (dz * inv - vz) * k;
++          x += vx * dt; y += vy * dt; z += vz * dt;
++          bright[i] = Math.max(blink(i), 0.55);
++          escPerL[li]++; escorting++;
++          // the lantern climbs past the fireflies' band: no clamp for an escort
++          state[i] = st;
++          pos[i3] = x; pos[i3 + 1] = y; pos[i3 + 2] = z;
++          vel[i3] = vx; vel[i3 + 1] = vy; vel[i3 + 2] = vz;
++          continue;
++        }
++      }
++
 +      if (st === FOLLOW) {
 +        const hi = followHand[i], k = followIdx[i];
 +        if (hi < 0 || rib.slots[hi * rib.max + k] !== i || !rib.hold[hi]) {
@@ -553,10 +801,13 @@ index b7ae8cc..6191724 100644
        if (st === LANDED) {
          const hi = slotHand[i], hs = hands[hi], s = slotIdx[i];
          const j = hs.joints[SLOT_JOINTS[s]];
-@@ -432,5 +624,13 @@ export const fireflies = {
+@@ -432,5 +779,16 @@ export const fireflies = {
      S.posAttr.needsUpdate = true;
      S.brightAttr.needsUpdate = true;
      ctx.fireflies.landedCount = landed;
++    // the escort's counters: how many fireflies orbit each rising lantern (lanterns.js flares the flame with them)
++    S.escortCount = escorting; ctx.fireflies.escortCount = escorting;
++    if (lanterns) for (let li = 0; li < lanterns.length && li < escPerL.length; li++) { const L = lanterns[li]; if (L.state === 'rising') L.escorts = escPerL[li]; }
 +    // the ribbon's counters and the centroid of each hand's arrived followers (the hand itself while there are none)
 +    for (let hi = 0; hi < 2; hi++) {
 +      rib.followers[hi] = rib.cnt[hi];
@@ -568,25 +819,26 @@ index b7ae8cc..6191724 100644
    },
  };
 diff --git a/src/world/hints.js b/src/world/hints.js
-index d584b3a..93393ce 100644
+index d584b3a..4935203 100644
 --- a/src/world/hints.js
 +++ b/src/world/hints.js
-@@ -17,6 +17,9 @@ const HINTS = [
+@@ -17,6 +17,10 @@ const HINTS = [
    { id: 'still', text: 'hold a hand open and still', after: 95, done: (ctx, s) => s.fireflyLanded, ready: (ctx, s) => s.touchedWater },
    { id: 'wade', text: 'pinch the water and pull it toward you', after: 60, done: (ctx, s) => s.moved, ready: (ctx, s) => s.touchedWater && (nearestLantern(ctx) > REACH + 0.2 || nearestLotus(ctx) > REACH + 0.2) },
    { id: 'turn', text: 'pinch with both hands and turn them to look around', after: 150, done: (ctx, s) => s.turned, ready: (ctx, s) => s.moved && ctx.playerCtl.state.seated },
 +  { id: 'lanternlotus', text: 'leave a lantern among the lily pads', after: 130, done: (ctx, s) => s.lanternBloomed, ready: (ctx, s) => s.grabbed && s.bloomed && nearestLotus(ctx) < REACH + 0.15 && nearestLantern(ctx) < REACH + 0.15 },
 +  { id: 'hush', text: 'rest a hand flat on the water and be still', after: 140, done: (ctx, s) => s.hushed, ready: (ctx, s) => s.touchedWater },
 +  { id: 'ribbon', text: 'move an open hand slowly and they follow', after: 130, done: (ctx, s) => s.followed, ready: (ctx, s) => s.touchedWater },
++  { id: 'escort', text: 'let a lantern go with fireflies on your hand', after: 200, done: (ctx, s) => s.escorted, ready: (ctx, s) => s.fireflyLanded && s.released && nearestLantern(ctx) < REACH + 0.15 },
  ];
  const LEAVE = { id: 'leave', text: 'keep your palms together to leave', repeat: true };
  const SHOW_HANDS = { id: 'hands', text: 'show your hands to the headset', repeat: true };
-@@ -63,11 +66,13 @@ export const hints = {
+@@ -63,11 +67,15 @@ export const hints = {
      mesh.renderOrder = 1; mesh.frustumCulled = false; mesh.visible = false; mesh.name = 'hint';
      ctx.scene.add(mesh);
  
 -    const s = { handsSeen: false, touchedWater: false, grabbed: false, fireflyLanded: false, moved: false, turned: false, bloomed: false, sessionStart: -1, handsLostSince: -1, noTracking: false, shows: {} };
-+    const s = { handsSeen: false, touchedWater: false, grabbed: false, fireflyLanded: false, moved: false, turned: false, bloomed: false, lanternBloomed: false, hushStarted: false, hushed: false, followed: false, sessionStart: -1, handsLostSince: -1, noTracking: false, shows: {} };
++    const s = { handsSeen: false, touchedWater: false, grabbed: false, fireflyLanded: false, moved: false, turned: false, bloomed: false, lanternBloomed: false, hushStarted: false, hushed: false, followed: false, released: false, escorted: false, sessionStart: -1, handsLostSince: -1, noTracking: false, shows: {} };
      ctx.events.on('handenter', () => { s.touchedWater = true; });
      ctx.events.on('grab', () => { s.grabbed = true; });
      ctx.events.on('fireflyland', () => { s.fireflyLanded = true; });
@@ -594,10 +846,12 @@ index d584b3a..93393ce 100644
 +    ctx.events.on('lotusbloom', (e) => { s.bloomed = true; if (e && e.cause === 'lantern') s.lanternBloomed = true; });
 +    ctx.events.on('hush', () => { s.hushStarted = true; });
 +    ctx.events.on('fireflyfollow', () => { s.followed = true; });
++    ctx.events.on('lanternrelease', () => { s.released = true; });
++    ctx.events.on('fireflyescort', (e) => { if (e && (e.count | 0) >= 3) s.escorted = true; });
      const startSession = (e) => { s.sessionStart = ctx.time.t; s.noTracking = !!(e && e.hasHands === false); s.handsSeen = false; s.handsLostSince = -1; s.shows = {}; st.current = null; st.cooldownUntil = 0; };
      ctx.events.on('xrstart', startSession);
      ctx.events.on('desktopstart', startSession);
-@@ -104,6 +109,7 @@ export const hints = {
+@@ -104,6 +112,7 @@ export const hints = {
      if (!s.handsSeen && ctx.hands.list.some((h) => h.tracked)) s.handsSeen = true;
      if (!s.moved && (ctx.playerCtl.state.speed > 0.25 || (ctx.playerCtl.state.pullSpeed || 0) > 0.2)) s.moved = true;
      if (!s.turned && Math.abs(ctx.playerCtl.state.turnRate || 0) > 0.15) s.turned = true;
@@ -734,7 +988,7 @@ index be519ee..33ce0a7 100644
 -export const WORLD_MODULES = [wavesim, water, sky, aurora, plankton, drips, shore, mist, lotus, lanterns, fireflies, leave, hints];
 +export const WORLD_MODULES = [wavesim, water, sky, aurora, plankton, drips, shore, mist, lotus, lanterns, fireflies, hush, leave, hints];
 diff --git a/src/world/lanterns.js b/src/world/lanterns.js
-index aab5764..8b8a6dd 100644
+index aab5764..b084fed 100644
 --- a/src/world/lanterns.js
 +++ b/src/world/lanterns.js
 @@ -1,6 +1,7 @@
@@ -758,7 +1012,7 @@ index aab5764..8b8a6dd 100644
   *  - held: a point mass on an 8 cm string under the pinch point (position-based pendulum, unilateral
   *    so it can go slack and float when pushed under water); the body tilts along the string.
   *  - rising: the string's anchor becomes a virtual balloon: 0.4 s buoyancy ramp, 0.25 -> 0.5 m/s,
-@@ -26,9 +31,10 @@ import {
+@@ -26,9 +31,12 @@ import {
   * Grab protocol (src/core/hands.js): each lantern keeps an entry in ctx.grabbables
   * { position, radius, active, held, warm, onGrab(hand), onRelease(hand, velocity, { lost }) }.
   *
@@ -766,13 +1020,15 @@ index aab5764..8b8a6dd 100644
 - * top (Vector3), state, bright, seed, held, attracted }.
 - * Events: 'lanterngrab' {pos, hand}, 'lanternrelease' {pos, hand}, 'lanternsplash' {pos}, 'lanternstar' {dir, pos}.
 + * Public surface: ctx.lanterns = { list, count, MAX, touches }; list entries expose { position (centre, Vector3),
-+ * top (Vector3), state, bright, seed, held, attracted, touched, amongPads, push, spinKick, inContact }.
++ * top (Vector3), state, bright, seed, held, attracted, touched, amongPads, push, spinKick, inContact, escorts, spilled }.
++ * Cross-module fields written by fireflies.js: `escorts` (fireflies orbiting a rising lantern this frame; the flame flares
++ * with them) and `spilled` (that escort has already spilled); both are reset here on grab and respawn.
 + * Events: 'lanterngrab' {pos, hand}, 'lanternrelease' {pos, hand}, 'lanternsplash' {pos}, 'lanternstar' {dir, pos},
 + * 'lanterntouch' {pos, hand, lantern, speed}.
   */
  const MAX = 24;
  const H = 0.26;               // lantern height (m); geometry origin is at the top (hanging point)
-@@ -51,6 +57,19 @@ const SWAY_AMP = 0.3, SWAY_PERIOD = 6;
+@@ -51,6 +59,19 @@ const SWAY_AMP = 0.3, SWAY_PERIOD = 6;
  const BRIGHT_FLOAT = 0.55;
  const GRAVITY = 9.81;
  const ATTRACT_RADIUS = 0.35, ATTRACT_K = 2.5, ATTRACT_VMAX = 0.25;
@@ -792,7 +1048,7 @@ index aab5764..8b8a6dd 100644
  
  // mulberry32: small seeded PRNG so placement is deterministic (and testable)
  function makeRng(seed) {
-@@ -171,7 +190,7 @@ export const lanterns = {
+@@ -171,7 +192,7 @@ export const lanterns = {
  
      // ---- lantern records
      const list = [];
@@ -801,7 +1057,7 @@ index aab5764..8b8a6dd 100644
      const s = this._ = {
        ctx, rng, list, bodies, bodyMat, glowMat, mirrorMat, flameMat, instGeos, setInstanceCount, markInstDirty, pPos, pBright, pFlame, pSeed, seedArr, brightArr, heldArr, aSeed, aBright, aHeld,
        spawnTimer: SPAWN_INTERVAL * 0.5, lastNearT: 0,
-@@ -188,6 +207,8 @@ export const lanterns = {
+@@ -188,6 +209,8 @@ export const lanterns = {
        const seed = rng();
        const L = {
          i, seed, state: 'floating', held: null, incoming, attracted: false, dropping: false,
@@ -810,25 +1066,27 @@ index aab5764..8b8a6dd 100644
          position: new THREE.Vector3(x, floatCentreY(x, z, ctx.time.t, seed), z), // centre of the body (grab point)
          top: new THREE.Vector3(),          // hanging point (the pendulum bob while held/rising)
          anchor: new THREE.Vector3(),       // the other end of the string: pinch point, then the virtual balloon
-@@ -198,6 +219,7 @@ export const lanterns = {
+@@ -198,6 +221,8 @@ export const lanterns = {
          bright: incoming ? 0 : BRIGHT_FLOAT, flame: 1,
          yaw: rng() * Math.PI * 2, spin: (rng() - 0.5) * 0.3,
          lean: new THREE.Vector2(), leanT: new THREE.Vector2(),
 +        push: new THREE.Vector2(), spinKick: 0, touchT: -1e9, inContact: false, // a hand's nudge: glide, yaw kick, last touch
++        escorts: 0, spilled: false,        // the firefly escort of a rising lantern (fireflies.js)
          wind: WIND_DIR.clone().rotateAround(new THREE.Vector2(), THREE.MathUtils.degToRad((rng() - 0.5) * 40)).multiplyScalar(WIND_SPEED),
          walk: new THREE.Vector2(), walkT: new THREE.Vector2(), walkTimer: rng() * 3,
          loiterR: 5 + rng() * 3,
-@@ -232,7 +254,9 @@ export const lanterns = {
+@@ -232,7 +257,10 @@ export const lanterns = {
        L.top.copy(L.position).y += H * 0.5;
        L.vel.set(0, 0, 0); L.bobVel.set(0, 0, 0); L.att.set(0, 0); L.up.set(0, 1, 0);
        L.lean.set(0, 0); L.leanT.set(0, 0);
 +      L.push.set(0, 0); L.spinKick = 0; L.inContact = false;
        L.state = 'floating'; L.incoming = true; L.bright = 0; L.held = null; L.dropping = false; L.attracted = false;
 +      L.touched = false; L.amongPads = false;
++      L.escorts = 0; L.spilled = false;
        L.loiterR = 5 + rng() * 3;
        L.grab.active = true; L.grab.held = null;
      }
-@@ -254,10 +278,10 @@ export const lanterns = {
+@@ -254,10 +282,11 @@ export const lanterns = {
  
      function onGrab(L, hand) {
        const wasRising = L.state === 'rising';
@@ -838,10 +1096,22 @@ index aab5764..8b8a6dd 100644
        if (!wasRising) { L.top.copy(L.position).addScaledVector(L.up, H * 0.5); L.bobVel.copy(L.vel); }
 -      L.att.set(0, 0);
 +      L.att.set(0, 0); L.push.set(0, 0); L.spinKick = 0; L.inContact = false;
++      L.escorts = 0; L.spilled = false;
        // ease the string from its current length to STRING over ~120 ms (with a little overshoot)
        L.grabT = 0; L.grabLen = Math.max(0.01, L.top.distanceTo(L.anchor));
        ctx.events.emit('lanterngrab', { pos: L.position.clone(), hand, lantern: L });
-@@ -421,7 +445,17 @@ export const lanterns = {
+@@ -397,7 +426,9 @@ export const lanterns = {
+         const lh = Math.hypot(L.up.x, L.up.z);
+         if (lh > 1e-5) L.leanT.set(L.up.x / lh * la, L.up.z / lh * la); else L.leanT.set(0, 0);
+         L.lean.lerp(L.leanT, Math.min(1, dt * 14));
+-        L.flame += (1 - L.flame) * Math.min(1, dt * 3);
++        // a rising lantern's flame flares with the fireflies spiralling round it (up to +30% at four)
++        const flameT = L.state === 'rising' ? 1 + 0.3 * Math.min(1, (L.escorts || 0) / 4) : 1;
++        L.flame += (flameT - L.flame) * Math.min(1, dt * 3);
+       } else { // floating
+         // drift: wind (per-lantern direction) + slow random walk (+ homing while drifting in from far away)
+         L.walkTimer -= dt;
+@@ -421,7 +452,17 @@ export const lanterns = {
            const ease = THREE.MathUtils.smoothstep(dp, 0.7, 1.1);
            vx += dxp / dp * sp * ease; vz += dzp / dp * sp * ease;
          }
@@ -860,7 +1130,7 @@ index aab5764..8b8a6dd 100644
          let attracted = false;
          for (const h of hands) {
            if (!h || !h.visible || h.active === false || !h.open || h.submerged || h.pinch.active) continue;
-@@ -429,14 +463,25 @@ export const lanterns = {
+@@ -429,14 +470,25 @@ export const lanterns = {
            const ax = hp.x - P.x, az = hp.z - P.z;
            const ad = Math.hypot(ax, az);
            if (ad > ATTRACT_RADIUS || ad < 1e-4 || Math.abs(hp.y - P.y) > 0.6) continue;
@@ -888,7 +1158,7 @@ index aab5764..8b8a6dd 100644
          // don't drift into the player's body
          const dxh = P.x - head.x, dzh = P.z - head.z;
          const dh = Math.hypot(dxh, dzh);
-@@ -475,6 +520,7 @@ export const lanterns = {
+@@ -475,6 +527,7 @@ export const lanterns = {
          const sx = (swell(P.x + e, P.z, t) - swell(P.x - e, P.z, t)) / (2 * e);
          const sz = (swell(P.x, P.z + e, t) - swell(P.x, P.z - e, t)) / (2 * e);
          L.leanT.set(-sx * 2.5 + 0.04 * Math.sin(t * 0.9 + L.seed * 20), -sz * 2.5 + 0.04 * Math.cos(t * 0.7 + L.seed * 31));
@@ -896,7 +1166,7 @@ index aab5764..8b8a6dd 100644
          L.lean.lerp(L.leanT, Math.min(1, dt * 4));
          L.up.set(0, 1, 0);
          L.top.copy(P).y += H * 0.5;
-@@ -489,8 +535,8 @@ export const lanterns = {
+@@ -489,8 +542,8 @@ export const lanterns = {
          if (!L.incoming && dp > KEEP_RADIUS) s.respawnFar(L);
        }
  
@@ -907,7 +1177,7 @@ index aab5764..8b8a6dd 100644
  
        // instance matrix: rotate about the top (hanging point)
        const lx = L.lean.x, lz = L.lean.y;
-@@ -516,6 +562,56 @@ export const lanterns = {
+@@ -516,6 +569,56 @@ export const lanterns = {
    },
  };
  
@@ -965,10 +1235,10 @@ index aab5764..8b8a6dd 100644
   * Position-based pendulum step for the lantern's top (the bob) on a string whose anchor moved from
   * A0 to A during this frame (interpolated over the substeps so a fast anchor never jumps past the bob).
 diff --git a/src/world/lotus.js b/src/world/lotus.js
-index 28a392b..992a734 100644
+index 28a392b..db08b39 100644
 --- a/src/world/lotus.js
 +++ b/src/world/lotus.js
-@@ -8,13 +8,25 @@ import { LOTUS_FLOWER_VERT, LOTUS_FLOWER_FRAG, LOTUS_GLOW_VERT, LOTUS_GLOW_FRAG
+@@ -8,13 +8,28 @@ import { LOTUS_FLOWER_VERT, LOTUS_FLOWER_FRAG, LOTUS_GLOW_VERT, LOTUS_GLOW_FRAG
   * sings a pentatonic degree ('lotusbloom'), bumps the world energy and pushes a ring into the water.
   * It closes again after a minute. When all six are open at once, 'lotuschord' fires once.
   *
@@ -989,14 +1259,17 @@ index 28a392b..992a734 100644
   *
 - * Public surface: ctx.lotus = { flowers: [{ index, position, bud, bloom, color, note, open }], open(i), clusters }
 - * Events: 'lotusbloom' { index, note, pos, color }, 'lotuschord' {}
++ * When the lake wave rolls out from the player ('lakewave', fireflies.js), every open flower it passes brightens for two
++ * seconds as the front reaches it (its glow surges the way the chord's surge does; the audio restates its note in step).
++ *
 + * Public surface: ctx.lotus = { flowers: [{ index, position, bud, bloom, color, note, open, state, lean, leanX, leanZ,
-+ *   hoverT, openSeconds, warm, warmNear, lanternIdx }], open(i, opts), clusters }
++ *   hoverT, openSeconds, warm, warmNear, lanternIdx, waveAt }], open(i, opts), clusters }
 + * Events: 'lotusbloom' { index, note, pos, color, cause: 'touch'|'patient'|'lantern', hand }, 'lotusstir' { index, note, pos, hand },
 + *   'lotuschord' {}
   */
  
  const CLUSTERS = 6;
-@@ -27,6 +39,15 @@ const OPEN_SECONDS = 1.6, CLOSE_SECONDS = 6, STAY_MIN = 55, STAY_MAX = 75;
+@@ -27,6 +42,16 @@ const OPEN_SECONDS = 1.6, CLOSE_SECONDS = 6, STAY_MIN = 55, STAY_MAX = 75;
  const PAD_LIFT = 0.004, FLOWER_LIFT = 0.006, BUD_HEIGHT = 0.045;
  const GLOW_SIZE = 0.35, MIRROR_GAIN = 0.3, SURGE_SECONDS = 3.0; // the reflection is drawn on the surface, so it needs less gain
  const GLOW_GAIN_CLOSED = 0.08, GLOW_GAIN_OPEN = 0.40; // additive halo brightness (the petals carry their own glow)
@@ -1009,10 +1282,11 @@ index 28a392b..992a734 100644
 +// the amber light on the petals (shader), energy the (small) world-energy bump for such a bloom
 +const WARM = { enter: 0.45, exit: 0.55, minBright: 0.3, need: 2.5, cap: 3.5, openSeconds: 5.0, linger: 10, energy: 0.08, glowLight: 0.6 };
 +const WARM_HALO = 0.10;                                 // extra halo gain as the lantern's warmth builds
++const WAVE_SPEED = 2.5, WAVE_SECONDS = 2.0, WAVE_SURGE = 0.7; // the lake wave's front speed, a flower's brightening and its strength
  const PAD_COLOR = 0x0f2a1c, PAD_EMISSIVE = 0x02110a;
  
  function mulberry32(seed) {
-@@ -216,8 +237,12 @@ export const lotus = {
+@@ -216,8 +241,13 @@ export const lotus = {
        bud: new THREE.Vector3(c.x, ctx.water.level + FLOWER_LIFT + BUD_HEIGHT, c.z),
        color: new THREE.Color(colors[i % colors.length]),
        bloom: 0, open: false,
@@ -1023,10 +1297,11 @@ index 28a392b..992a734 100644
 +      leanX: 0, leanZ: 0, lean: 0, hoverT: 0, stirred: false, warmGlow: 0, rot: new THREE.Quaternion(),
 +      // warmth from a lantern set down among the pads (seconds, capped), and which lantern it is
 +      warm: 0, warmNear: false, lanternIdx: -1,
++      waveAt: -1,   // when the lake wave's front reaches this flower (-1: none pending)
      }));
  
      // ---- pads
-@@ -247,10 +272,13 @@ export const lotus = {
+@@ -247,10 +277,13 @@ export const lotus = {
      const bloomAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLUSTERS), 1).setUsage(THREE.DynamicDrawUsage);
      const colorAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLUSTERS * 3), 3);
      const phaseAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLUSTERS), 1);
@@ -1040,7 +1315,7 @@ index 28a392b..992a734 100644
      const flowerUniforms = {
        uTime: { value: 0 },
        uMoonDir: { value: new THREE.Vector3(0.3, 0.8, 0.5).normalize() },
-@@ -307,32 +335,37 @@ export const lotus = {
+@@ -307,32 +340,45 @@ export const lotus = {
      const glowGain = { setX: (i, v) => { glowGainArr[i] = v; }, set needsUpdate(v) { for (const g of glowGeos) g.attributes.aGain.needsUpdate = v; } };
  
      // ---- interaction helpers
@@ -1065,6 +1340,14 @@ index 28a392b..992a734 100644
        return true;
      };
  
++    // the lake wave: each open flower brightens as the front (WAVE_SPEED m/s from the wave's origin) reaches it
++    ctx.events.on('lakewave', (e) => {
++      const o = e && e.pos;
++      if (!o || typeof o.x !== 'number') return;
++      const t = ctx.time.t;
++      for (const f of flowers) f.waveAt = f.open ? t + Math.hypot(f.position.x - o.x, f.position.z - o.z) / WAVE_SPEED : -1;
++    });
++
      ctx.lotus = {
        flowers, clusters, pads,
 -      /** Bloom flower i as if it had been touched (returns false if it is already open). */
@@ -1087,7 +1370,7 @@ index 28a392b..992a734 100644
      };
    },
  
-@@ -341,7 +374,7 @@ export const lotus = {
+@@ -341,7 +387,7 @@ export const lotus = {
      const t = ctx.time.t;
      const level = ctx.water.level;
      const swell = ctx.water.swell || (() => 0);
@@ -1096,7 +1379,7 @@ index 28a392b..992a734 100644
  
      // ---- pads: float on the swell, tilt with its slope, drift and turn very slowly
      const E = 0.05;
-@@ -368,7 +401,7 @@ export const lotus = {
+@@ -368,7 +414,7 @@ export const lotus = {
      for (const f of S.flowers) {
        f.timer += dt;
        if (f.state === 'opening') {
@@ -1105,7 +1388,7 @@ index 28a392b..992a734 100644
          f.bloom = f.bloomFrom + (1 - f.bloomFrom) * easeOutCubic(u);
          if (u >= 1) { f.state = 'open'; f.timer = 0; f.bloom = 1; }
        } else if (f.state === 'open') {
-@@ -388,6 +421,78 @@ export const lotus = {
+@@ -388,6 +434,78 @@ export const lotus = {
        f.bud.set(f.position.x, y + BUD_HEIGHT * f.scale, f.position.z);
      }
  
@@ -1184,7 +1467,7 @@ index 28a392b..992a734 100644
      // ---- nearest closed bud (for the hints)
      {
        const head = ctx.playerCtl ? ctx.playerCtl.state.headWorld : null;
-@@ -401,13 +506,13 @@ export const lotus = {
+@@ -401,13 +519,13 @@ export const lotus = {
        const r2 = TOUCH_RADIUS * TOUCH_RADIUS;
        for (const f of S.flowers) {
          if (f.bloom >= TOUCH_MAX_BLOOM || f.open) continue;
@@ -1201,7 +1484,7 @@ index 28a392b..992a734 100644
        }
      }
  
-@@ -423,15 +528,16 @@ export const lotus = {
+@@ -423,15 +541,19 @@ export const lotus = {
      // ---- flower instances + glow attributes
      for (let i = 0; i < S.flowers.length; i++) {
        const f = S.flowers[i];
@@ -1214,10 +1497,14 @@ index 28a392b..992a734 100644
        const pulse = f.open ? 1 + 0.1 * Math.sin(t * (Math.PI * 2 / 4) + f.pulsePhase) : 1;
 +      const closedGain = GLOW_GAIN_CLOSED + (f.bloom < TOUCH_MAX_BLOOM ? WARM_GAIN * f.warmGlow : 0); // warms as a hand nears
 +      const lanternGain = WARM_HALO * smooth(Math.min(1, f.warm));                                      // and as a lantern's warmth builds
++      // the lake wave passing: this flower's own surge, a 2 s swell from the moment the front reaches it
++      const sf = f.waveAt > 0 ? Math.sin(Math.PI * Math.min(1, Math.max(0, (t - f.waveAt) / WAVE_SECONDS))) : 0;
++      const surgeF = Math.max(surge, WAVE_SURGE * sf);
        S.glowPos.setXYZ(i, f.bud.x, f.bud.y, f.bud.z);
-       S.glowSize.setX(i, GLOW_SIZE * (0.2 + f.bloom) * f.scale * (1 + 0.15 * surge));
+-      S.glowSize.setX(i, GLOW_SIZE * (0.2 + f.bloom) * f.scale * (1 + 0.15 * surge));
 -      S.glowGain.setX(i, (GLOW_GAIN_CLOSED + (GLOW_GAIN_OPEN - GLOW_GAIN_CLOSED) * f.bloom) * pulse * (1 + 0.8 * surge));
-+      S.glowGain.setX(i, (closedGain + lanternGain + (GLOW_GAIN_OPEN - GLOW_GAIN_CLOSED) * f.bloom) * pulse * (1 + 0.8 * surge));
++      S.glowSize.setX(i, GLOW_SIZE * (0.2 + f.bloom) * f.scale * (1 + 0.15 * surgeF));
++      S.glowGain.setX(i, (closedGain + lanternGain + (GLOW_GAIN_OPEN - GLOW_GAIN_CLOSED) * f.bloom) * pulse * (1 + 0.8 * surgeF));
      }
      S.flowerMesh.instanceMatrix.needsUpdate = true;
      S.bloomAttr.needsUpdate = true;
