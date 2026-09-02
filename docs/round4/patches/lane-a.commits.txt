@@ -1,2 +1,0 @@
-de002d6 lantern-nudge: Touch and nudge
-d97f965 lantern-lotus: Lantern among the lily pads
