@@ -203,7 +203,7 @@ export const sky = {
 
     // ---- moon
     const M = S.moon;
-    const moonR = M.distance * Math.tan(THREE.MathUtils.degToRad(0.26)) * 1.25; // a touch larger than life
+    const moonR = M.distance * Math.tan(THREE.MathUtils.degToRad(0.26)) * 1.9; // larger than life so the crescent reads in a headset
     const moonMat = new THREE.ShaderMaterial({
       uniforms: { uMap: { value: tex.moon }, uSun: { value: new THREE.Vector3(1, 0, 0) }, uTint: { value: new THREE.Color(M.tint) }, uLow: { value: 0 } },
       vertexShader: /* glsl */`
