@@ -1,0 +1,135 @@
+[
+  {
+    "id": "lotus-lean",
+    "status": "partial",
+    "summary": "Implemented the lotus-lean feature in the lane-a worktree: a closed lotus bud now leans toward the nearest fingertip (index/middle/ring/pinky/thumb) of any visible, active, dry, non-pinching, non-grabbing hand within 35 cm, easing in over 0.6 s and out over 1.2 s, with a warming halo (GLOW_GAIN_CLOSED + 0.14 * warmGlow while bloom < 0.25). The lean goes into the flower instance matrix as a base-pivot rotation (axis (leanZ, 0, -leanX)) composed with the yaw, and f.bud is recomputed from that rotation every frame before the touch test and glow update, so the touch target and halo follow the pod. A still fingertip 9–22 cm from the bud accumulates hoverT; at 0.6 s a 'lotusstir' event fires (thin rising band-passed white-noise whisper at 2x→3x the note's register-6 frequency in sfx.js) and at 2 s openFlower(i, { cause: 'patient', hand }) opens the bud; the FM bell for a patient bloom uses attack 0.06, dur 4.2, gain 0.40. openFlower now takes opts { cause, hand, openSeconds } and stores f.openSeconds (used by the 'opening' branch); the touch loop passes the hand whose tip hit; ctx.lotus.open(i, opts) passes opts through; 'lotusbloom' carries cause and hand. main.js logs 'lotusstir', summarizes 'cause', and world().lotus entries gain state and lean. Scenario gained three steps before the existing touch step (lotus-leans, lotus-patient-open, lotus-too-high-stays-closed) and parks the hand with curl 0.6 afterwards so the existing 'lotus-bloomed' step picks the next closed bud (cluster 1 at 1.44 m, inside its 2.2 m reach check; verified from the seeded layout). Verification was cut short by the orchestrator's output-enforcement: the harness run and a geometry probe were still executing when the structured result was demanded, and the scenario has not been run, so nothing is committed.",
+    "filesChanged": [
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-a/src/world/lotus.js",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-a/src/audio/sfx.js",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-a/src/main.js",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-a/tools/harness/scenario.mjs",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-a/tools/harness/out/lotus-lean-probe.mjs",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-a/tools/harness/out/lotus-layout.mjs"
+    ],
+    "newEvents": [
+      "lotusstir { index, note, pos (bud Vector3 clone), hand }",
+      "lotusbloom now carries { cause: 'touch'|'patient'|'lantern', hand } in addition to { index, note, pos, color }"
+    ],
+    "configKeys": [],
+    "hintsAdded": [],
+    "harness": {
+      "pass": false,
+      "drawCalls": 0,
+      "warnings": 0,
+      "errors": 0,
+      "notes": "UNVERIFIED. `node tools/harness/run.mjs --out tools/harness/out/lotus-lean` was started (log: tools/harness/out/lotus-lean-run.log) and had reached the XR phase (xr_t3.png taken, no errors printed so far) when the orchestrator forced the structured result; summary.json was not yet written. Draw calls are expected unchanged (no new meshes; the lean only changes instance matrices and existing glow attributes). Re-run to confirm."
+    },
+    "scenario": {
+      "pass": false,
+      "stepsTotal": 16,
+      "stepsPassed": 0,
+      "newSteps": [
+        "lotus-leans",
+        "lotus-patient-open",
+        "lotus-too-high-stays-closed"
+      ],
+      "notes": "NOT RUN. The scenario was not started because the harness and a geometry probe (tools/harness/out/lotus-lean-probe.mjs, prints per-frame tip distance / still / hoverT / lean for the spec's hover pose) were still running when the result was demanded. The probe's first attempt failed only because world() entries carry no `index` field (fixed to use indexOf; the scenario steps already use indexOf). The step poses follow the spec exactly; if the fake skeleton's tips land outside the 0.09–0.22 band, adjust the wrist height (B.y + 0.18) after reading the probe output. Run: node tools/harness/out/lotus-lean-probe.mjs [dy] [dz], then node tools/harness/scenario.mjs --out tools/harness/out/lotus-lean-scn."
+    },
+    "deviations": "1) Not committed and not verified: the orchestrator enforced StructuredOutput while the harness run and the probe were still executing, so the 'both must pass before commit' rule could not be satisfied; the working tree in lane-a holds the complete change (git diff --stat: lotus.js +93/-21 lines net, sfx.js +13, main.js +6, scenario.mjs new block). 2) The scenario step identifies buds with `w.lotus.indexOf(b)` because world() entries have no `index` field (the spec's `B.index` does not exist). 3) Per-flower rotation is cached in a preallocated `f.rot` Quaternion (computed once in the lean pass, reused by the instance pass) instead of recomputing `_q` twice; behaviour is identical to the spec's formula. 4) lotusstir handler in sfx.js guards on hasXYZ(e.pos) like the other handlers. 5) DESIGN.md untouched per the lane rules (documentation pass follows integration).",
+    "notesForIntegrator": "Shared identifiers: openFlower(i, opts = {}) with { cause = 'touch', hand = null, openSeconds = OPEN_SECONDS } — the lotus-lantern lane must use the identical signature; f.openSeconds replaces OPEN_SECONDS in the 'opening' branch; ctx.lotus.open(i, opts) passes opts through. Flower record fields added: leanX, leanZ, lean, hoverT, stirred, warmGlow, openSeconds, rot (THREE.Quaternion, the instance rotation incl. lean). Module constants: LEAN = { far 0.35, near 0.08, angle 0.40, tauIn 0.6, tauOut 1.2, hoverMin 0.09, hoverMax 0.22, stirAt 0.6, openAt 2.0, decay 2 }, WARM_GAIN 0.14. Update order in lotus.js is now: pads -> bloom state + float -> lean/patience (recomputes f.rot and f.bud) -> nearest-bud hint -> touch -> chord -> instances (uses f.rot). Only flowers with state === 'closed' lean/hover; 'opening' buds (e.g. lantern-warmed) are skipped. Hand gate for leaning: h.visible && h.active && !h.submerged && !h.pinch.active && !h.grabbed; patience additionally needs h.still. main.js: 'lotusstir' added to the eventLog list, 'cause' to summarize(), world().lotus entries gain { state, lean }. sfx.js: on('lotusstir') -> onLotusStir (noiseBurst bandpass 2f->3f, q 14, dur 1.4, gain 0.035, refDistance 1.0); onLotus uses attack 0.06 / dur 4.2 / gain 0.40 when e.cause === 'patient'. Scenario: the new block runs before the touch block and leaves the right hand parked at [0.25,1.25,-0.4] with curl 0.6; the touch block re-reads world() so it picks the next closed bud (cluster 1, 1.44 m from origin). Fragile: the hover pose relies on the fake skeleton's index/middle tips ending ~0.10–0.15 m above the bud for wrist at B.y+0.18, z+0.175, curl 0.15 — confirm with tools/harness/out/lotus-lean-probe.mjs before trusting the 'lotus-leans'/'lotus-patient-open' steps. Remaining to do before merge: finish harness (must be PASS, 0 errors), run scenario (all 16 steps), then git add -A && git commit -m \"lotus-lean: Buds that turn to the hand\" in the lane-a worktree.",
+    "commit": "none — uncommitted in worktree lane-a (branch r4/lane-a at base 0d5c77d); verification was interrupted"
+  },
+  {
+    "id": "hush",
+    "status": "partial",
+    "summary": "Implemented Hush per the spec. A new ~110-line module src/world/hush.js (registered after fireflies, before leave) watches each hand for the pose (visible, active, open, still, not pinching/grabbing, palm normal.y < -0.8, palm joint within [-0.05, 0.03] m of the surface); after 0.6 s of hold a circle activates under the palm, its strength eases in (tau 0.8 s) and its radius grows from 0.25 m to 1.2 m over 3 s (ease-out cubic) while the centre follows the palm at 1/s; breaking the pose decays strength (tau 1.2 s) with r = max(r0, rGrown*s), and a pose resumed mid-fade continues growth from the current radius (no radius pop). It emits 'hush' {hand, pos} when s crosses 0.05 and 'hushend' {hand} below 0.02, and writes two vec4 arrays every frame (ctx.water.hush.data in tile uv for the sim, ctx.water.hushWorld in world metres for the surface) plus ctx.hush = {strength, circles, count}. wavesim.init allocates both arrays and the uHush uniform, the sim fragment damps velocity (x0.3) and height (x0.85 per step) inside the circles, and uDamping uses max(calm, 0.6*hush). water.js adds uHush, flattens the normal (x0.08), lifts fresnel to >= 0.32*hf so the sky comes through, darkens plankton (x0.1), draws a thin plankton-coloured ring on the spreading front, and uses the same calm max for uCalm. Sound: sfx plays a 6 s ceramic bowl on the chord root (C3-ish, 120 ms attack, half wet) plus a tuned bowl sample an octave up, and the calm drone gate includes hush strength; music gates raindrops on S.hushing (set by hush/hushend) with 3-7 s spacing. Hint 'rest a hand flat on the water and be still' appended (after 140 s, ready on touchedWater, done once a hush event has fired and strength >= 0.8 observed). main.js logs 'hush'/'hushend' and stats() gains hush. Four scenario steps were added after the fireflies step (hush-circle-forms, hush-stills-the-water, hush-dissolves, hush-no-new-draw-calls) with a control ripple before and the same ripple inside the disc after. Harness passed (0 errors, 60 XR draw calls, one pre-existing requestaborted warning for hands/left.glb); the scenario run had not finished when the orchestrator forced the result, so the new steps are unverified.",
+    "filesChanged": [
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-b/src/world/hush.js",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-b/src/world/wavesim.js",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-b/src/world/water.js",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-b/src/world/index.js",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-b/src/audio/sfx.js",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-b/src/audio/music.js",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-b/src/world/hints.js",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-b/src/main.js",
+      "/tmp/claude-0/-home-user-quest-vr-app/ae7f4cfd-c264-5184-9059-7a8ed9aad3c0/scratchpad/lane-b/tools/harness/scenario.mjs"
+    ],
+    "newEvents": [
+      "hush { hand, pos }",
+      "hushend { hand }"
+    ],
+    "configKeys": [],
+    "hintsAdded": [
+      "hush: 'rest a hand flat on the water and be still' (after 140 s, ready: touchedWater, done: s.hushed = hush event fired and ctx.hush.strength >= 0.8 observed)"
+    ],
+    "harness": {
+      "pass": true,
+      "drawCalls": 60,
+      "warnings": 1,
+      "errors": 0,
+      "notes": "node tools/harness/run.mjs --out tools/harness/out/hush: PASS, 0 errors. XR draw calls 60 at t3/t7/t14 (62 at t11 while drips are live), unchanged by hush (no geometry added). The single warning is kind 'requestaborted' for GET /assets/hands/left.glb — the hand model fetch aborted when the page phase changed; unrelated to this feature. Caveat: this run loaded wavesim.js before a trivial rename of a loop-local GLSL variable (r -> hr, to avoid shadowing the outer 'r' sample); the committed shader is otherwise identical. The run took 656 s because it shared 4 cores with the concurrent scenario run. No hush screenshot exists from run.mjs (its default timeline never rests a palm on the surface); the visual 'not a grey plate' check was planned from the scenario's hush.png, which had not been produced yet."
+    },
+    "scenario": {
+      "pass": false,
+      "stepsTotal": 17,
+      "stepsPassed": 4,
+      "newSteps": [
+        "hush-circle-forms",
+        "hush-stills-the-water",
+        "hush-dissolves",
+        "hush-no-new-draw-calls"
+      ],
+      "notes": "UNVERIFIED: node tools/harness/scenario.mjs --out tools/harness/out/hush-scn was still running (4/17 pre-existing steps passed so far, no failures, still in the lantern-star fast-forward) when the orchestrator forced the structured result. The four new steps sit after the fireflies step: hands parked, control disturb(0.19,-0.48,0.15,0.3) -> h0 after 15 frames, 120 frames settle, right hand at [0.2, level+0.012, -0.45] pitch 0 roll 0 curl 0.05 for 120 frames, assert stats().hush > 0.8, circles[1].r > 0.8, hands.right.still, a 'hush' event with hand 'right'; same disturb -> h1 < 0.4*h0 (and h0 >= 0.04); lift to level+0.3 curl 0.6 for 90 frames -> stats().hush < 0.1 and a 'hushend' event; draw calls (per-view count minus the self-toggling hint plane and drips Points) equal before and during. Expected by geometry: palm joint at level+0.014 with normal (0,-1,0), thumb tip 1.8 cm under, still after ~0.8 s, activation at ~1.4 s, s ~0.91 and r ~1.15 at the check. If h0 turns out below 0.04 on the fake device the h0 >= 0.04 clause (spec's 'expect', folded into the step) may need relaxing; log at tools/harness/out/hush-scn.log, report.json and hush.png in tools/harness/out/hush-scn."
+    },
+    "deviations": "1) nxy *= 1 - 0.92*hf is applied after the sim gradient is added to nxy (not immediately after the loop as the spec's ordering reads) so the disc is a true mirror of both the normal map and the ripples; numbers unchanged. 2) The spec's `hr` name in the water loop was renamed to `hrad` (the water shader already has `hr` for the right height sample) and `r` in the wavesim loop to `hr` (outer `r` sample); the edge term accumulates into a float `hedge` inside the loop and is added as col += uPlankton2 * hedge after the bioluminescence (col does not exist yet at the loop). 3) A pose that resumes while the circle is fading continues growth from the current radius (growT set from the inverse ease) instead of snapping back to rGrown; spec formula is otherwise followed. 4) hold is capped at HUSH.hold while the pose is held. 5) The draw-call assertion counts per view and subtracts the hint plane and drips Points when visible, because both toggle their own visibility on a schedule unrelated to hush (the 'water' hint fades out over ~2.7 s exactly when the hand enters the water). 6) 'expect >= 0.04' for the control ripple was folded into the hush-stills-the-water step as a hard clause. 7) Committed before the scenario finished (orchestrator forced termination) — status partial.",
+    "notesForIntegrator": "Module order: WORLD_MODULES = [..., fireflies, hush, leave, hints]. ctx.water.hush = { data: Float32Array(8), strength } and ctx.water.hushWorld = Float32Array(8) are allocated in wavesim.init (hush.init throws if absent). Layout per hand hi: [hi*4] = x, z, r, s (uv units in .data, world metres in .hushWorld). ctx.hush = { strength, circles: [{x, z, r, s, hold, growT, rGrown, active, wasActive, prevPose}], count }. HUSH constants exported from src/world/hush.js (HUSH.calmGain 0.6 is duplicated as the literal 0.6 in wavesim.update and water.update — keep in sync). Water uniforms gained uHush (Float32Array(8), vec4[2]); wavesim uniforms gained uHush bound directly to ctx.water.hush.data. sfx: new onHush(S, e) handler, tag 'hush'; calm drone gate is max(water.calm, ctx.calm, ctx.hush.strength). music: S.hushing flag, calmWorld = (energy < 0.15 && !anySub) || S.hushing, gap 3-7 s while hushing. hints: s.hushStarted / s.hushed flags. main.js: 'hush','hushend' appended to eventLog list; stats().hush. Scenario: the hush block reassigns the outer `s` (stats) at its end, as other steps do, and reparks the right hand at [0.25,1.25,-0.4] before the stroke step. Fragile: the scenario's draw-call comparison relies on scene object names 'hint' and 'drips'; hush pose thresholds depend on palm joint = middle-finger-metacarpal being ~1.4 cm above the wrist on the fake skeleton. Please rerun node tools/harness/scenario.mjs on this branch (allow 10-20 min on a loaded box) before merging; also glance at tools/harness/out/hush-scn/hush.png for the grey-plate check (drop the 0.32 fresnel lift to 0.22 in water.js if the disc reads flat grey).",
+    "commit": "0659c9a"
+  },
+  {
+    "id": "lantern-lotus",
+    "status": "done",
+    "summary": "Carrying a lantern to a closed lotus cluster and letting it go in the water now warms the bud open. In lanterns.js each record gains touched (set in onGrab, cleared in respawnFar) and amongPads; in the floating branch, after wind/walk/homing and before the hand-attraction term, the nearest ctx.lotus.clusters entry is found and within PADS.hold (0.40 m) vx/vz are damped to a quarter, so a placed lantern lingers while an open hand can still coax it out. In lotus.js a per-frame warmth pass (after the lean/bud pass, before the touch test) scans ctx.lanterns.list: floating, touched, settled, lit (bright > 0.3) lanterns within a 0.45/0.55 m hysteresis band accumulate f.warm (dt in, -2dt out, capped 3.5); past 2.5 s a closed bud opens via openFlower(i, { cause: 'lantern', openSeconds: 5 }) with a smaller energy bump (0.08) and softer ring (0.18), and while the lantern stays an open flower's timer is held at stay - 10 so it closes only 10 s after the lantern leaves. The brightest nearby lantern (any state but rising, within 0.6 m) is written to a new per-instance vec4 aLantern; the flower vertex shader computes vWarm (lambert toward the lantern with 1/(1+12d²) falloff) and the fragment shader adds amber (1.0, 0.70, 0.34)*0.9 to the petal and pod branches, so petals read amber on the lantern side and moon-pale on the other; the halo gains +0.10*smoothstep(warm) (mirror follows automatically). sfx.js onLotus plays a ceramic bell with a 0.35 s attack, dur 5, gain 0.32, wet 0.4 plus a 0.18 tuned-bowl layer for cause 'lantern'. hints.js gains 'leave a lantern among the lily pads' (after 130 s, ready when a lantern has been grabbed, a bud has bloomed and both are within reach; done on a lantern-caused bloom). main.js world().lanterns entries gain pads/touched. The scenario gained four steps after 'lotus-bloomed' (ready, grabbed, set-down, warms-lotus) and the bud opened 2.47 s after the splash, bloom 0.69 at +4 s, pads true. Harness PASS with 0 errors (60 XR draw calls, unchanged from the lane's previous run) and scenario PASS 21/21.",
+    "filesChanged": [
+      "src/world/lotus.js",
+      "src/world/lanterns.js",
+      "src/shaders/lotus.js",
+      "src/audio/sfx.js",
+      "src/world/hints.js",
+      "src/main.js",
+      "tools/harness/scenario.mjs"
+    ],
+    "newEvents": [
+      "lotusbloom now also carries cause 'lantern' with hand null (no new event type; 'lanternsplash' fires at set-down as before)"
+    ],
+    "configKeys": [
+      "lotus.js WARM = { enter: 0.45, exit: 0.55, minBright: 0.3, need: 2.5, cap: 3.5, openSeconds: 5.0, linger: 10, energy: 0.08, glowLight: 0.6 }",
+      "lotus.js WARM_HALO = 0.10",
+      "lanterns.js PADS = { hold: 0.40 }"
+    ],
+    "hintsAdded": [
+      "lanternlotus: 'leave a lantern among the lily pads' (after 130 s; ready: s.grabbed && s.bloomed && nearestLotus < REACH+0.15 && nearestLantern < REACH+0.15; done: s.lanternBloomed from 'lotusbloom' with cause 'lantern')"
+    ],
+    "harness": {
+      "pass": true,
+      "drawCalls": 60,
+      "warnings": 1,
+      "errors": 0,
+      "notes": "node tools/harness/run.mjs --out tools/harness/out/lantern-lotus: PASS, 240 XR frames, 0 errors, 763 s wall time (machine load ~15 from lane-b's concurrent runs). XR draw calls 60 at t3/t7/t14 (62 at t11, the transient drips/hint plane), identical to this lane's earlier lotus-lean run, so zero new draw calls; desktop 28, afterExit 31. The single warning is 'requestaborted GET /assets/hands/right.glb', which is pre-existing (the base240-out baseline shows the same for both hand GLBs: the hand-mesh fetch is cancelled when the page closes)."
+    },
+    "scenario": {
+      "pass": true,
+      "stepsTotal": 21,
+      "stepsPassed": 21,
+      "newSteps": [
+        "lantern-lotus-ready",
+        "lantern-lotus-grabbed",
+        "lantern-lotus-set-down",
+        "lantern-warms-lotus"
+      ],
+      "notes": "node tools/harness/scenario.mjs --out tools/harness/out/lantern-lotus-scn: PASS 21/21, 0 errors (all 17 pre-existing steps incl. the three lotus-lean steps pass). In the run the nearest closed bud was cluster 4 at (-1.62, 0.89) and the nearest floating lantern index 2; grab at t=49.07, splash at 51.46 with the lantern 0.33 m from the cluster (pads true, touched true), lantern-caused lotusbloom at 53.93, bloom 0.69 / state 'opening' / warm 3.5 at +4 s. The spec's optional 80 s fast-forward 'still open' assert was not added (see deviations). A geometry probe (tools/harness/out/lantern-lotus-probe.mjs, ignored dir) confirmed the same behaviour from a fresh calibration on cluster 0: min fingertip-to-pod distance during the carry 0.27 m, release top.y - H below the level, bud opened at warm 2.5."
+    },
+    "deviations": "1) Scenario carry path: the spec lerps the wrist straight from the grab point to T at level+0.10, but a straight line from a lantern near the player to a point 0.33 m beyond the bud can pass directly over the pod (pinched tips sit ~6 cm below the wrist, i.e. within the 8 cm touch radius), which would open the bud by touch. The step therefore carries at level+0.40 for 48 frames, then lowers to level+0.10 over 18 frames before releasing; the release point and the rest of the spec's numbers (0.33*u, +0.135 z, 0.1 curl, 6-frame release, park pose, 144-frame wait) are as specified. 2) The optional 80 s fast-forward 'still open' assert was not added: among the pads the wind is only damped to ~1 cm/s and the homing to ~1.25 cm/s, so a placed lantern can leave the 0.55 m exit band within 10–60 s depending on its per-lantern wind direction, after which the 10 s linger closes the flower before the stay would have ended; the assertion would be nondeterministic across seeds/positions. 3) The scenario's 'lantern-warms-lotus' step reads world().lotus[i] fields and page.evaluate(...flowers[i].warm) exactly as specified, but identifies buds/lanterns by array index (world() entries carry no index field, same as lotus-lean). 4) The 'state' field on world().lotus entries and 'cause' in summarize() were already present from lotus-lean, so main.js only gained pads/touched on lantern entries. 5) The commit necessarily includes the previously uncommitted lotus-lean work (it lives in the same files in this worktree); both were verified together by this harness and scenario run. DESIGN.md/README untouched per the lane rules.",
+    "notesForIntegrator": "Shared identifiers: openFlower(i, opts = {}) with { cause = 'touch', hand = null, openSeconds = OPEN_SECONDS } (identical to lotus-lean; the two features share this worktree so there is one implementation). Flower record fields added: warm (0..3.5 s), warmNear (bool, 0.45/0.55 m hysteresis), lanternIdx (index into ctx.lanterns.list while warmNear, else -1). Lantern record fields added: touched (true from onGrab until respawnFar), amongPads (recomputed every floating frame). lanterns.js reads ctx.lotus.clusters (entries { x, z, azDeg, r }) — lotus updates before lanterns in WORLD_MODULES and clusters are static, so order is not load-bearing. lotus.js reads ctx.lanterns.list entries' state/touched/incoming/dropping/bright/position; lanterns runs after lotus so warmth uses last frame's lantern positions (fine at 1 cm/s). Update order in lotus.js: pads -> bloom state + float -> lean/patience (f.rot, f.bud) -> warmth (aLantern, may call openFlower) -> nearest-bud hint -> touch -> chord -> instances/glow. flowerGeo has a new InstancedBufferAttribute 'aLantern' (vec4, 6 instances, DynamicDrawUsage) written every frame; the vertex shader declares attribute vec4 aLantern and varying float vWarm, the fragment shader adds amber to the petal (part < 1.5) and pod (1.5 < part < 2.5) branches before the fog mix, never to the base. Halo: lanternGain = 0.10 * smooth(min(1, warm)) added to the per-instance aGain (shared by glow and mirror). openFlower for cause 'lantern' bumps energy by WARM.energy (0.08) and disturbs (0.18, 0.18) instead of CONFIG.energy.lotus / 0.28. sfx.js onLotus branches on e.cause: 'lantern' -> ceramic bell attack 0.35/dur 5/gain 0.32/wet 0.4 + bowl layer gain 0.18; 'patient' -> lotus-lean's softer bell; else touch. hints.js: new flag s.lanternBloomed and HINTS entry 'lanternlotus' appended last (after 'turn'). main.js: world().lanterns entries now { x, y, z, state, pads, touched }. Scenario: the new block sits between the touch block and the fireflies block, re-reads world() for the nearest closed bud and nearest floating lantern, and leaves the right hand parked at [0.25,1.25,-0.4] curl 0.6 like the lotus-lean block. Fragile: the carry relies on the pinch point being ~13.5 cm ahead of and ~6 cm below the wrist in the fake skeleton and on the lantern's top settling below level+0.26 at the release height (level+0.10) so it floats rather than rises; a hush disc or any feature that changes lantern buoyancy/rope length or the set-down splash would need this step re-probed (tools/harness/out/lantern-lotus-probe.mjs, gitignored, drives it from a fresh calibration and prints per-frame lantern/flower state). Harness runs here took ~13 min and the scenario ~50 min under lane-b's concurrent load; pkill/pgrep -f patterns that appear in your own shell command line kill your own shell (exit 144) — use a launcher script.",
+    "commit": "d97f965"
+  }
+]

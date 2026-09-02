@@ -1,0 +1,811 @@
+diff --git a/src/audio/sfx.js b/src/audio/sfx.js
+index 1871206..85fea43 100644
+--- a/src/audio/sfx.js
++++ b/src/audio/sfx.js
+@@ -119,9 +119,13 @@ export const sfx = {
+     // ---- events
+     const on = (name, fn) => S.offs.push(ctx.events.on(name, (e) => { try { fn(e || {}); } catch (err) { console.error('[sfx]', name, err); } }));
+     on('lotusbloom', (e) => onLotus(S, e));
++    on('lotusstir', (e) => onLotusStir(S, e));
+     on('fireflyland', (e) => onFirefly(S, e));
+     on('lanterngrab', (e) => { if (hasXYZ(e.pos)) noiseBurst(S, { pos: e.pos, dur: 0.09, gain: 0.12, type: 'bandpass', freq: 1500, q: 1.0 }); });
+     on('lanternrelease', (e) => onLanternRelease(S, e));
++    // a soft paper tap when a hand meets a floating lantern, louder for a brisk brush; a sustained nuzzle is
++    // silent (the lanterns module fires this once per fresh contact, at most every 0.25 s)
++    on('lanterntouch', (e) => { if (!hasXYZ(e.pos)) return; const sp = clamp((typeof e.speed === 'number' ? e.speed : 0) / 0.8, 0, 1); noiseBurst(S, { pos: e.pos, dur: 0.05 + 0.05 * sp, gain: 0.03 + 0.10 * sp, type: 'bandpass', freq: 900, q: 1.2 }); });
+     on('lanternsplash', (e) => { if (hasXYZ(e.pos)) playAt(S, SPLASHES[Math.floor(S.rng() * 4)], e.pos, { gain: 0.4, refDistance: 1.5, out: S.out.world }); });
+     on('lanternstar', (e) => onLanternStar(S, e));
+     on('handenter', (e) => onHandEnter(S, e));
+@@ -314,12 +318,24 @@ function notePlayed(S, midi) { S.playerNotes.push(midi); if (S.playerNotes.lengt
+ function onLotus(S, e) {
+   const pos = hasXYZ(e.pos) ? e.pos : S.head();
+   const midi = pitchFor(S, e.note | 0, 5);
+-  triggerBell(S, { midi, pos, gain: 0.45, dur: 3.2, kind: (e.index | 0) & 1 ? 'ceramic' : 'glass', tag: 'lotus' });
++  // a bud that opened by itself under a patient hand sings softer and longer than one that was touched;
++  // one warmed open by a lantern swells in over a third of a second instead of striking
++  const patient = e.cause === 'patient', lantern = e.cause === 'lantern';
++  if (lantern) triggerBell(S, { midi, pos, gain: 0.32, dur: 5.0, kind: 'ceramic', attack: 0.35, wet: 0.4, tag: 'lotus' });
++  else triggerBell(S, { midi, pos, gain: patient ? 0.40 : 0.45, dur: patient ? 4.2 : 3.2, attack: patient ? 0.06 : 0.005, kind: (e.index | 0) & 1 ? 'ceramic' : 'glass', tag: 'lotus' });
+   const layer = pickTuned(S, BOWLS.concat(TINGS), midi);
+-  if (layer) playAt(S, layer.name, pos, { gain: 0.25, rate: layer.rate, refDistance: 2, out: S.out.chimes });
++  if (layer) playAt(S, layer.name, pos, { gain: lantern ? 0.18 : 0.25, rate: layer.rate, refDistance: 2, out: S.out.chimes });
+   notePlayed(S, midi);
+ }
+ 
++// a thin rising whisper two octaves up from the bud's note: the pod stirring under a still fingertip.
++// It simply finishes on its own if the hand leaves.
++function onLotusStir(S, e) {
++  if (!hasXYZ(e.pos)) return;
++  const f = mtof(pitchFor(S, e.note | 0, 6));
++  noiseBurst(S, { pos: e.pos, dur: 1.4, gain: 0.035, type: 'bandpass', freq: 2 * f, q: 14, sweepTo: 3 * f, kind: 'white', refDistance: 1.0 });
++}
++
+ function onFirefly(S, e) {
+   const pos = hasXYZ(e.pos) ? e.pos : (hasXYZ(e.hand?.palm?.position) ? e.hand.palm.position : S.head());
+   const midi = pitchFor(S, Math.floor(S.rng() * 4), 6); // D6 … A6
+diff --git a/src/main.js b/src/main.js
+index 390b8e8..90cff89 100644
+--- a/src/main.js
++++ b/src/main.js
+@@ -87,13 +87,13 @@ async function boot() {
+   ctx.audio.load().catch((e) => console.warn('[audio] decode failed', e)); // decoding needs no gesture
+   // event log for the harness / debugging
+   ctx.eventLog = [];
+-  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'starborn', 'lotusbloom', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart', 'leave', 'drip']) {
++  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'lanterntouch', 'starborn', 'lotusbloom', 'lotusstir', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart', 'leave', 'drip']) {
+     ctx.events.on(type, (e) => { if (ctx.eventLog.length < 500) ctx.eventLog.push({ type, t: +ctx.time.t.toFixed(2), detail: summarize(e) }); });
+   }
+   function summarize(e) {
+     if (!e || typeof e !== 'object') return null;
+     const o = {};
+-    for (const k of ['index', 'note', 'grabbed', 'kind', 'lost', 'released', 'seated', 'eyeHeight', 'hasHands', 'count', 'speed']) if (k in e) o[k] = e[k];
++    for (const k of ['index', 'note', 'grabbed', 'kind', 'lost', 'released', 'seated', 'eyeHeight', 'hasHands', 'count', 'speed', 'cause']) if (k in e) o[k] = e[k];
+     if (e.hand?.handedness) o.hand = e.hand.handedness;
+     if (e.pos?.x !== undefined) o.pos = [+e.pos.x.toFixed(2), +e.pos.y.toFixed(2), +e.pos.z.toFixed(2)];
+     return o;
+@@ -196,8 +196,8 @@ async function boot() {
+     audioStats: () => ctx.audio?.stats?.(),
+     events: () => ctx.eventLog.slice(),
+     world: () => ({
+-      lanterns: (ctx.lanterns?.list || []).map((l) => ({ x: +l.position.x.toFixed(2), y: +l.position.y.toFixed(2), z: +l.position.z.toFixed(2), state: l.state })),
+-      lotus: (ctx.lotus?.flowers || []).map((f) => ({ x: +f.position.x.toFixed(2), y: +f.position.y.toFixed(2), z: +f.position.z.toFixed(2), bloom: +(f.bloom || 0).toFixed(2), open: !!f.open })),
++      lanterns: (ctx.lanterns?.list || []).map((l) => ({ x: +l.position.x.toFixed(2), y: +l.position.y.toFixed(2), z: +l.position.z.toFixed(2), state: l.state, pads: !!l.amongPads, touched: !!l.touched, push: +(l.push ? l.push.length() : 0).toFixed(3) })),
++      lotus: (ctx.lotus?.flowers || []).map((f) => ({ x: +f.position.x.toFixed(2), y: +f.position.y.toFixed(2), z: +f.position.z.toFixed(2), bloom: +(f.bloom || 0).toFixed(2), open: !!f.open, state: f.state, lean: +(f.lean || 0).toFixed(3) })),
+       rig: { x: player.position.x, y: player.position.y, z: player.position.z, ry: player.rotation.y },
+       head: ctx.playerCtl.state.headWorld.toArray().map((v) => +v.toFixed(3)),
+     }),
+@@ -209,7 +209,7 @@ async function boot() {
+       hands: { left: ctx.hands.left.visible, right: ctx.hands.right.visible, pinchL: ctx.hands.left.pinch.active, pinchR: ctx.hands.right.pinch.active, submergedR: ctx.hands.right.submerged, debug: ctx.hands.debugInfo?.() },
+       calibrated: ctx.playerCtl.state.calibrated, seated: ctx.playerCtl.state.seated, calm: ctx.calm,
+       moonAltitudeDeg: ctx.sky?.moonAltitudeDeg, lanternStars: ctx.sky?.lanternStarCount?.(), aurora: ctx.aurora?.intensity,
+-      lanterns: ctx.lanterns?.count, fireflies: ctx.fireflies?.count, fireflyLanded: ctx.fireflies?.landedCount, lotusOpen: ctx.lotus?.flowers?.filter((f) => f.open).length,
++      lanterns: ctx.lanterns?.count, lanternTouches: ctx.lanterns?.touches, fireflies: ctx.fireflies?.count, fireflyLanded: ctx.fireflies?.landedCount, lotusOpen: ctx.lotus?.flowers?.filter((f) => f.open).length,
+       player: { x: player.position.x, y: player.position.y, z: player.position.z },
+       water: ctx.water.level,
+     }),
+diff --git a/src/shaders/lotus.js b/src/shaders/lotus.js
+index 54fc601..9217130 100644
+--- a/src/shaders/lotus.js
++++ b/src/shaders/lotus.js
+@@ -11,15 +11,19 @@ import { GLSL_FOG } from './common.js';
+  * The petal is lofted along a circular-arc spine whose base tilt and curvature are driven by aBloom:
+  * closed = nearly vertical, curling inward over the bud; open = outer ring ~75° from vertical with
+  * drooping tips, inner ring ~45°. Edges are cupped toward the axis (strongly when closed, so the
+- * petals wrap the bud). A slow breathing motion rides on the base tilt.
++ * petals wrap the bud). A slow breathing motion rides on the base tilt. aLantern (xyz, weight) is the
++ * brightest lantern near this flower: its amber light lands on the side of the petals that faces it (vWarm),
++ * so a lantern set down among the pads reads amber on one side and moon-pale on the other.
+  */
+ export const LOTUS_FLOWER_VERT = /* glsl */`
+ attribute vec3 aPetal;
+ attribute float aBloom;
+ attribute vec3 aColor;
+ attribute float aPhase;
++attribute vec4 aLantern;
+ uniform float uTime;
+ varying vec3 vColor; varying vec3 vNormalW; varying vec3 vWorldPos; varying vec2 vUv; varying float vBloom; varying float vPart;
++varying float vWarm;
+ void main() {
+   float phi = aPetal.x, part = aPetal.y, L = aPetal.z;
+   float b = aBloom;
+@@ -58,6 +62,10 @@ void main() {
+   wp = modelMatrix * wp;
+   vWorldPos = wp.xyz;
+   vNormalW = normalize(mat3(modelMatrix) * nW);
++  // lantern light: lambert toward the lantern, falling off with distance (a small amber lamp, not the moon)
++  vec3 toL = aLantern.xyz - wp.xyz;
++  float d2 = dot(toL, toL);
++  vWarm = aLantern.w * max(dot(vNormalW, normalize(toL + vec3(1e-4))), 0.0) / (1.0 + 12.0 * d2);
+   vColor = aColor;
+   vUv = uv;
+   vBloom = b;
+@@ -75,6 +83,7 @@ precision highp float;
+ uniform vec3 uMoonDir; uniform vec3 uMoonColor; uniform vec3 uFogColor;
+ uniform float uFogDensity; uniform float uSurge;
+ varying vec3 vColor; varying vec3 vNormalW; varying vec3 vWorldPos; varying vec2 vUv; varying float vBloom; varying float vPart;
++varying float vWarm;
+ ${GLSL_FOG}
+ void main() {
+   vec3 N = normalize(vNormalW);
+@@ -91,6 +100,7 @@ void main() {
+     // bud / seed pod: warm centre, lights up as the flower opens
+     vec3 pod = mix(vColor, vec3(1.0, 0.86, 0.45), 0.6);
+     col = pod * (0.05 + 0.30 * hl) + pod * (0.06 + 0.75 * b) * (1.0 + 1.2 * uSurge);
++    col += vWarm * vec3(1.0, 0.70, 0.34) * 0.9;
+   } else {
+     float t = vUv.y, xn = vUv.x;
+     vec3 base = vColor * mix(0.18, 0.75, t);
+@@ -102,6 +112,7 @@ void main() {
+     float back = max(dot(-N, uMoonDir), 0.0);
+     vec3 trans = vColor * (0.12 * rim + 0.10 * back) * (0.4 + 0.6 * b);
+     col = lit + glow * 0.6 * (1.0 + 1.2 * uSurge) + trans;
++    col += vWarm * vec3(1.0, 0.70, 0.34) * 0.9; // a lantern's amber on the side that faces it
+   }
+   float fog = fogExp2(length(cameraPosition - vWorldPos), uFogDensity);
+   col = mix(col, uFogColor, fog);
+diff --git a/src/world/hints.js b/src/world/hints.js
+index d584b3a..f3e5998 100644
+--- a/src/world/hints.js
++++ b/src/world/hints.js
+@@ -17,6 +17,7 @@ const HINTS = [
+   { id: 'still', text: 'hold a hand open and still', after: 95, done: (ctx, s) => s.fireflyLanded, ready: (ctx, s) => s.touchedWater },
+   { id: 'wade', text: 'pinch the water and pull it toward you', after: 60, done: (ctx, s) => s.moved, ready: (ctx, s) => s.touchedWater && (nearestLantern(ctx) > REACH + 0.2 || nearestLotus(ctx) > REACH + 0.2) },
+   { id: 'turn', text: 'pinch with both hands and turn them to look around', after: 150, done: (ctx, s) => s.turned, ready: (ctx, s) => s.moved && ctx.playerCtl.state.seated },
++  { id: 'lanternlotus', text: 'leave a lantern among the lily pads', after: 130, done: (ctx, s) => s.lanternBloomed, ready: (ctx, s) => s.grabbed && s.bloomed && nearestLotus(ctx) < REACH + 0.15 && nearestLantern(ctx) < REACH + 0.15 },
+ ];
+ const LEAVE = { id: 'leave', text: 'keep your palms together to leave', repeat: true };
+ const SHOW_HANDS = { id: 'hands', text: 'show your hands to the headset', repeat: true };
+@@ -63,11 +64,11 @@ export const hints = {
+     mesh.renderOrder = 1; mesh.frustumCulled = false; mesh.visible = false; mesh.name = 'hint';
+     ctx.scene.add(mesh);
+ 
+-    const s = { handsSeen: false, touchedWater: false, grabbed: false, fireflyLanded: false, moved: false, turned: false, bloomed: false, sessionStart: -1, handsLostSince: -1, noTracking: false, shows: {} };
++    const s = { handsSeen: false, touchedWater: false, grabbed: false, fireflyLanded: false, moved: false, turned: false, bloomed: false, lanternBloomed: false, sessionStart: -1, handsLostSince: -1, noTracking: false, shows: {} };
+     ctx.events.on('handenter', () => { s.touchedWater = true; });
+     ctx.events.on('grab', () => { s.grabbed = true; });
+     ctx.events.on('fireflyland', () => { s.fireflyLanded = true; });
+-    ctx.events.on('lotusbloom', () => { s.bloomed = true; });
++    ctx.events.on('lotusbloom', (e) => { s.bloomed = true; if (e && e.cause === 'lantern') s.lanternBloomed = true; });
+     const startSession = (e) => { s.sessionStart = ctx.time.t; s.noTracking = !!(e && e.hasHands === false); s.handsSeen = false; s.handsLostSince = -1; s.shows = {}; st.current = null; st.cooldownUntil = 0; };
+     ctx.events.on('xrstart', startSession);
+     ctx.events.on('desktopstart', startSession);
+diff --git a/src/world/lanterns.js b/src/world/lanterns.js
+index aab5764..8b8a6dd 100644
+--- a/src/world/lanterns.js
++++ b/src/world/lanterns.js
+@@ -1,6 +1,7 @@
+ import * as THREE from 'three';
+ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+ import { CONFIG } from '../config.js';
++import { TIP_NAMES } from '../core/hands.js';
+ import {
+   LANTERN_BODY_VERT, LANTERN_BODY_FRAG,
+   LANTERN_GLOW_VERT, LANTERN_MIRROR_VERT, LANTERN_GLOW_FRAG,
+@@ -17,7 +18,11 @@ import {
+  * States: 'floating' | 'held' | 'rising'.
+  *  - floating: sits on the swell, drifts with a per-lantern wind + random walk; arrivals home in from
+  *    ~45 m (fog) and loiter at 5-8 m while 6 lanterns are already within reach; a gentle pull toward an
+- *    open hand turns near-misses into grabs.
++ *    open hand turns near-misses into grabs. Lily pads hold a hull that drifts among them (wind and walk
++ *    damped to a quarter), so a lantern set down at a lotus cluster stays there a while; lotus.js reads
++ *    `touched` (has been in a hand) to let such a lantern warm the bud open. An open hand meets the paper
++ *    flank instead of passing through it: a slow hand rests it against the fingers, a brisk brush sends it
++ *    gliding off with a slow spin, the flame flaring and guttering ('lanterntouch', see nudgeContact).
+  *  - held: a point mass on an 8 cm string under the pinch point (position-based pendulum, unilateral
+  *    so it can go slack and float when pushed under water); the body tilts along the string.
+  *  - rising: the string's anchor becomes a virtual balloon: 0.4 s buoyancy ramp, 0.25 -> 0.5 m/s,
+@@ -26,9 +31,10 @@ import {
+  * Grab protocol (src/core/hands.js): each lantern keeps an entry in ctx.grabbables
+  * { position, radius, active, held, warm, onGrab(hand), onRelease(hand, velocity, { lost }) }.
+  *
+- * Public surface: ctx.lanterns = { list, count, MAX }; list entries expose { position (centre, Vector3),
+- * top (Vector3), state, bright, seed, held, attracted }.
+- * Events: 'lanterngrab' {pos, hand}, 'lanternrelease' {pos, hand}, 'lanternsplash' {pos}, 'lanternstar' {dir, pos}.
++ * Public surface: ctx.lanterns = { list, count, MAX, touches }; list entries expose { position (centre, Vector3),
++ * top (Vector3), state, bright, seed, held, attracted, touched, amongPads, push, spinKick, inContact }.
++ * Events: 'lanterngrab' {pos, hand}, 'lanternrelease' {pos, hand}, 'lanternsplash' {pos}, 'lanternstar' {dir, pos},
++ * 'lanterntouch' {pos, hand, lantern, speed}.
+  */
+ const MAX = 24;
+ const H = 0.26;               // lantern height (m); geometry origin is at the top (hanging point)
+@@ -51,6 +57,19 @@ const SWAY_AMP = 0.3, SWAY_PERIOD = 6;
+ const BRIGHT_FLOAT = 0.55;
+ const GRAVITY = 9.81;
+ const ATTRACT_RADIUS = 0.35, ATTRACT_K = 2.5, ATTRACT_VMAX = 0.25;
++const PADS = { hold: 0.40 };  // within this of a lotus cluster the pads hold the hull (drift damped to a quarter)
++// touch and nudge: an open hand's knuckles, tips and wrist are discs against the hull's widest radius
++const NUDGE = {
++  reach: 0.45,                // palm within this of the centre before any joint is tested
++  skin: 0.008, body: 0.075,   // joint radius padding; contact radius of the paper flank
++  pushMax: 0.7, pushK: 0.9,   // glide velocity cap and how much of the palm's normal speed the hull takes
++  spinK: 2.5, spinMax: 2.5,   // yaw kick from the sideways sweep (rad/s)
++  pushDecay: 1.5, spinDecay: 0.9,
++  gutterSpeed: 0.35,          // a brush faster than this makes the flame gutter
++  eventGap: 0.25,             // 'lanterntouch' at most this often per lantern
++  attEaseNear: 0.095, attEaseFar: 0.175, // the hand pull eases out as the pinch point closes on the hull
++};
++const CONTACT_JOINTS = ['wrist', 'middle-finger-metacarpal', 'index-finger-phalanx-proximal', 'middle-finger-phalanx-proximal', 'ring-finger-phalanx-proximal', 'pinky-finger-phalanx-proximal', ...TIP_NAMES];
+ 
+ // mulberry32: small seeded PRNG so placement is deterministic (and testable)
+ function makeRng(seed) {
+@@ -171,7 +190,7 @@ export const lanterns = {
+ 
+     // ---- lantern records
+     const list = [];
+-    ctx.lanterns = { list, count: 0, MAX, nearestDistance: Infinity };
++    ctx.lanterns = { list, count: 0, MAX, nearestDistance: Infinity, touches: 0 };
+     const s = this._ = {
+       ctx, rng, list, bodies, bodyMat, glowMat, mirrorMat, flameMat, instGeos, setInstanceCount, markInstDirty, pPos, pBright, pFlame, pSeed, seedArr, brightArr, heldArr, aSeed, aBright, aHeld,
+       spawnTimer: SPAWN_INTERVAL * 0.5, lastNearT: 0,
+@@ -188,6 +207,8 @@ export const lanterns = {
+       const seed = rng();
+       const L = {
+         i, seed, state: 'floating', held: null, incoming, attracted: false, dropping: false,
++        touched: false,                    // has been carried by a hand (only such a lantern warms a lotus bud)
++        amongPads: false,                  // held by a lotus cluster's pads this frame
+         position: new THREE.Vector3(x, floatCentreY(x, z, ctx.time.t, seed), z), // centre of the body (grab point)
+         top: new THREE.Vector3(),          // hanging point (the pendulum bob while held/rising)
+         anchor: new THREE.Vector3(),       // the other end of the string: pinch point, then the virtual balloon
+@@ -198,6 +219,7 @@ export const lanterns = {
+         bright: incoming ? 0 : BRIGHT_FLOAT, flame: 1,
+         yaw: rng() * Math.PI * 2, spin: (rng() - 0.5) * 0.3,
+         lean: new THREE.Vector2(), leanT: new THREE.Vector2(),
++        push: new THREE.Vector2(), spinKick: 0, touchT: -1e9, inContact: false, // a hand's nudge: glide, yaw kick, last touch
+         wind: WIND_DIR.clone().rotateAround(new THREE.Vector2(), THREE.MathUtils.degToRad((rng() - 0.5) * 40)).multiplyScalar(WIND_SPEED),
+         walk: new THREE.Vector2(), walkT: new THREE.Vector2(), walkTimer: rng() * 3,
+         loiterR: 5 + rng() * 3,
+@@ -232,7 +254,9 @@ export const lanterns = {
+       L.top.copy(L.position).y += H * 0.5;
+       L.vel.set(0, 0, 0); L.bobVel.set(0, 0, 0); L.att.set(0, 0); L.up.set(0, 1, 0);
+       L.lean.set(0, 0); L.leanT.set(0, 0);
++      L.push.set(0, 0); L.spinKick = 0; L.inContact = false;
+       L.state = 'floating'; L.incoming = true; L.bright = 0; L.held = null; L.dropping = false; L.attracted = false;
++      L.touched = false; L.amongPads = false;
+       L.loiterR = 5 + rng() * 3;
+       L.grab.active = true; L.grab.held = null;
+     }
+@@ -254,10 +278,10 @@ export const lanterns = {
+ 
+     function onGrab(L, hand) {
+       const wasRising = L.state === 'rising';
+-      L.state = 'held'; L.held = hand; L.incoming = false; L.attracted = false; L.dropping = false;
++      L.state = 'held'; L.held = hand; L.incoming = false; L.attracted = false; L.dropping = false; L.touched = true;
+       L.anchor.copy(hand.pinch.point);
+       if (!wasRising) { L.top.copy(L.position).addScaledVector(L.up, H * 0.5); L.bobVel.copy(L.vel); }
+-      L.att.set(0, 0);
++      L.att.set(0, 0); L.push.set(0, 0); L.spinKick = 0; L.inContact = false;
+       // ease the string from its current length to STRING over ~120 ms (with a little overshoot)
+       L.grabT = 0; L.grabLen = Math.max(0.01, L.top.distanceTo(L.anchor));
+       ctx.events.emit('lanterngrab', { pos: L.position.clone(), hand, lantern: L });
+@@ -421,7 +445,17 @@ export const lanterns = {
+           const ease = THREE.MathUtils.smoothstep(dp, 0.7, 1.1);
+           vx += dxp / dp * sp * ease; vz += dzp / dp * sp * ease;
+         }
+-        // near-miss help: a gentle pull toward an open, visible hand above the water
++        // lily pads hold the hull: among a lotus cluster the wind and walk (and the homing) drop to a quarter,
++        // so a lantern set down there stays a while; the hand terms below are untouched, so it can be coaxed out
++        L.amongPads = false;
++        const clusters = ctx.lotus ? ctx.lotus.clusters : null;
++        if (clusters) {
++          let cd = Infinity;
++          for (let c = 0; c < clusters.length; c++) { const d = Math.hypot(clusters[c].x - P.x, clusters[c].z - P.z); if (d < cd) cd = d; }
++          if (cd < PADS.hold) { vx *= 0.25; vz *= 0.25; L.amongPads = true; }
++        }
++        // near-miss help: a gentle pull toward an open, visible hand above the water; it eases out as the pinch
++        // point closes on the hull, so a lantern resting against the fingers is not tugged into them
+         let attracted = false;
+         for (const h of hands) {
+           if (!h || !h.visible || h.active === false || !h.open || h.submerged || h.pinch.active) continue;
+@@ -429,14 +463,25 @@ export const lanterns = {
+           const ax = hp.x - P.x, az = hp.z - P.z;
+           const ad = Math.hypot(ax, az);
+           if (ad > ATTRACT_RADIUS || ad < 1e-4 || Math.abs(hp.y - P.y) > 0.6) continue;
++          const ease = THREE.MathUtils.smoothstep(ad, NUDGE.attEaseNear, NUDGE.attEaseFar);
++          if (ease <= 0) continue;
+           attracted = true;
+-          L.att.x += ax * ATTRACT_K * dt; L.att.y += az * ATTRACT_K * dt;
++          L.att.x += ax * ATTRACT_K * dt * ease; L.att.y += az * ATTRACT_K * dt * ease;
+         }
+         if (attracted) { if (L.att.length() > ATTRACT_VMAX) L.att.setLength(ATTRACT_VMAX); }
+         else L.att.multiplyScalar(Math.max(0, 1 - 4 * dt));
+         L.attracted = attracted;
+         vx += L.att.x; vz += L.att.y;
+-        L.flame += ((attracted ? 1.3 : 1) - L.flame) * Math.min(1, dt * 4);
++        // touch and nudge: the hull is moved out of an open hand's way and takes a decaying glide and yaw kick
++        // from it (applied after the pads' damping, so a lantern among the pads can still be nudged out)
++        L.push.multiplyScalar(Math.max(0, 1 - NUDGE.pushDecay * dt));
++        L.spinKick *= Math.max(0, 1 - NUDGE.spinDecay * dt);
++        if (!L.dropping) nudgeContact(L, hands, ctx, t, dt); else L.inContact = false;
++        vx += L.push.x; vz += L.push.y;
++        const pushLen = L.push.length();
++        let flameT = attracted ? 1.3 : 1;
++        if (pushLen > 0.05) flameT = Math.max(flameT, 1 + Math.min(0.7, pushLen * 1.2)); // the flame flares as it glides
++        L.flame += (flameT - L.flame) * Math.min(1, dt * 4);
+         // don't drift into the player's body
+         const dxh = P.x - head.x, dzh = P.z - head.z;
+         const dh = Math.hypot(dxh, dzh);
+@@ -475,6 +520,7 @@ export const lanterns = {
+         const sx = (swell(P.x + e, P.z, t) - swell(P.x - e, P.z, t)) / (2 * e);
+         const sz = (swell(P.x, P.z + e, t) - swell(P.x, P.z - e, t)) / (2 * e);
+         L.leanT.set(-sx * 2.5 + 0.04 * Math.sin(t * 0.9 + L.seed * 20), -sz * 2.5 + 0.04 * Math.cos(t * 0.7 + L.seed * 31));
++        L.leanT.x += L.push.x * 0.5; L.leanT.y += L.push.y * 0.5; // heels away from the hand that pushed it
+         L.lean.lerp(L.leanT, Math.min(1, dt * 4));
+         L.up.set(0, 1, 0);
+         L.top.copy(P).y += H * 0.5;
+@@ -489,8 +535,8 @@ export const lanterns = {
+         if (!L.incoming && dp > KEEP_RADIUS) s.respawnFar(L);
+       }
+ 
+-      // spin
+-      L.yaw += L.spin * dt * (L.state === 'floating' ? 1 : 0.4);
++      // spin (+ the kick from a sideways brush while floating)
++      L.yaw += (L.state === 'floating' ? L.spin + L.spinKick : L.spin * 0.4) * dt;
+ 
+       // instance matrix: rotate about the top (hanging point)
+       const lx = L.lean.x, lz = L.lean.y;
+@@ -516,6 +562,56 @@ export const lanterns = {
+   },
+ };
+ 
++/**
++ * An open, non-pinching hand meets a floating lantern's paper flank. Each contact joint (knuckles, tips,
++ * wrist) is a disc against the hull's widest radius, tested only on the flank (a joint above the rim or
++ * below the waterline never pushes): the hull is moved out of the way (positional, never vertical), the
++ * palm's velocity along the contact normal goes into L.push (a decaying glide) and its sideways component
++ * into L.spinKick. A fresh contact after a quiet gap is a 'lanterntouch': a ring from the hull, a gutter of
++ * the flame when the brush was brisk, and a paper tap in sfx.js. Held and rising lanterns never get here.
++ */
++function nudgeContact(L, hands, ctx, t, dt) {
++  const P = L.position, push = L.push;
++  const yLo = P.y - 0.11, yHi = L.top.y - 0.02;
++  let contact = false, vnMax = 0, touchHand = null;
++  for (let hi = 0; hi < hands.length; hi++) {
++    const h = hands[hi];
++    if (!h || !h.visible || !h.active || h.pinch.active || h.grasp || h.grabbed) continue; // a grasp/pinch is a grab or a pull
++    if (h.palm.position.distanceToSquared(P) > NUDGE.reach * NUDGE.reach) continue;
++    const v = h.palm.velocity; // world, so a pulled rig counts as the hand moving
++    for (let k = 0; k < CONTACT_JOINTS.length; k++) {
++      const j = h.joints[CONTACT_JOINTS[k]];
++      if (!j.valid) continue;
++      const jp = j.position;
++      if (jp.y <= yLo || jp.y >= yHi) continue;
++      const jr = j.radius + NUDGE.skin;
++      const dx = P.x - jp.x, dz = P.z - jp.z;
++      const d = Math.hypot(dx, dz);
++      if (d >= NUDGE.body + jr || d <= 1e-4) continue;
++      const nx = dx / d, nz = dz / d, pen = NUDGE.body + jr - d;
++      P.x += nx * pen; P.z += nz * pen;
++      const vn = Math.max(0, v.x * nx + v.z * nz);
++      const pn = push.x * nx + push.y * nz;
++      if (vn * NUDGE.pushK > pn) { const add = vn * NUDGE.pushK - pn; push.x += nx * add; push.y += nz * add; }
++      const vtx = v.x - nx * vn, vtz = v.z - nz * vn;
++      L.spinKick = THREE.MathUtils.clamp(L.spinKick + (nx * vtz - nz * vtx) * NUDGE.spinK * dt * 30, -NUDGE.spinMax, NUDGE.spinMax);
++      contact = true;
++      if (vn >= vnMax) { vnMax = vn; touchHand = h; }
++    }
++  }
++  if (contact) {
++    if (push.lengthSq() > NUDGE.pushMax * NUDGE.pushMax) push.setLength(NUDGE.pushMax);
++    if (!L.inContact && t - L.touchT > NUDGE.eventGap) {
++      L.touchT = t;
++      if (vnMax > NUDGE.gutterSpeed) L.bright = Math.max(0.3, L.bright - 0.2); // the flame gutters; the float easing restores it
++      ctx.water.disturb?.(P.x, P.z, 0.1, 0.05 + 0.2 * Math.min(1, vnMax));
++      ctx.lanterns.touches++;
++      ctx.events.emit('lanterntouch', { pos: P.clone(), hand: touchHand, lantern: L, speed: vnMax });
++    }
++  }
++  L.inContact = contact;
++}
++
+ /**
+  * Position-based pendulum step for the lantern's top (the bob) on a string whose anchor moved from
+  * A0 to A during this frame (interpolated over the substeps so a fast anchor never jumps past the bob).
+diff --git a/src/world/lotus.js b/src/world/lotus.js
+index 28a392b..992a734 100644
+--- a/src/world/lotus.js
++++ b/src/world/lotus.js
+@@ -8,13 +8,25 @@ import { LOTUS_FLOWER_VERT, LOTUS_FLOWER_FRAG, LOTUS_GLOW_VERT, LOTUS_GLOW_FRAG
+  * sings a pentatonic degree ('lotusbloom'), bumps the world energy and pushes a ring into the water.
+  * It closes again after a minute. When all six are open at once, 'lotuschord' fires once.
+  *
++ * A closed bud also answers a hand that merely comes near: it leans toward the nearest fingertip
++ * within 35 cm (pivoting at its base) and its halo warms. Hold a fingertip still 9–22 cm above the
++ * pod and after 0.6 s a thin whisper rises ('lotusstir'); at 2 s the bud opens by itself with a
++ * softer, longer note ('lotusbloom' cause 'patient'). Touching it still opens it at once.
++ *
++ * A lantern the player has carried and set down among the pads warms a bud too: its light falls amber on
++ * the near side of the petals (per-instance aLantern in the shader), and after 2.5 s within 45 cm the bud
++ * opens slowly, over 5 s ('lotusbloom' cause 'lantern'), and stays open until 10 s after the lantern
++ * drifts away. Lanterns that merely home in by themselves (never touched) do not count.
++ *
+  * Four draw calls: one InstancedMesh of pads (MeshLambert, lit by the moon + hemisphere light), one
+  * InstancedMesh of flowers (custom ShaderMaterial, per-instance aBloom/aColor), one instanced set of
+  * additive billboard quads for the glows (renderOrder 4) and their reflection drawn on the surface just
+  * after the water (renderOrder 3).
+  *
+- * Public surface: ctx.lotus = { flowers: [{ index, position, bud, bloom, color, note, open }], open(i), clusters }
+- * Events: 'lotusbloom' { index, note, pos, color }, 'lotuschord' {}
++ * Public surface: ctx.lotus = { flowers: [{ index, position, bud, bloom, color, note, open, state, lean, leanX, leanZ,
++ *   hoverT, openSeconds, warm, warmNear, lanternIdx }], open(i, opts), clusters }
++ * Events: 'lotusbloom' { index, note, pos, color, cause: 'touch'|'patient'|'lantern', hand }, 'lotusstir' { index, note, pos, hand },
++ *   'lotuschord' {}
+  */
+ 
+ const CLUSTERS = 6;
+@@ -27,6 +39,15 @@ const OPEN_SECONDS = 1.6, CLOSE_SECONDS = 6, STAY_MIN = 55, STAY_MAX = 75;
+ const PAD_LIFT = 0.004, FLOWER_LIFT = 0.006, BUD_HEIGHT = 0.045;
+ const GLOW_SIZE = 0.35, MIRROR_GAIN = 0.3, SURGE_SECONDS = 3.0; // the reflection is drawn on the surface, so it needs less gain
+ const GLOW_GAIN_CLOSED = 0.08, GLOW_GAIN_OPEN = 0.40; // additive halo brightness (the petals carry their own glow)
++const WARM_GAIN = 0.14;                                 // extra halo on a closed bud with a hand near it
++// the lean toward a fingertip: full angle inside `near`, none beyond `far`; the patience band is the height
++// above the pod (not touching) where a still fingertip counts, whispering at stirAt and opening at openAt
++const LEAN = { far: 0.35, near: 0.08, angle: 0.40, tauIn: 0.6, tauOut: 1.2, hoverMin: 0.09, hoverMax: 0.22, stirAt: 0.6, openAt: 2.0, decay: 2 };
++// a set-down lantern warming a bud: enter/exit is a horizontal hysteresis band, `need` seconds of warmth open it
++// over `openSeconds`, and it lingers open `linger` seconds after the lantern leaves; glowLight is the reach of
++// the amber light on the petals (shader), energy the (small) world-energy bump for such a bloom
++const WARM = { enter: 0.45, exit: 0.55, minBright: 0.3, need: 2.5, cap: 3.5, openSeconds: 5.0, linger: 10, energy: 0.08, glowLight: 0.6 };
++const WARM_HALO = 0.10;                                 // extra halo gain as the lantern's warmth builds
+ const PAD_COLOR = 0x0f2a1c, PAD_EMISSIVE = 0x02110a;
+ 
+ function mulberry32(seed) {
+@@ -216,8 +237,12 @@ export const lotus = {
+       bud: new THREE.Vector3(c.x, ctx.water.level + FLOWER_LIFT + BUD_HEIGHT, c.z),
+       color: new THREE.Color(colors[i % colors.length]),
+       bloom: 0, open: false,
+-      state: 'closed', timer: 0, bloomFrom: 0, stay: 0,
++      state: 'closed', timer: 0, bloomFrom: 0, stay: 0, openSeconds: OPEN_SECONDS,
+       yaw: rnd() * Math.PI * 2, scale: 1.0 + rnd() * 0.25, phase: rnd() * Math.PI * 2, pulsePhase: rnd() * Math.PI * 2,
++      // lean toward a near fingertip (radians, about the base) and the patience clock for opening by stillness
++      leanX: 0, leanZ: 0, lean: 0, hoverT: 0, stirred: false, warmGlow: 0, rot: new THREE.Quaternion(),
++      // warmth from a lantern set down among the pads (seconds, capped), and which lantern it is
++      warm: 0, warmNear: false, lanternIdx: -1,
+     }));
+ 
+     // ---- pads
+@@ -247,10 +272,13 @@ export const lotus = {
+     const bloomAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLUSTERS), 1).setUsage(THREE.DynamicDrawUsage);
+     const colorAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLUSTERS * 3), 3);
+     const phaseAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLUSTERS), 1);
++    // the brightest nearby lantern per flower (xyz, weight): amber light on the near side of the petals
++    const lanternAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLUSTERS * 4), 4).setUsage(THREE.DynamicDrawUsage);
+     flowers.forEach((f, i) => { colorAttr.setXYZ(i, f.color.r, f.color.g, f.color.b); phaseAttr.setX(i, f.phase); });
+     flowerGeo.setAttribute('aBloom', bloomAttr);
+     flowerGeo.setAttribute('aColor', colorAttr);
+     flowerGeo.setAttribute('aPhase', phaseAttr);
++    flowerGeo.setAttribute('aLantern', lanternAttr);
+     const flowerUniforms = {
+       uTime: { value: 0 },
+       uMoonDir: { value: new THREE.Vector3(0.3, 0.8, 0.5).normalize() },
+@@ -307,32 +335,37 @@ export const lotus = {
+     const glowGain = { setX: (i, v) => { glowGainArr[i] = v; }, set needsUpdate(v) { for (const g of glowGeos) g.attributes.aGain.needsUpdate = v; } };
+ 
+     // ---- interaction helpers
+-    const openFlower = (i) => {
++    // opts: cause 'touch' (default) | 'patient' | 'lantern', hand (the hand that did it), openSeconds
++    const openFlower = (i, opts = {}) => {
++      const { cause = 'touch', hand = null, openSeconds = OPEN_SECONDS } = opts;
+       const f = flowers[i];
+       if (!f || f.state === 'opening' || f.state === 'open') return false;
+-      f.state = 'opening'; f.timer = 0; f.bloomFrom = f.bloom; f.open = true;
++      f.state = 'opening'; f.timer = 0; f.bloomFrom = f.bloom; f.open = true; f.openSeconds = openSeconds;
++      f.hoverT = 0; f.stirred = false;
+       f.stay = STAY_MIN + rnd() * (STAY_MAX - STAY_MIN);
+-      ctx.energy = Math.min(1, ctx.energy + CONFIG.energy.lotus);
+-      if (typeof ctx.water.disturb === 'function') ctx.water.disturb(f.position.x, f.position.z, 0.18, 0.28);
+-      ctx.events.emit('lotusbloom', { index: i, note: f.note, pos: f.position.clone(), color: f.color });
++      // a lantern-warmed bloom is slow and quiet: a smaller bump to the world and a softer ring on the water
++      const lantern = cause === 'lantern';
++      ctx.energy = Math.min(1, ctx.energy + (lantern ? WARM.energy : CONFIG.energy.lotus));
++      if (typeof ctx.water.disturb === 'function') ctx.water.disturb(f.position.x, f.position.z, 0.18, lantern ? 0.18 : 0.28);
++      ctx.events.emit('lotusbloom', { index: i, note: f.note, pos: f.position.clone(), color: f.color, cause, hand });
+       return true;
+     };
+ 
+     ctx.lotus = {
+       flowers, clusters, pads,
+-      /** Bloom flower i as if it had been touched (returns false if it is already open). */
+-      open: (i) => openFlower(i),
++      /** Bloom flower i as if it had been touched (returns false if it is already open); opts as openFlower. */
++      open: (i, opts) => openFlower(i, opts),
+       chordCount: 0,
+       nearestBudDistance: Infinity, // horizontal distance from the head to the nearest closed bud
+     };
+ 
+     this._ = {
+-      flowers, pads, padMesh, flowerMesh, flowerUniforms, bloomAttr, glowPoints, mirrorPoints, glowMat, mirrorMat,
++      flowers, pads, padMesh, flowerMesh, flowerUniforms, bloomAttr, lanternAttr, glowPoints, mirrorPoints, glowMat, mirrorMat,
+       glowPos, glowSize, glowGain, openFlower, rnd,
+       moonLight: null, moonLookupFrame: -1,
+       surgeT: SURGE_SECONDS, chordArmed: true,
+       _m: new THREE.Matrix4(), _q: new THREE.Quaternion(), _qy: new THREE.Quaternion(), _p: new THREE.Vector3(),
+-      _s: new THREE.Vector3(), _n: new THREE.Vector3(), _up: new THREE.Vector3(0, 1, 0),
++      _s: new THREE.Vector3(), _n: new THREE.Vector3(), _up: new THREE.Vector3(0, 1, 0), _axis: new THREE.Vector3(),
+     };
+   },
+ 
+@@ -341,7 +374,7 @@ export const lotus = {
+     const t = ctx.time.t;
+     const level = ctx.water.level;
+     const swell = ctx.water.swell || (() => 0);
+-    const { _m, _q, _qy, _p, _s, _n, _up } = S;
++    const { _m, _q, _qy, _p, _s, _n, _up, _axis } = S;
+ 
+     // ---- pads: float on the swell, tilt with its slope, drift and turn very slowly
+     const E = 0.05;
+@@ -368,7 +401,7 @@ export const lotus = {
+     for (const f of S.flowers) {
+       f.timer += dt;
+       if (f.state === 'opening') {
+-        const u = Math.min(1, f.timer / OPEN_SECONDS);
++        const u = Math.min(1, f.timer / f.openSeconds);
+         f.bloom = f.bloomFrom + (1 - f.bloomFrom) * easeOutCubic(u);
+         if (u >= 1) { f.state = 'open'; f.timer = 0; f.bloom = 1; }
+       } else if (f.state === 'open') {
+@@ -388,6 +421,78 @@ export const lotus = {
+       f.bud.set(f.position.x, y + BUD_HEIGHT * f.scale, f.position.z);
+     }
+ 
++    // ---- lean + patience: a closed bud turns toward the nearest fingertip of an open, dry, idle hand
++    const hands = ctx.hands && ctx.hands.list ? ctx.hands.list : null;
++    const kIn = 1 - Math.exp(-dt / LEAN.tauIn), kOut = 1 - Math.exp(-dt / LEAN.tauOut);
++    for (let i = 0; i < S.flowers.length; i++) {
++      const f = S.flowers[i];
++      let tx = 0, tz = 0, p = 0, k = kOut;
++      if (f.state === 'closed' && hands) {
++        let bestD2 = Infinity, bestHand = null, bestTip = null;
++        for (let hi = 0; hi < hands.length; hi++) {
++          const h = hands[hi];
++          if (!h.visible || !h.active || h.submerged || h.pinch.active || h.grabbed) continue;
++          for (let j = 0; j < h.tips.length; j++) {
++            const d2 = h.tips[j].distanceToSquared(f.bud);
++            if (d2 < bestD2) { bestD2 = d2; bestHand = h; bestTip = h.tips[j]; }
++          }
++        }
++        const d = Math.sqrt(bestD2);
++        if (d < LEAN.far) {
++          p = 1 - smooth(Math.min(1, Math.max(0, (d - LEAN.near) / (LEAN.far - LEAN.near))));
++          const ux = bestTip.x - f.bud.x, uz = bestTip.z - f.bud.z, ul = Math.hypot(ux, uz);
++          if (ul > 1e-5) { tx = ux / ul * LEAN.angle * p; tz = uz / ul * LEAN.angle * p; }
++          k = kIn;
++        }
++        // patience: a still fingertip hovering in the band above the pod (not touching) opens it in time
++        if (d >= LEAN.hoverMin && d <= LEAN.hoverMax && bestHand.still) f.hoverT += dt;
++        else { f.hoverT = Math.max(0, f.hoverT - LEAN.decay * dt); if (f.hoverT <= 0) f.stirred = false; }
++        if (f.hoverT >= LEAN.stirAt && !f.stirred) {
++          f.stirred = true;
++          ctx.events.emit('lotusstir', { index: i, note: f.note, pos: f.bud.clone(), hand: bestHand });
++        }
++        if (f.hoverT >= LEAN.openAt) S.openFlower(i, { cause: 'patient', hand: bestHand });
++      } else { f.hoverT = 0; f.stirred = false; }
++      f.leanX += (tx - f.leanX) * k;
++      f.leanZ += (tz - f.leanZ) * k;
++      f.lean = Math.hypot(f.leanX, f.leanZ);
++      f.warmGlow = p;
++      // the pose pivots at the base; the bud (touch target, halo centre) follows it
++      _qy.setFromAxisAngle(_up, f.yaw);
++      if (f.lean > 1e-4) { _axis.set(f.leanZ / f.lean, 0, -f.leanX / f.lean); f.rot.setFromAxisAngle(_axis, f.lean).multiply(_qy); }
++      else f.rot.copy(_qy);
++      f.bud.set(0, BUD_HEIGHT * f.scale, 0).applyQuaternion(f.rot).add(f.position);
++    }
++
++    // ---- warmth: a lantern the player set down among the pads (floating, once held, settled, lit) warms the
++    // bud open after a while and keeps it open; the brightest lantern nearby, whatever it is doing, lights the petals
++    const lanterns = ctx.lanterns && ctx.lanterns.list ? ctx.lanterns.list : null;
++    for (let i = 0; i < S.flowers.length; i++) {
++      const f = S.flowers[i];
++      let near = Infinity, nearIdx = -1, lightW = 0, light = null;
++      if (lanterns) {
++        for (let li = 0; li < lanterns.length; li++) {
++          const L = lanterns[li];
++          if (L.state === 'rising') continue;
++          const d = Math.hypot(L.position.x - f.position.x, L.position.z - f.position.z);
++          if (d < WARM.glowLight && L.bright > 0.05) {
++            const w = L.bright * (1 - smooth(Math.min(1, Math.max(0, (d - 0.35) / 0.25))));
++            if (w > lightW) { lightW = w; light = L; }
++          }
++          if (L.state === 'floating' && L.touched && !L.incoming && !L.dropping && L.bright > WARM.minBright && d < near) { near = d; nearIdx = li; }
++        }
++      }
++      if (near < WARM.enter) f.warmNear = true; else if (near > WARM.exit) f.warmNear = false;
++      f.lanternIdx = f.warmNear ? nearIdx : -1;
++      f.warm = Math.min(WARM.cap, Math.max(0, f.warm + (f.warmNear ? dt : -2 * dt)));
++      if (f.warm > WARM.need && f.state === 'closed' && f.bloom < TOUCH_MAX_BLOOM) S.openFlower(i, { cause: 'lantern', openSeconds: WARM.openSeconds });
++      // while the lantern stays, the flower stays: it closes only `linger` seconds after the lantern has left
++      if (f.warmNear && f.state === 'open') f.timer = Math.min(f.timer, f.stay - WARM.linger);
++      if (light) S.lanternAttr.setXYZW(i, light.position.x, light.position.y, light.position.z, lightW);
++      else S.lanternAttr.setW(i, 0);
++    }
++    S.lanternAttr.needsUpdate = true;
++
+     // ---- nearest closed bud (for the hints)
+     {
+       const head = ctx.playerCtl ? ctx.playerCtl.state.headWorld : null;
+@@ -401,13 +506,13 @@ export const lotus = {
+       const r2 = TOUCH_RADIUS * TOUCH_RADIUS;
+       for (const f of S.flowers) {
+         if (f.bloom >= TOUCH_MAX_BLOOM || f.open) continue;
+-        let hit = false;
++        let hit = null;
+         for (const h of ctx.hands.list) {
+           if (!h.visible) continue;
+-          for (let k = 0; k < h.tips.length && !hit; k++) if (h.tips[k].distanceToSquared(f.bud) < r2) hit = true;
++          for (let k = 0; k < h.tips.length && !hit; k++) if (h.tips[k].distanceToSquared(f.bud) < r2) hit = h;
+           if (hit) break;
+         }
+-        if (hit) S.openFlower(f.index);
++        if (hit) S.openFlower(f.index, { cause: 'touch', hand: hit });
+       }
+     }
+ 
+@@ -423,15 +528,16 @@ export const lotus = {
+     // ---- flower instances + glow attributes
+     for (let i = 0; i < S.flowers.length; i++) {
+       const f = S.flowers[i];
+-      _qy.setFromAxisAngle(_up, f.yaw);
+       _s.setScalar(f.scale);
+-      _m.compose(f.position, _qy, _s);
++      _m.compose(f.position, f.rot, _s);
+       S.flowerMesh.setMatrixAt(i, _m);
+       S.bloomAttr.setX(i, f.bloom);
+       const pulse = f.open ? 1 + 0.1 * Math.sin(t * (Math.PI * 2 / 4) + f.pulsePhase) : 1;
++      const closedGain = GLOW_GAIN_CLOSED + (f.bloom < TOUCH_MAX_BLOOM ? WARM_GAIN * f.warmGlow : 0); // warms as a hand nears
++      const lanternGain = WARM_HALO * smooth(Math.min(1, f.warm));                                      // and as a lantern's warmth builds
+       S.glowPos.setXYZ(i, f.bud.x, f.bud.y, f.bud.z);
+       S.glowSize.setX(i, GLOW_SIZE * (0.2 + f.bloom) * f.scale * (1 + 0.15 * surge));
+-      S.glowGain.setX(i, (GLOW_GAIN_CLOSED + (GLOW_GAIN_OPEN - GLOW_GAIN_CLOSED) * f.bloom) * pulse * (1 + 0.8 * surge));
++      S.glowGain.setX(i, (closedGain + lanternGain + (GLOW_GAIN_OPEN - GLOW_GAIN_CLOSED) * f.bloom) * pulse * (1 + 0.8 * surge));
+     }
+     S.flowerMesh.instanceMatrix.needsUpdate = true;
+     S.bloomAttr.needsUpdate = true;
+diff --git a/tools/harness/scenario.mjs b/tools/harness/scenario.mjs
+index 2412be0..b024360 100644
+--- a/tools/harness/scenario.mjs
++++ b/tools/harness/scenario.mjs
+@@ -1,6 +1,9 @@
+ // End-to-end interaction scenario on the fake WebXR device:
+-//   1. calibrate, 2. grab the nearest lantern, lift it, let go above the water → it rises → a star is born,
+-//   3. touch the nearest lotus bud → it blooms, 4. hold a hand open and still → a firefly lands,
++//   1. calibrate, 2. grab the nearest lantern, lift it, let go above the water → it rises → a star is born; brush an open
++//      hand sideways through the next floating lantern → it is nudged away (no grab, no pull),
++//   3. hold a fingertip still above the nearest lotus bud → it leans, whispers and opens by itself; hovering too high does
++//      nothing; touch the next bud → it blooms; set a lantern down among the next closed cluster's pads → it warms the bud open,
++//   4. hold a hand open and still → a firefly lands,
+ //   5. locomotion: a stroke does nothing, a missed pinch does nothing, pinch-and-pull moves, two hands turn, 6. palms together → leave.
+ // Prints a JSON report and exits 1 if any step fails. Usage: node tools/harness/scenario.mjs [--out dir]
+ import { chromium } from 'playwright';
+@@ -82,7 +85,79 @@ try {
+     await page.evaluate(() => { window.__fakeXR.clock.step = 1 / 36; });
+   }
+ 
+-  // ---- lotus
++  // ---- touch and nudge: an open hand, fingers along -X, swept sideways through the nearest floating lantern pushes it
++  // away along -X and fires 'lanterntouch'; nothing is pinched, grabbed or pulled, so the rig stays put
++  {
++    w = await world();
++    const hd = w.head, rig0 = w.rig;
++    const fl = w.lanterns.map((l, index) => ({ ...l, index })).filter((l) => l.state === 'floating');
++    fl.sort((a, b) => Math.hypot(a.x - hd[0], a.z - hd[2]) - Math.hypot(b.x - hd[0], b.z - hd[2]));
++    const LN = fl[0];
++    step('lantern-nudge-ready', !!LN, { lantern: LN });
++    if (LN) {
++      const brush = { yawDeg: 90, pitchDeg: 0, rollDeg: 0, curl: 0.05 }; // wrist east of the hull, fingertips 0.175 m along -X
++      const n0 = (await events()).length;
++      await setHand('right', [LN.x + 0.32, LN.y + 0.02, LN.z], 0, brush);
++      await frames(8);
++      const L0 = (await world()).lanterns[LN.index];
++      let minX = L0.x;
++      const sample = async () => { minX = Math.min(minX, (await world()).lanterns[LN.index].x); };
++      // sweep the wrist from +0.32 to +0.05 over 20 frames (≈0.49 m/s): the fingers pass through the body
++      for (let i = 1; i <= 20; i++) { await setHand('right', [LN.x + 0.32 - 0.27 * i / 20, LN.y + 0.02, LN.z], 0, brush); await frame(); if (i % 2 === 0) await sample(); }
++      for (let i = 1; i <= 10; i++) { await frame(); if (i % 2 === 0) await sample(); }
++      const ev = (await events()).slice(n0);
++      s = await stats();
++      const w1 = await world();
++      const touch = ev.find((e) => e.type === 'lanterntouch' && e.detail?.speed > 0.2 && e.detail?.hand === 'right');
++      const stray = ev.filter((e) => e.type === 'grab' || e.type === 'pinchmiss');
++      const rigMoved = Math.hypot(w1.rig.x - rig0.x, w1.rig.z - rig0.z);
++      step('lantern-nudged', !!touch && minX < L0.x - 0.10 && s.hands.pinchR === false && stray.length === 0 && rigMoved < 0.005,
++        { index: LN.index, x0: L0.x, minX: +minX.toFixed(3), pushed: +(L0.x - minX).toFixed(3), touch: touch?.detail, pinchR: s.hands.pinchR, stray: stray.length, rigMoved: +rigMoved.toFixed(4), lantern: w1.lanterns[LN.index] });
++      await shot('lantern_nudged.png');
++      await setHand('right', [0.25, 1.25, -0.4], 0, { curl: 0.6 });
++      await frames(30);
++      s = await stats();
++      const w2 = await world();
++      step('lantern-nudge-settles', (s.lanternTouches || 0) >= 1 && w2.lanterns[LN.index].state === 'floating', { touches: s.lanternTouches, lantern: w2.lanterns[LN.index] });
++    }
++  }
++
++  // ---- lotus, by patience: a still fingertip 9–22 cm above a closed bud makes it lean, stir and open on its own
++  {
++    w = await world();
++    const closed = w.lotus.filter((f) => !f.open);
++    closed.sort((a, b) => Math.hypot(a.x - head[0], a.z - head[2]) - Math.hypot(b.x - head[0], b.z - head[2]));
++    const B = closed[0], C = closed[1];
++    const budIdx = (b) => w.lotus.indexOf(b);
++    const hover = { pitchDeg: 0, rollDeg: 0, curl: 0.15 };
++    // the pose is the wrist; with the fake skeleton the index/middle tips end ~15 cm above the pod and 1–3 cm off axis:
++    // inside the hover band, outside the 8 cm touch radius
++    await setHand('right', [B.x, B.y + 0.18, B.z + 0.175], 0, hover);
++    await frames(20);
++    let lw = await world();
++    step('lotus-leans', lw.lotus[budIdx(B)].lean >= 0.15, { index: budIdx(B), lean: lw.lotus[budIdx(B)].lean, state: lw.lotus[budIdx(B)].state });
++    await frames(100); // still after 0.5 s, stir at ~1.1 s, open at ~2.5 s
++    let ev = await events();
++    lw = await world();
++    const iStir = ev.findIndex((e) => e.type === 'lotusstir' && e.detail?.index === budIdx(B));
++    const iBloom = ev.findIndex((e) => e.type === 'lotusbloom' && e.detail?.index === budIdx(B) && e.detail?.cause === 'patient');
++    step('lotus-patient-open', iStir >= 0 && iBloom > iStir && lw.lotus[budIdx(B)].open === true, { index: budIdx(B), stirAt: ev[iStir]?.t, bloomAt: ev[iBloom]?.t, events: ev.filter((e) => e.type === 'lotusstir' || e.type === 'lotusbloom').slice(-3) });
++    await shot('lotus_patient.png');
++    // negative: hovering too high (≈30 cm above the pod) leans the bud a little but never opens it
++    if (C) {
++      const n0 = ev.filter((e) => e.type === 'lotusbloom' && e.detail?.index === budIdx(C)).length;
++      await setHand('right', [C.x, C.y + 0.33, C.z + 0.175], 0, hover);
++      await frames(110);
++      ev = await events();
++      lw = await world();
++      const n1 = ev.filter((e) => e.type === 'lotusbloom' && e.detail?.index === budIdx(C)).length;
++      step('lotus-too-high-stays-closed', n1 === n0 && lw.lotus[budIdx(C)].open === false, { index: budIdx(C), lean: lw.lotus[budIdx(C)].lean, hoverT: await page.evaluate((i) => +window.__nocturneCtx.lotus.flowers[i].hoverT.toFixed(2), budIdx(C)) });
++    }
++    await setHand('right', [0.25, 1.25, -0.4], 0, { curl: 0.6 });
++    await frames(10);
++  }
++
++  // ---- lotus, by touch (the next closed bud)
+   w = await world();
+   const buds = w.lotus.filter((f) => !f.open);
+   buds.sort((a, b) => Math.hypot(a.x - head[0], a.z - head[2]) - Math.hypot(b.x - head[0], b.z - head[2]));
+@@ -100,6 +175,54 @@ try {
+     await shot('lotus.png');
+   }
+ 
++  // ---- lantern among the lily pads: carry a lantern to the nearest closed cluster and let it go in the water;
++  // the pads hold it and its light warms the bud open (slowly) without any fingertip coming near the pod
++  {
++    w = await world();
++    const hd = w.head, level = (await stats()).water;
++    const closed = w.lotus.map((f, index) => ({ ...f, index })).filter((f) => !f.open);
++    closed.sort((a, b) => Math.hypot(a.x - hd[0], a.z - hd[2]) - Math.hypot(b.x - hd[0], b.z - hd[2]));
++    const fl = w.lanterns.map((l, index) => ({ ...l, index })).filter((l) => l.state === 'floating');
++    fl.sort((a, b) => Math.hypot(a.x - hd[0], a.z - hd[2]) - Math.hypot(b.x - hd[0], b.z - hd[2]));
++    const B = closed[0], L2 = fl[0];
++    step('lantern-lotus-ready', !!B && !!L2, { bud: B, lantern: L2 });
++    if (B && L2) {
++      const grip = { pitchDeg: 0, rollDeg: 0, curl: 0.1 };
++      const grabs0 = (await events()).filter((e) => e.type === 'grab').length;
++      const G = [L2.x, L2.y + 0.12, L2.z];
++      await setHand('right', G, 0, grip);
++      await frames(12);
++      await setHand('right', G, 1, grip);
++      await frames(12);
++      let ev = await events();
++      step('lantern-lotus-grabbed', ev.filter((e) => e.type === 'grab').length > grabs0, { events: ev.filter((e) => e.type === 'grab' || e.type === 'pinchmiss' || e.type === 'lanterngrab').slice(-3) });
++      // the pinch point is ~13.5 cm ahead (-z) of the wrist: aim it 0.33 m beyond the bud, on the far side from the head,
++      // carrying high so no fingertip passes within 8 cm of any pod, then lower it until the lantern's bottom is under water
++      const ul = Math.hypot(B.x - hd[0], B.z - hd[2]) || 1;
++      const u = [(B.x - hd[0]) / ul, (B.z - hd[2]) / ul];
++      const Tx = B.x + 0.33 * u[0], Tz = B.z + 0.33 * u[1] + 0.135;
++      const hi = [Tx, level + 0.40, Tz], lo = [Tx, level + 0.10, Tz];
++      for (let i = 1; i <= 48; i++) { const k = i / 48; await setHand('right', [G[0] + (hi[0] - G[0]) * k, G[1] + (hi[1] - G[1]) * k, G[2] + (hi[2] - G[2]) * k], 1, grip); await frame(); }
++      for (let i = 1; i <= 18; i++) { const k = i / 18; await setHand('right', [Tx, hi[1] + (lo[1] - hi[1]) * k, Tz], 1, grip); await frame(); }
++      await frames(6);
++      const splashes0 = (await events()).filter((e) => e.type === 'lanternsplash').length;
++      await setHand('right', lo, 0, grip);
++      await frames(6);
++      ev = await events();
++      const lw = await world();
++      step('lantern-lotus-set-down', ev.filter((e) => e.type === 'lanternsplash').length > splashes0 && lw.lanterns[L2.index].state === 'floating', { lantern: lw.lanterns[L2.index], events: ev.filter((e) => e.type.startsWith('lantern')).slice(-3) });
++      await setHand('right', [0.25, 1.25, -0.4], 0, { curl: 0.6 });
++      await frames(144); // 4 s: warmth needs 2.5 s, then the bud opens over 5 s
++      ev = await events();
++      const fw = await world();
++      const warm = await page.evaluate((i) => { const f = window.__nocturneCtx.lotus.flowers[i]; return { warm: +f.warm.toFixed(2), near: f.warmNear, lanternIdx: f.lanternIdx, openSeconds: f.openSeconds }; }, B.index);
++      const bloom = ev.find((e) => e.type === 'lotusbloom' && e.detail?.cause === 'lantern' && e.detail?.index === B.index);
++      step('lantern-warms-lotus', !!bloom && fw.lotus[B.index].open && fw.lotus[B.index].bloom < 1 && fw.lanterns[L2.index].pads === true && warm.warm > 2.5,
++        { index: B.index, bloomAt: bloom?.t, flower: fw.lotus[B.index], lantern: fw.lanterns[L2.index], ...warm });
++      await shot('lantern_lotus.png');
++    }
++  }
++
+   // ---- fireflies: open hand, palm up, still for ~4 s
+   await setHand('right', [0.3, 1.3, -0.45], 0, { pitchDeg: 0, rollDeg: 180 });
+   await setHand('left', [-0.3, 1.3, -0.45], 0, { pitchDeg: 0, rollDeg: -180 });

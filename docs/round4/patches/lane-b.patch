@@ -1,0 +1,856 @@
+diff --git a/src/audio/music.js b/src/audio/music.js
+index 6da62e6..f0d5cf5 100644
+--- a/src/audio/music.js
++++ b/src/audio/music.js
+@@ -95,6 +95,7 @@ export const music = {
+       nextChordAt: now + 0.05, breathing: false, breathUntil: 0, breathAt: now + 180 + 120 * rng(),
+       nextDrop: now + 8 + 6 * rng(), dropArmed: true, drops: [], dropKind: 0,
+       lastSwell: -100, swellQueue: null, swellEnds: [], swellToggle: false,
++      hushing: false, // a hand rests on the water (hush.js): raindrops fall even though that hand is submerged
+     };
+     this._s = S;
+     S.arc = () => clamp((c.currentTime - S.t0) / SESSION_ARC, 0, 1);
+@@ -149,6 +150,8 @@ export const music = {
+ 
+     S.offs.push(ctx.events.on('lanternrelease', () => { S.swellToggle = !S.swellToggle; requestSwell(S, S.swellToggle ? 'pad_northern_brilliant' : 'pad_northern_swell', 0.35); }));
+     S.offs.push(ctx.events.on('lotuschord', () => requestSwell(S, 'pad_bioluminescence', 0.45)));
++    S.offs.push(ctx.events.on('hush', () => { S.hushing = true; }));
++    S.offs.push(ctx.events.on('hushend', () => { S.hushing = (ctx.hush?.strength || 0) > 0.02; })); // the other hand may still rest
+   },
+ 
+   update(api, ctx, dt) {
+@@ -182,13 +185,15 @@ export const music = {
+     }
+ 
+     // ---- raindrop notes when the world is calm
++    // (a hush overrides the submerged-hand rule — the resting hand is in the water — and the drops come closer together)
+     const anySub = !!ctx.hands?.list?.some((h) => h.visible && h.submerged);
+-    const calmWorld = energy < 0.15 && !anySub;
++    const calmWorld = (energy < 0.15 && !anySub) || S.hushing;
++    const gap = () => (S.hushing ? 3 + 4 * S.rng() : 6 + 8 * S.rng());
+     if (!calmWorld) S.dropArmed = false;
+-    else if (!S.dropArmed) { S.dropArmed = true; S.nextDrop = now + 6 + 8 * S.rng(); }
++    else if (!S.dropArmed) { S.dropArmed = true; S.nextDrop = now + gap(); }
+     if (calmWorld && now + LOOKAHEAD >= S.nextDrop) {
+       raindrop(S, Math.max(S.nextDrop, now + 0.01));
+-      S.nextDrop = Math.max(S.nextDrop, now) + 6 + 8 * S.rng();
++      S.nextDrop = Math.max(S.nextDrop, now) + gap();
+     }
+ 
+     // ---- queued swell
+diff --git a/src/audio/sfx.js b/src/audio/sfx.js
+index 1871206..f86fc79 100644
+--- a/src/audio/sfx.js
++++ b/src/audio/sfx.js
+@@ -9,7 +9,7 @@ import { CONFIG } from '../config.js';
+  * enter/exit plips and ticks, the calm-reward drone, and the aurora voice after a star is born.
+  *
+  * Node budget (persistent): bells 8 × 6 = 48, crackle 3 × 3 = 9, swish 2 × 2 = 4, glide 2,
+- * calm drone 5, noise sources 2 ≈ 70. HRTF only on the two hand swishes.
++ * calm drone 5, hand voices 2 × 5 = 10, noise sources 2 ≈ 80. HRTF only on the two hand swishes.
+  */
+ const LOOKAHEAD = 0.15;
+ const BELL_POOL = 8;
+@@ -116,6 +116,20 @@ export const sfx = {
+       S.calm = { o1, o2, g2, lp, g };
+     }
+ 
++    // ---- the hand voice: per hand, two sines on the chord's root and fifth two octaves up, low-passed, at the centroid of
++    // the fireflies strung out behind that hand; it breathes in as the strand fills (silent below one, full at ten)
++    S.voice = [];
++    for (let i = 0; i < 2; i++) {
++      const o1 = c.createOscillator(); o1.type = 'sine'; o1.frequency.value = mtof(84 + mod12(ROOT));
++      const o2 = c.createOscillator(); o2.type = 'sine'; o2.frequency.value = mtof(84 + mod12(ROOT + 7));
++      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2500; lp.Q.value = 0.5;
++      const g = c.createGain(); g.gain.value = 0.0001;
++      const pa = api.spatial({ refDistance: 1.0, rolloff: 1.2, out: S.out.chimes });
++      o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(pa.input);
++      o1.start(now); o2.start(now);
++      S.voice.push({ o1, o2, lp, g, pa });
++    }
++
+     // ---- events
+     const on = (name, fn) => S.offs.push(ctx.events.on(name, (e) => { try { fn(e || {}); } catch (err) { console.error('[sfx]', name, err); } }));
+     on('lotusbloom', (e) => onLotus(S, e));
+@@ -128,6 +142,8 @@ export const sfx = {
+     on('handexit', (e) => onHandExit(S, e));
+     on('drip', (e) => onDrip(S, e));
+     on('pinchmiss', (e) => { const p = hasXYZ(e.point) ? e.point : e.hand?.pinch?.point; if (hasXYZ(p)) noiseBurst(S, { pos: p, dur: 0.02, gain: 0.05, type: 'bandpass', freq: 2000, q: 3 }); });
++    on('hush', (e) => onHush(S, e));
++    on('fireflyfollow', (e) => onFollow(S, e));
+   },
+ 
+   update(api, ctx, dt) {
+@@ -159,14 +175,30 @@ export const sfx = {
+       // glide rush from the player's own wading
+       const speed = ctx.playerCtl?.state?.speed || 0;
+       S.glide.g.gain.setTargetAtTime(smoothstep(0.2, 1.0, speed) * 0.18, now, 0.15);
++      // the hand voices follow the strand behind each hand and swell with how much of it has arrived
++      const ff = ctx.fireflies;
++      for (let i = 0; i < S.voice.length; i++) {
++        const v = S.voice[i];
++        const n = ff?.followArrived ? ff.followArrived[i] : 0;
++        const cen = ff?.followCentroid;
++        if (cen && n > 0) v.pa.position.set(cen[i * 3], cen[i * 3 + 1], cen[i * 3 + 2]);
++        v.g.gain.setTargetAtTime(0.03 * smoothstep(0, 10, n), now, 0.3);
++      }
+     }
+ 
+     // ---- slow controls (4 Hz): calm drone
+     S.slowAcc += dt;
+     if (S.slowAcc >= 0.25) {
+       S.slowAcc = 0;
+-      const calm = Math.max(ctx.water?.calm || 0, ctx.calm || 0);
++      const calm = Math.max(ctx.water?.calm || 0, ctx.calm || 0, ctx.hush?.strength || 0); // a hush is calm too
+       S.calm.g.gain.setTargetAtTime(calm > 0.5 ? 0.06 : 0.0001, now, 1.5);
++      // the hand voices stay on the current chord
++      const ch = ctx.music?.currentChord;
++      const root = ch ? ch.root : mod12(ROOT), fifth = ch ? ch.fifth : mod12(ROOT + 7);
++      for (const v of S.voice) {
++        v.o1.frequency.setTargetAtTime(mtof(84 + mod12(root)), now, 0.3);
++        v.o2.frequency.setTargetAtTime(mtof(84 + mod12(fifth)), now, 0.3);
++      }
+     }
+ 
+     // ---- lantern crackle: nearest ≤ 3 lanterns re-evaluated every 0.5 s, positions every frame
+@@ -207,6 +239,7 @@ export const sfx = {
+     for (const sw of S.swish) { kill(sw.bp); try { sw.pa.dispose(); } catch { /* */ } }
+     kill(S.glide.lp); kill(S.glide.g);
+     kill(S.calm.o1); kill(S.calm.o2); kill(S.calm.g2); kill(S.calm.lp); kill(S.calm.g);
++    for (const v of S.voice || []) { kill(v.o1); kill(v.o2); kill(v.lp); kill(v.g); try { v.pa.dispose(); } catch { /* */ } }
+     kill(S.noiseWhite); kill(S.noisePink);
+   },
+ 
+@@ -356,6 +389,25 @@ function onLanternStar(S, e) {
+   S.auroraNotes = S.playerNotes.slice(-4);
+ }
+ 
++// a hush takes under a resting palm: a low ceramic bowl on the chord root, struck so softly (120 ms) that it seems to
++// have been there already, half in the reverb, with a real bowl an octave up under it
++function onHush(S, e) {
++  const pos = hasXYZ(e.pos) ? e.pos : (hasXYZ(e.hand?.palm?.position) ? e.hand.palm.position : S.head());
++  const root = S.ctx.music?.currentChord?.root ?? mod12(ROOT);
++  const midi = 48 + mod12(root);
++  triggerBell(S, { midi, pos, gain: 0.22, dur: 6, kind: 'ceramic', attack: 0.12, wet: 0.5, tag: 'hush' });
++  const layer = pickTuned(S, BOWLS, midi + 12);
++  if (layer) playAt(S, layer.name, pos, { gain: 0.16, rate: layer.rate, refDistance: 2, out: S.out.chimes });
++}
++
++// a firefly takes its place in the ribbon behind a hand: a small glass bell for the first, a higher one for the eighth
++function onFollow(S, e) {
++  const pos = hasXYZ(e.pos) ? e.pos : (hasXYZ(e.hand?.palm?.position) ? e.hand.palm.position : S.head());
++  const n = e.count | 0;
++  if (n === 1) triggerBell(S, { midi: pitchFor(S, 2, 6), pos, gain: 0.10, dur: 1.2, kind: 'glass', wet: 0.5, tag: 'ribbon' });
++  else if (n === 8) triggerBell(S, { midi: pitchFor(S, 4, 6), pos, gain: 0.12, dur: 1.2, kind: 'glass', wet: 0.5, tag: 'ribbon' });
++}
++
+ function onHandEnter(S, e) {
+   const h = e.hand;
+   const pos = hasXYZ(h?.palm?.position) ? h.palm.position : null;
+diff --git a/src/main.js b/src/main.js
+index 390b8e8..0ceff63 100644
+--- a/src/main.js
++++ b/src/main.js
+@@ -87,7 +87,7 @@ async function boot() {
+   ctx.audio.load().catch((e) => console.warn('[audio] decode failed', e)); // decoding needs no gesture
+   // event log for the harness / debugging
+   ctx.eventLog = [];
+-  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'starborn', 'lotusbloom', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart', 'leave', 'drip']) {
++  for (const type of ['grab', 'pinchstart', 'pinchend', 'pinchmiss', 'handenter', 'handexit', 'lanterngrab', 'lanternrelease', 'lanternsplash', 'lanternstar', 'starborn', 'lotusbloom', 'lotuschord', 'fireflyland', 'calibrated', 'xrstart', 'xrend', 'moonset', 'meteor', 'audiostart', 'leave', 'drip', 'hush', 'hushend', 'fireflyfollow']) {
+     ctx.events.on(type, (e) => { if (ctx.eventLog.length < 500) ctx.eventLog.push({ type, t: +ctx.time.t.toFixed(2), detail: summarize(e) }); });
+   }
+   function summarize(e) {
+@@ -210,8 +210,10 @@ async function boot() {
+       calibrated: ctx.playerCtl.state.calibrated, seated: ctx.playerCtl.state.seated, calm: ctx.calm,
+       moonAltitudeDeg: ctx.sky?.moonAltitudeDeg, lanternStars: ctx.sky?.lanternStarCount?.(), aurora: ctx.aurora?.intensity,
+       lanterns: ctx.lanterns?.count, fireflies: ctx.fireflies?.count, fireflyLanded: ctx.fireflies?.landedCount, lotusOpen: ctx.lotus?.flowers?.filter((f) => f.open).length,
++      fireflyFollowers: ctx.fireflies?.followers ? [ctx.fireflies.followers[0], ctx.fireflies.followers[1]] : [0, 0],
++      fireflyFollowArrived: ctx.fireflies?.followArrived ? [ctx.fireflies.followArrived[0], ctx.fireflies.followArrived[1]] : [0, 0],
+       player: { x: player.position.x, y: player.position.y, z: player.position.z },
+-      water: ctx.water.level,
++      water: ctx.water.level, hush: ctx.hush?.strength,
+     }),
+     ctx,
+   };
+diff --git a/src/world/fireflies.js b/src/world/fireflies.js
+index b7ae8cc..6191724 100644
+--- a/src/world/fireflies.js
++++ b/src/world/fireflies.js
+@@ -14,6 +14,10 @@ import { FIREFLY_VERT, FIREFLY_MIRROR_VERT, FIREFLY_FRAG } from '../shaders/fire
+  *    last, then the middle knuckle); they ease in and land on the tip, glow steadily, then leave
+  *    with an upward burst when the hand moves, dips, disappears, or after 8–18 s
+  *  - a fast hand scatters everything within 0.6 m
++ *  - the ribbon: an open hand carried slowly through the dark, palm up, recruits fireflies one by one
++ *    from the nearest cloud; they fly in and then string out along the path the hand has taken (a
++ *    distance-sampled trail, 8 cm apart), so the strand follows every slow curve. Stop, and the hand
++ *    becomes an open still hand: the nearest of them take the landing slots; move fast and they scatter
+  * Per-firefly flash, shaped like a Photinus flash: a fast rise (~0.15 s), a slower decay (~0.5 s) and a
+  * dim ember in between, repeating every 1.4–3.2 s; ~15% are long-glowers that breathe slowly instead.
+  * Loose synchrony: every SYNC.dt each home cloud's flashers are nudged toward the cloud's mean phase
+@@ -23,7 +27,7 @@ import { FIREFLY_VERT, FIREFLY_MIRROR_VERT, FIREFLY_FRAG } from '../shaders/fire
+  * audio module (positions, brightness, states, homes, per-cloud coherence).
+  */
+ 
+-const WANDER = 0, APPROACH = 1, LANDED = 2, SCATTER = 3;
++const WANDER = 0, APPROACH = 1, LANDED = 2, SCATTER = 3, FOLLOW = 5;   // 4 is reserved for the escort
+ // landing spots, in the order they fill: fingertips, but also knuckles and the palm so they don't all perch on the tips
+ const SLOT_JOINTS = ['index-finger-tip', 'middle-finger-phalanx-proximal', 'ring-finger-tip', 'index-finger-metacarpal', 'thumb-tip', 'pinky-finger-tip', 'middle-finger-tip', 'ring-finger-phalanx-proximal'];
+ const SLOTS = SLOT_JOINTS.length;
+@@ -48,6 +52,15 @@ const FLASH = { rise: 0.15, decay: 0.5, ember: 0.035 };
+ // synchrony: pass interval, peak coupling (rad/s; the clouds' natural rates spread over ~2–4.5 rad/s, so
+ // this locks most of a cloud at its peak and none of it near zero), and the swell period per cloud
+ const SYNC = { dt: 0.25, kMax: 2.4, swell: [26, 34, 41] };
++// the ribbon: the hand must drift sideways (m/s) with its palm up; a pause or a tracking blip within the graces keeps
++// the gesture; recruiting starts after recruitAfter s and adds one firefly per recruitEvery s up to max (× particleScale).
++// The trail is sampled every sampleStep m into a ring (5 m); follower k sits spacing samples behind follower k-1,
++// lift m above the palm; a follower more than inbound m from the hand flies to the hand first, then joins the strand.
++export const RIB = {
++  speedMin: 0.05, speedMax: 0.35, breakSpeed: 0.5, normalY: 0.15,
++  pauseGrace: 0.4, lostGrace: 0.4, recruitAfter: 0.5, recruitEvery: 0.3, max: 16,
++  sampleStep: 0.02, ring: 256, spacing: 4, lift: 0.09, inbound: 0.3, releaseCooldown: 4,
++};
+ 
+ function mulberry32(a) {
+   return function () {
+@@ -156,18 +169,42 @@ export const fireflies = {
+     const syncPsi = new Float32Array(HOME_SPECS.length), syncGain = new Float32Array(HOME_SPECS.length);
+     const coherence = new Float32Array(HOME_SPECS.length);   // Kuramoto order parameter R per cloud, 0..1
+ 
+-    ctx.fireflies = { count: N, landedCount: 0, positions: pos, brightness: bright, states: state, homes, coherence };
++    // ---- the ribbon: per-firefly follow state and per-hand gesture state (its own PRNG so the cloud layout above is unchanged)
++    const followHand = new Int8Array(N).fill(-1), followIdx = new Int8Array(N).fill(-1);
++    const followPhase = new Uint8Array(N);          // 0 inbound (flying to the hand), 1 on the strand, 2 arrived at its sample
++    const followOff = new Float32Array(N * 3);      // a fixed ±3 cm offset per firefly so the strand is not a string of beads
++    const rnd2 = mulberry32(0x5EED6);
++    for (let i = 0; i < N * 3; i++) followOff[i] = (rnd2() - 0.5) * 0.06;
++    const ribMax = Math.max(1, Math.round(RIB.max * (ctx.quality.particleScale || 1)));
++    const rib = {
++      max: ribMax,
++      slowFor: new Float32Array(2), pauseT: new Float32Array(2), lostT: new Float32Array(2), followT: new Float32Array(2),
++      drifting: [false, false], hold: [false, false],
++      slots: new Int16Array(2 * ribMax).fill(-1),           // follower index k per hand → firefly, so k is unique
++      trail: [new Float32Array(3 * RIB.ring), new Float32Array(3 * RIB.ring)],
++      trailHead: new Int16Array(2), trailN: new Int16Array(2),   // head = next write slot; head-1 is the newest sample
++      trailLast: [new THREE.Vector3(), new THREE.Vector3()], T: new THREE.Vector3(),
++      followers: new Int16Array(2), followArrived: new Int16Array(2), followCentroid: new Float32Array(6),
++      cnt: new Int16Array(4), newArr: new Int16Array(2),   // this frame's followers/arrived per hand, arrivals this frame
++    };
++
++    ctx.fireflies = {
++      count: N, landedCount: 0, positions: pos, brightness: bright, states: state, homes, coherence,
++      followers: rib.followers, followArrived: rib.followArrived, followCentroid: rib.followCentroid,
++    };
+ 
+     this._ = {
+       N, rnd, pos, vel, bright, seed, homeIdx, homeOff, state, slotHand, slotIdx, timer, stay, cooldown, period, phase, steady,
+       homes, homeRel, following: false, geo, posAttr, brightAttr, matMain, matMirror, points, mirror, slots, recruitT, hf,
+       syncT: SYNC.dt, syncAcc, syncPsi, syncGain, coherence,
++      followHand, followIdx, followPhase, followOff, rib,
+     };
+   },
+ 
+   update(ctx, dt) {
+     const S = this._;
+     const { N, rnd, pos, vel, bright, seed, homeIdx, homeOff, state, slotHand, slotIdx, timer, stay, cooldown, period, phase, steady, homes, homeRel, slots, recruitT, hf } = S;
++    const { followHand, followIdx, followPhase, followOff, rib } = S;
+     const t = ctx.time.t;
+     const level = ctx.water.level;
+     const { renderer, camera } = ctx;
+@@ -225,6 +262,54 @@ export const fireflies = {
+       hf.still[hi] = !!hs && (hs.still || hs.speed < stillSpeed);
+     }
+ 
++    // ---- the ribbon gesture: an open hand, palm up, drifting sideways at 5–35 cm/s. Followers stay for as long as
++    // the hand is open, above the water, not pinching and under breakSpeed — stopped or not (a stop is how they land);
++    // the drift accumulator (which gates recruiting) survives a pause or a tracking blip within the graces.
++    for (let hi = 0; hi < 2; hi++) {
++      const hs = hands[hi];
++      const sp = hs ? hs.palm.speed : 0;
++      let hold = !!hs && !hs.submerged && !hs.pinch.active && !hs.grabbed && hs.open && sp <= RIB.breakSpeed;
++      if (hold && !hs.visible) { rib.lostT[hi] += dt; if (rib.lostT[hi] >= RIB.lostGrace) hold = false; }
++      else rib.lostT[hi] = 0;
++      const poseOk = hold && hs.visible && hs.active && hs.palm.normal.y > RIB.normalY;
++      const drifting = poseOk && !hs.still && sp >= RIB.speedMin && sp <= RIB.speedMax && hs.palm.speedH >= 0.6 * sp;
++      if (drifting) { rib.slowFor[hi] += dt; rib.pauseT[hi] = 0; }
++      else if (poseOk && sp <= RIB.speedMax && (sp < RIB.speedMin || hs.still) && rib.pauseT[hi] < RIB.pauseGrace) rib.pauseT[hi] += dt;
++      else if (hold && !hs.visible) { /* lost within the grace: keep the accumulator */ }
++      else rib.slowFor[hi] = 0;
++      rib.drifting[hi] = drifting; rib.hold[hi] = hold;
++      rib.followT[hi] -= dt;
++      const hasFollowers = rib.followers[hi] > 0;
++      if (!hold) {
++        if (hasFollowers) releaseFollowers(hi);
++        rib.trailN[hi] = 0; rib.trailHead[hi] = 0;
++        continue;
++      }
++      if (!hasFollowers && !drifting) { rib.trailN[hi] = 0; rib.trailHead[hi] = 0; continue; }   // nothing to lead: start the trail afresh
++      if (!hs.visible) continue;
++      // the trail: samples of the point 9 cm above the palm, every 2 cm of travel (distance-based, so the strand keeps its spacing at any speed)
++      const pp = hs.palm.position, pn = hs.palm.normal, T = rib.T;
++      T.set(pp.x + pn.x * RIB.lift, pp.y + pn.y * RIB.lift, pp.z + pn.z * RIB.lift);
++      if (rib.trailN[hi] === 0 || T.distanceTo(rib.trailLast[hi]) >= RIB.sampleStep) {
++        const tr = rib.trail[hi], h3 = rib.trailHead[hi] * 3;
++        tr[h3] = T.x; tr[h3 + 1] = T.y; tr[h3 + 2] = T.z;
++        rib.trailHead[hi] = (rib.trailHead[hi] + 1) % RIB.ring;
++        if (rib.trailN[hi] < RIB.ring) rib.trailN[hi]++;
++        rib.trailLast[hi].copy(T);
++      }
++    }
++    function releaseFollowers(hi) {
++      const base = hi * rib.max;
++      for (let k = 0; k < rib.max; k++) {
++        const i = rib.slots[base + k];
++        if (i < 0) continue;
++        rib.slots[base + k] = -1;
++        if (followHand[i] !== hi) continue;
++        followHand[i] = -1; followIdx[i] = -1;
++        if (state[i] === FOLLOW) { state[i] = WANDER; cooldown[i] = RIB.releaseCooldown; }
++      }
++    }
++
+     // ---- recruiting: an open still hand pulls one wandering firefly per slot, staggered in time
+     for (let hi = 0; hi < 2; hi++) {
+       recruitT[hi] -= dt;
+@@ -247,11 +332,61 @@ export const fireflies = {
+       }
+     }
+ 
++    // ---- ribbon recruiting: once the hand has drifted for recruitAfter s, the nearest free wanderer joins every recruitEvery s
++    for (let hi = 0; hi < 2; hi++) {
++      if (!rib.hold[hi] || rib.slowFor[hi] <= RIB.recruitAfter || rib.followT[hi] > 0) continue;
++      const base = hi * rib.max;
++      let k = -1;
++      for (let s = 0; s < rib.max; s++) { if (rib.slots[base + s] < 0) { k = s; break; } }
++      if (k < 0) continue;
++      const pp = hands[hi].palm.position;
++      let best = -1, bestD = P.recruitRange * P.recruitRange;
++      for (let i = 0; i < N; i++) {
++        if (state[i] !== WANDER || cooldown[i] > 0) continue;
++        const dx = pos[i * 3] - pp.x, dy = pos[i * 3 + 1] - pp.y, dz = pos[i * 3 + 2] - pp.z;
++        const d2 = dx * dx + dy * dy + dz * dz;
++        if (d2 < bestD) { bestD = d2; best = i; }
++      }
++      if (best >= 0) {
++        state[best] = FOLLOW; followHand[best] = hi; followIdx[best] = k; followPhase[best] = 0; rib.slots[base + k] = best;
++        rib.followT[hi] = RIB.recruitEvery;
++      }
++    }
++
+     const releaseSlot = (i) => {
+       const sh = slotHand[i];
+       if (sh >= 0) { const ss = slotIdx[i]; if (slots[sh][ss] === i) slots[sh][ss] = -1; }
+       slotHand[i] = -1; slotIdx[i] = -1;
++      const fh = followHand[i];
++      if (fh >= 0) { const fk = fh * rib.max + followIdx[i]; if (rib.slots[fk] === i) rib.slots[fk] = -1; }
++      followHand[i] = -1; followIdx[i] = -1;
+     };
++
++    // ---- hand-off: a hand with followers that is open and still gives its free landing slots to the nearest of them; they
++    // land through the ordinary approach path (the rest keep hovering on their samples and step in as slots free up)
++    for (let hi = 0; hi < 2; hi++) {
++      if (!hf.attract[hi] || rib.followers[hi] === 0) continue;
++      const hs = hands[hi], base = hi * rib.max;
++      for (let s = 0; s < SLOTS; s++) {
++        if (slots[hi][s] >= 0) continue;
++        const j = hs.joints[SLOT_JOINTS[s]];
++        if (!j.valid) continue;
++        let best = -1, bestK = -1, bestD = Infinity;
++        for (let k = 0; k < rib.max; k++) {
++          const i = rib.slots[base + k];
++          if (i < 0 || state[i] !== FOLLOW) continue;
++          const dx = pos[i * 3] - j.position.x, dy = pos[i * 3 + 1] - j.position.y, dz = pos[i * 3 + 2] - j.position.z;
++          const d2 = dx * dx + dy * dy + dz * dz;
++          if (d2 < bestD) { bestD = d2; best = i; bestK = k; }
++        }
++        if (best < 0) break;
++        rib.slots[base + bestK] = -1; followHand[best] = -1; followIdx[best] = -1;
++        state[best] = APPROACH; slotHand[best] = hi; slotIdx[best] = s; slots[hi][s] = best;
++      }
++    }
++    rib.cnt.fill(0); rib.newArr.fill(0);
++    const cen = rib.followCentroid;
++    cen.fill(0);
+     // burst away along (ax, ay, az) with an upward bias; enters SCATTER for ~1 s
+     const burst = (i, ax, ay, az, strength) => {
+       let l = Math.hypot(ax, ay, az);
+@@ -334,6 +469,63 @@ export const fireflies = {
+         }
+       }
+ 
++      if (st === FOLLOW) {
++        const hi = followHand[i], k = followIdx[i];
++        if (hi < 0 || rib.slots[hi * rib.max + k] !== i || !rib.hold[hi]) {
++          releaseSlot(i); st = WANDER; cooldown[i] = RIB.releaseCooldown;
++        } else {
++          const hs = hands[hi];
++          const pp = hs.palm.position, pn = hs.palm.normal;
++          const Tx = pp.x + pn.x * RIB.lift, Ty = pp.y + pn.y * RIB.lift, Tz = pp.z + pn.z * RIB.lift;
++          // this follower's place: spacing samples behind the previous one (the oldest sample while the trail is short), plus its own offset
++          let tx, ty, tz;
++          const n = rib.trailN[hi];
++          if (n > 0) {
++            let back = RIB.spacing * (k + 1);
++            if (back > n - 1) back = n - 1;
++            const s3 = ((rib.trailHead[hi] - 1 - back + RIB.ring * 2) % RIB.ring) * 3;
++            const tr = rib.trail[hi];
++            tx = tr[s3] + followOff[i3]; ty = tr[s3 + 1] + followOff[i3 + 1]; tz = tr[s3 + 2] + followOff[i3 + 2];
++          } else { tx = Tx + followOff[i3]; ty = Ty + followOff[i3 + 1]; tz = Tz + followOff[i3 + 2]; }
++          let dx = tx - x, dy = ty - y, dz = tz - z;
++          let d = Math.sqrt(dx * dx + dy * dy + dz * dz);
++          let ph = followPhase[i];
++          if (ph === 0) {
++            // inbound: fly to the hand itself; join the strand once within reach of it
++            const ex = Tx - x, ey = Ty - y, ez = Tz - z;
++            const dT = Math.sqrt(ex * ex + ey * ey + ez * ez);
++            if (dT < RIB.inbound) ph = 1;
++            else { dx = ex; dy = ey; dz = ez; d = dT; }
++          }
++          if (ph > 0) {
++            if (d < RIB.inbound) {
++              if (ph === 1) {
++                ph = 2;
++                const count = rib.followArrived[hi] + (++rib.newArr[hi]);   // followArrived still holds last frame's total here
++                ctx.events.emit('fireflyfollow', { hand: hs, pos: new THREE.Vector3(x, y, z), count });
++              }
++            } else if (ph === 2 && d > RIB.inbound + 0.2) ph = 1;   // fell behind: dim again, chime again on return
++          }
++          followPhase[i] = ph;
++          // the approach easing, with the same wobble
++          const sp = Math.min(P.approachMax, 0.08 + d * 2.2);
++          const inv = d > 1e-5 ? sp / d : 0;
++          const s1 = seed[i] * 97, wob = 0.12 * Math.min(1, d);
++          const dvx = dx * inv + wob * Math.sin(t * 5.1 + s1);
++          const dvy = dy * inv + wob * Math.sin(t * 4.3 + s1 * 1.7);
++          const dvz = dz * inv + wob * Math.cos(t * 4.7 + s1 * 0.5);
++          const kk = Math.min(1, dt * 3.5);
++          vx += (dvx - vx) * kk; vy += (dvy - vy) * kk; vz += (dvz - vz) * kk;
++          x += vx * dt; y += vy * dt; z += vz * dt;
++          rib.cnt[hi]++;
++          if (ph === 2) {
++            bright[i] = 0.7 + 0.2 * Math.sin(t * 2.1 + seed[i] * 31);
++            rib.cnt[2 + hi]++;
++            cen[hi * 3] += x; cen[hi * 3 + 1] += y; cen[hi * 3 + 2] += z;
++          } else bright[i] = Math.max(blink(i), 0.35);
++        }
++      }
++
+       if (st === LANDED) {
+         const hi = slotHand[i], hs = hands[hi], s = slotIdx[i];
+         const j = hs.joints[SLOT_JOINTS[s]];
+@@ -432,5 +624,13 @@ export const fireflies = {
+     S.posAttr.needsUpdate = true;
+     S.brightAttr.needsUpdate = true;
+     ctx.fireflies.landedCount = landed;
++    // the ribbon's counters and the centroid of each hand's arrived followers (the hand itself while there are none)
++    for (let hi = 0; hi < 2; hi++) {
++      rib.followers[hi] = rib.cnt[hi];
++      const na = rib.cnt[2 + hi];
++      rib.followArrived[hi] = na;
++      if (na > 0) { cen[hi * 3] /= na; cen[hi * 3 + 1] /= na; cen[hi * 3 + 2] /= na; }
++      else if (hands[hi]) { const pp = hands[hi].palm.position; cen[hi * 3] = pp.x; cen[hi * 3 + 1] = pp.y; cen[hi * 3 + 2] = pp.z; }
++    }
+   },
+ };
+diff --git a/src/world/hints.js b/src/world/hints.js
+index d584b3a..ff2ffc5 100644
+--- a/src/world/hints.js
++++ b/src/world/hints.js
+@@ -17,6 +17,8 @@ const HINTS = [
+   { id: 'still', text: 'hold a hand open and still', after: 95, done: (ctx, s) => s.fireflyLanded, ready: (ctx, s) => s.touchedWater },
+   { id: 'wade', text: 'pinch the water and pull it toward you', after: 60, done: (ctx, s) => s.moved, ready: (ctx, s) => s.touchedWater && (nearestLantern(ctx) > REACH + 0.2 || nearestLotus(ctx) > REACH + 0.2) },
+   { id: 'turn', text: 'pinch with both hands and turn them to look around', after: 150, done: (ctx, s) => s.turned, ready: (ctx, s) => s.moved && ctx.playerCtl.state.seated },
++  { id: 'hush', text: 'rest a hand flat on the water and be still', after: 140, done: (ctx, s) => s.hushed, ready: (ctx, s) => s.touchedWater },
++  { id: 'ribbon', text: 'move an open hand slowly and they follow', after: 130, done: (ctx, s) => s.followed, ready: (ctx, s) => s.touchedWater },
+ ];
+ const LEAVE = { id: 'leave', text: 'keep your palms together to leave', repeat: true };
+ const SHOW_HANDS = { id: 'hands', text: 'show your hands to the headset', repeat: true };
+@@ -63,11 +65,13 @@ export const hints = {
+     mesh.renderOrder = 1; mesh.frustumCulled = false; mesh.visible = false; mesh.name = 'hint';
+     ctx.scene.add(mesh);
+ 
+-    const s = { handsSeen: false, touchedWater: false, grabbed: false, fireflyLanded: false, moved: false, turned: false, bloomed: false, sessionStart: -1, handsLostSince: -1, noTracking: false, shows: {} };
++    const s = { handsSeen: false, touchedWater: false, grabbed: false, fireflyLanded: false, moved: false, turned: false, bloomed: false, hushStarted: false, hushed: false, followed: false, sessionStart: -1, handsLostSince: -1, noTracking: false, shows: {} };
+     ctx.events.on('handenter', () => { s.touchedWater = true; });
+     ctx.events.on('grab', () => { s.grabbed = true; });
+     ctx.events.on('fireflyland', () => { s.fireflyLanded = true; });
+     ctx.events.on('lotusbloom', () => { s.bloomed = true; });
++    ctx.events.on('hush', () => { s.hushStarted = true; });
++    ctx.events.on('fireflyfollow', () => { s.followed = true; });
+     const startSession = (e) => { s.sessionStart = ctx.time.t; s.noTracking = !!(e && e.hasHands === false); s.handsSeen = false; s.handsLostSince = -1; s.shows = {}; st.current = null; st.cooldownUntil = 0; };
+     ctx.events.on('xrstart', startSession);
+     ctx.events.on('desktopstart', startSession);
+@@ -104,6 +108,7 @@ export const hints = {
+     if (!s.handsSeen && ctx.hands.list.some((h) => h.tracked)) s.handsSeen = true;
+     if (!s.moved && (ctx.playerCtl.state.speed > 0.25 || (ctx.playerCtl.state.pullSpeed || 0) > 0.2)) s.moved = true;
+     if (!s.turned && Math.abs(ctx.playerCtl.state.turnRate || 0) > 0.15) s.turned = true;
++    if (!s.hushed && s.hushStarted && (ctx.hush?.strength || 0) >= 0.8) s.hushed = true; // learned once the circle has fully taken
+     const anyTracked = ctx.hands.list.some((h) => h.tracked);
+     const presenting = ctx.renderer.xr.isPresenting;
+     if (presenting && s.handsSeen) { if (!anyTracked) { if (s.handsLostSince < 0) s.handsLostSince = t; } else s.handsLostSince = -1; }
+diff --git a/src/world/hush.js b/src/world/hush.js
+new file mode 100644
+index 0000000..28ee0b2
+--- /dev/null
++++ b/src/world/hush.js
+@@ -0,0 +1,109 @@
++import * as THREE from 'three';
++
++/**
++ * Hush. Rest an open palm flat on the water and keep it there: after a moment a circle of perfect
++ * stillness spreads from under the hand. Ripples die at its edge, the plankton go dark inside it and the
++ * stars come up through the glass-still disc; a bowl note holds and raindrop notes begin to fall
++ * (sfx/music). Lifting the hand lets the lake breathe again.
++ *
++ * No geometry of its own: two circles (one per hand) are written into two vec4 uniforms every frame —
++ * ctx.water.hush.data for the wave sim (uv centre, uv radius, strength) and ctx.water.hushWorld for the
++ * surface shader (world x, z, radius, strength). wavesim and water run before this module, so they read
++ * the previous frame's values: a one-frame lag nobody can see, and no dependence on module order.
++ * Exposes ctx.hush = { strength, circles: [{ x, z, r, s, active }, …], count } for the audio, the hints
++ * and the harness. Events: 'hush' { hand, pos } when a circle takes, 'hushend' { hand } when it is gone.
++ */
++const HUSH = {
++  normalY: -0.8,   // palm facing down
++  yMin: -0.05,     // palm joint height above the surface, metres: pressed deeper than 5 cm gets nothing
++  yMax: 0.03,
++  hold: 0.6,       // seconds of the pose before the circle takes
++  holdDecay: 3,    // the hold undoes itself ×3 faster than it accrues
++  tauIn: 0.8,      // strength ease in / out, seconds
++  tauOut: 1.2,
++  r0: 0.25,        // radius under the hand at first, metres
++  r1: 1.2,         // fully grown
++  grow: 3.0,       // seconds to grow (ease-out cubic)
++  follow: 1.0,     // the centre drifts after the palm at this fraction per second
++  onAt: 0.05,      // strength thresholds for the events
++  offAt: 0.02,
++  calmGain: 0.6,   // how much a full hush counts as calm for the sim damping and the surface (used in wavesim/water)
++};
++const easeOutCubic = (u) => 1 - Math.pow(1 - u, 3);
++const frac = (v) => v - Math.floor(v);
++
++export const hush = {
++  name: 'hush',
++  init(ctx) {
++    if (!ctx.water.hush || !ctx.water.hushWorld) throw new Error('hush needs the wave sim (ctx.water.hush)');
++    const circles = [];
++    for (let i = 0; i < 2; i++) circles.push({ x: 0, z: 0, r: 0, s: 0, hold: 0, growT: 0, rGrown: HUSH.r0, active: false, wasActive: false, prevPose: false });
++    ctx.hush = { strength: 0, circles, count: 0 };
++    this._ = { circles, tile: ctx.water.tileSize };
++    // a session change (or the desktop fallback) starts clean; the arrays go to zero on the next update
++    const reset = () => { for (const c of circles) { c.active = false; c.wasActive = false; c.hold = 0; c.s = 0; c.r = 0; c.prevPose = false; } ctx.hush.strength = 0; ctx.water.hush.strength = 0; };
++    ctx.events.on('xrstart', reset);
++    ctx.events.on('xrend', reset);
++  },
++
++  update(ctx, dt) {
++    const { circles, tile } = this._;
++    const level = ctx.water.level;
++    const hw = ctx.water.hushWorld, hd = ctx.water.hush.data;
++    let strength = 0;
++    for (let hi = 0; hi < 2; hi++) {
++      const h = ctx.hands.list[hi], c = circles[hi];
++      // the pose: open, palm down, the palm joint within a few centimetres of the surface (the pads dip: h.still
++      // is computed regardless of submersion), still, not pinching and not holding anything
++      let pose = false;
++      if (h && h.visible && h.active && h.open && h.still && !h.pinch.active && !h.grabbed && h.palm.normal.y < HUSH.normalY) {
++        const dy = h.palm.position.y - level;
++        pose = dy >= HUSH.yMin && dy <= HUSH.yMax;
++      }
++      if (pose) c.hold = Math.min(HUSH.hold, c.hold + dt); else c.hold = Math.max(0, c.hold - HUSH.holdDecay * dt);
++
++      if (!c.active && pose && c.hold >= HUSH.hold) {
++        c.active = true; c.wasActive = false;
++        c.x = h.palm.position.x; c.z = h.palm.position.z;
++        c.r = HUSH.r0; c.rGrown = HUSH.r0; c.s = 0; c.growT = 0;
++        ctx.hush.count++;
++      }
++      if (c.active) {
++        if (pose) {
++          // the pose came back while the circle was fading: carry the growth on from the radius it has now, no pop
++          if (!c.prevPose && c.r < c.rGrown) c.growT = HUSH.grow * (1 - Math.cbrt(Math.max(0, 1 - (c.r - HUSH.r0) / (HUSH.r1 - HUSH.r0))));
++          c.s += (1 - c.s) * (1 - Math.exp(-dt / HUSH.tauIn));
++          const k = Math.min(1, HUSH.follow * dt);
++          c.x += (h.palm.position.x - c.x) * k;
++          c.z += (h.palm.position.z - c.z) * k;
++          c.growT += dt;
++          c.rGrown = HUSH.r0 + (HUSH.r1 - HUSH.r0) * easeOutCubic(Math.min(1, c.growT / HUSH.grow));
++          c.r = c.rGrown;
++        } else {
++          // the hand lifts (or tracking goes): the stillness dissolves, the disc shrinking no faster than it fades
++          c.s += (0 - c.s) * (1 - Math.exp(-dt / HUSH.tauOut));
++          c.r = Math.max(HUSH.r0, c.rGrown * c.s);
++        }
++        if (!c.wasActive && c.s >= HUSH.onAt) {
++          c.wasActive = true;
++          ctx.events.emit('hush', { hand: h, pos: h.palm.position.clone() });
++        }
++        // gone: below the off threshold after it took, or the pose broke before it ever took
++        if (c.s < HUSH.offAt && (c.wasActive || !pose)) {
++          if (c.wasActive) ctx.events.emit('hushend', { hand: h });
++          c.active = false; c.wasActive = false; c.s = 0; c.r = 0; c.hold = 0;
++        }
++      }
++      c.prevPose = pose;
++      if (c.s > strength) strength = c.s;
++      // the two uniforms: world metres for the surface, tile uv for the sim
++      const o = hi * 4;
++      hw[o] = c.x; hw[o + 1] = c.z; hw[o + 2] = c.r; hw[o + 3] = c.s;
++      hd[o] = frac(c.x / tile); hd[o + 1] = frac(c.z / tile); hd[o + 2] = c.r / tile; hd[o + 3] = c.s;
++    }
++    ctx.hush.strength = strength;
++    ctx.water.hush.strength = strength;
++  },
++};
++
++export { HUSH };
+diff --git a/src/world/index.js b/src/world/index.js
+index be519ee..33ce0a7 100644
+--- a/src/world/index.js
++++ b/src/world/index.js
+@@ -12,6 +12,7 @@ import { mist } from './mist.js';
+ import { lotus } from './lotus.js';
+ import { lanterns } from './lanterns.js';
+ import { fireflies } from './fireflies.js';
++import { hush } from './hush.js';
+ import { leave } from './leave.js';
+ 
+-export const WORLD_MODULES = [wavesim, water, sky, aurora, plankton, drips, shore, mist, lotus, lanterns, fireflies, leave, hints];
++export const WORLD_MODULES = [wavesim, water, sky, aurora, plankton, drips, shore, mist, lotus, lanterns, fireflies, hush, leave, hints];
+diff --git a/src/world/water.js b/src/world/water.js
+index a81bff9..8cc9a62 100644
+--- a/src/world/water.js
++++ b/src/world/water.js
+@@ -46,6 +46,7 @@ export const water = {
+       uPatchHalf: { value: W.nearPatch / 2 },
+       uLights: { value: new Float32Array(MAX_LIGHTS * 4) }, // nearest lanterns: xyz, brightness
+       uLightColor: { value: new THREE.Color(CONFIG.colors.lantern) },
++      uHush: { value: new Float32Array(8) }, // hush circles: world x, z, radius, strength (copied from ctx.water.hushWorld)
+     };
+     // Two meshes share these uniforms: a flat far plane, and a near patch around the player whose vertices are
+     // displaced by the wave simulation so ripples from your fingers are real geometry, not just lighting.
+@@ -69,6 +70,7 @@ export const water = {
+         uniform mat3 uSkyInv; uniform float uSkyExposure, uTime, uTile, uSimTexel, uAlpha, uMoonStrength, uFogDensity, uCalm, uDebug, uHeightScale, uPatchHalf;
+         uniform vec3 uDeep, uPlankton, uPlankton2, uMoonDir, uMoonColor, uFogColor, uPlayer, uAurora, uLightColor;
+         uniform vec4 uLights[${MAX_LIGHTS}];
++        uniform vec4 uHush[2];
+         varying vec3 vWorld;
+         ${GLSL_GAL_UV}
+         ${GLSL_HASH}
+@@ -92,6 +94,16 @@ export const water = {
+           vec2 nxy = (n0.xy * 1.0 + n1.xy * 0.9 + n2.xy * 0.35) * detail * (0.55 - 0.25 * uCalm);
+           // --- wave simulation gradient
+           float dPlayer = length(p - uPlayer.xz);
++          // --- hush: a resting hand's disc of still water. hf = 1 inside, soft edge over the outer 40 % of the
++          // radius; hedge is the thin ring of plankton light on the spreading front (gone once fully grown)
++          float hf = 0.0, hedge = 0.0;
++          for (int i = 0; i < 2; i++) {
++            vec2 hd = p - uHush[i].xy;
++            float hrad = max(uHush[i].z, 1e-3);
++            float hl = length(hd);
++            hf = max(hf, uHush[i].w * (1.0 - smoothstep(0.6 * hrad, hrad, hl)));
++            hedge += 0.10 * uHush[i].w * (1.0 - smoothstep(0.0, 0.035, abs(hl - hrad))) * max(0.0, 1.0 - hrad / 1.2);
++          }
+           float simFade = 1.0 - smoothstep(6.0, 8.5, dPlayer);
+           vec2 suv = fract(p / uTile);
+           vec4 sim = texture2D(uSim, suv);
+@@ -101,6 +113,7 @@ export const water = {
+           vec2 grad = vec2(hr - sim.r, hu - sim.r) * (1.0 / (uSimTexel * uTile)); // dh/dx in (units/m)
+           // slope of the displaced surface (uHeightScale metres per unit), exaggerated ×2.5 so rings read at night
+           nxy += -grad * uHeightScale * 2.5 * simFade;
++          nxy *= 1.0 - 0.92 * hf; // glass-still inside the hush: a mirror
+           vec3 N = normalize(vec3(nxy.x, 1.0, nxy.y));
+           // --- reflection of the real sky
+           vec3 R = reflect(-V, N);
+@@ -117,6 +130,7 @@ export const water = {
+           // --- fresnel mix
+           float ndv = max(dot(N, V), 0.0);
+           float F = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
++          F = max(F, 0.32 * hf); // a deliberate lift so the stars and the aurora come up through the disc at this steep angle
+           vec3 col = mix(uDeep, skyCol, F) + moon;
+           // --- the nearest lanterns: their light breaks up on the ripples, so rings from your fingers read
+           // as orange glints even where the sky reflection is too dim to show them
+@@ -141,7 +155,9 @@ export const water = {
+           float crest = clamp(length(grad) * uHeightScale * 6.0, 0.0, 1.0);
+           bio *= 0.7 + 0.6 * crest; // the plankton light gathers on the ripple slopes, so rings show inside the glow
+           bio += uCalm * 0.05 * (0.5 + 0.5 * sin(t * 0.8 + dPlayer * 2.0)) * (1.0 - smoothstep(1.5, 4.5, dPlayer)) * speck;
++          bio *= 1.0 - 0.9 * hf; // the plankton go quiet inside the hush
+           col += mix(uPlankton, uPlankton2, dens2) * bio * 0.7;
++          col += uPlankton2 * hedge;
+           // --- fog
+           float fog = fogExp2(dist, uFogDensity);
+           col = mix(col, uFogColor, fog);
+@@ -183,7 +199,8 @@ export const water = {
+     const u = this.uniforms;
+     u.uTime.value = ctx.time.t;
+     u.uSim.value = ctx.water.simTexture;
+-    u.uCalm.value = ctx.water.calm || 0;
++    u.uCalm.value = Math.max(ctx.water.calm || 0, 0.6 * (ctx.water.hush?.strength || 0)); // a full hush counts as 0.6 calm
++    if (ctx.water.hushWorld) u.uHush.value.set(ctx.water.hushWorld);
+     const p = ctx.playerCtl.state.headWorld;
+     u.uPlayer.value.copy(p);
+     // keep the quad centred on the player (the shader works in world space, so this is invisible)
+diff --git a/src/world/wavesim.js b/src/world/wavesim.js
+index 00b1c5e..c60faca 100644
+--- a/src/world/wavesim.js
++++ b/src/world/wavesim.js
+@@ -26,6 +26,11 @@ export const wavesim = {
+     let cur = rtA, next = rtB;
+ 
+     const disturb = new Float32Array(MAX_DISTURB * 4);
++    // the hush circles (src/world/hush.js): two vec4 of uv centre, uv radius, strength — the sim damps waves
++    // inside them. Allocated here so wavesim/water never depend on the hush module running, or existing.
++    const hush = { data: new Float32Array(8), strength: 0 };
++    ctx.water.hush = hush;
++    ctx.water.hushWorld = new Float32Array(8); // world x, z, radius, strength — filled by hush.js for the surface shader
+     const uniforms = {
+       uPrev: { value: null },
+       uTexel: { value: 1 / size },
+@@ -34,6 +39,7 @@ export const wavesim = {
+       uGlowDecay: { value: 0.975 },
+       uDisturb: { value: disturb },
+       uCount: { value: 0 },
++      uHush: { value: hush.data },
+     };
+     const mat = new THREE.ShaderMaterial({
+       uniforms,
+@@ -41,6 +47,7 @@ export const wavesim = {
+       fragmentShader: /* glsl */`
+         precision highp float;
+         uniform sampler2D uPrev; uniform float uTexel, uDamping, uSpeed, uGlowDecay; uniform vec4 uDisturb[${MAX_DISTURB}]; uniform int uCount;
++        uniform vec4 uHush[2];
+         varying vec2 vUv;
+         void main() {
+           vec4 c = texture2D(uPrev, vUv);
+@@ -51,6 +58,15 @@ export const wavesim = {
+           float u = texture2D(uPrev, vUv + vec2(0.0,  uTexel)).r;
+           float lap = (l + r + u + d) * 0.25 - h;
+           float vel = (h - hp) * uDamping;
++          // hush: inside a resting hand's circle the water loses its momentum within a few steps, so waves
++          // entering it die at the edge instead of crossing it
++          float hf = 0.0;
++          for (int i = 0; i < 2; i++) {
++            vec2 dv = vUv - uHush[i].xy; dv -= floor(dv + 0.5);
++            float hr = max(uHush[i].z, 1e-4);
++            hf = max(hf, uHush[i].w * (1.0 - smoothstep(0.6 * hr, hr, length(dv))));
++          }
++          vel *= 1.0 - 0.7 * hf;
+           float hn = h + vel + lap * uSpeed;
+           float inj = 0.0; // how hard something is pushing the water here this step
+           for (int i = 0; i < ${MAX_DISTURB}; i++) {
+@@ -64,6 +80,7 @@ export const wavesim = {
+             hn += uDisturb[i].w * g * (1.0 - q);
+             inj += abs(uDisturb[i].w) * g;
+           }
++          hn *= 1.0 - 0.15 * hf; // and the height itself relaxes flat
+           hn = clamp(hn, -0.6, 0.6);
+           hn *= 0.999; // tiny leak so the tile settles to flat
+           // Plankton flash under shear, so the light is where the water is being pushed: brightest in the
+@@ -179,7 +196,8 @@ export const wavesim = {
+     for (const q of s.queue) push(q.x, q.z, q.radius, q.strength);
+     s.queue.length = 0;
+ 
+-    const calm = ctx.water.calm || 0;
++    // a full hush counts as 0.6 calm (HUSH.calmGain) for the damping, whoever is stiller
++    const calm = Math.max(ctx.water.calm || 0, 0.6 * (ctx.water.hush.strength || 0));
+     s.mat.uniforms.uDamping.value = 0.98 - calm * 0.02;
+     s.mat.uniforms.uPrev.value = s.cur.texture;
+ 
+diff --git a/tools/harness/scenario.mjs b/tools/harness/scenario.mjs
+index 2412be0..b905be6 100644
+--- a/tools/harness/scenario.mjs
++++ b/tools/harness/scenario.mjs
+@@ -1,6 +1,6 @@
+ // End-to-end interaction scenario on the fake WebXR device:
+ //   1. calibrate, 2. grab the nearest lantern, lift it, let go above the water → it rises → a star is born,
+-//   3. touch the nearest lotus bud → it blooms, 4. hold a hand open and still → a firefly lands,
++//   3. touch the nearest lotus bud → it blooms, 4. hold a hand open and still → a firefly lands, 4b. a palm resting flat on the water hushes it,
+ //   5. locomotion: a stroke does nothing, a missed pinch does nothing, pinch-and-pull moves, two hands turn, 6. palms together → leave.
+ // Prints a JSON report and exits 1 if any step fails. Usage: node tools/harness/scenario.mjs [--out dir]
+ import { chromium } from 'playwright';
+@@ -109,6 +109,87 @@ try {
+   step('firefly-landed', ev.some((e) => e.type === 'fireflyland') || (s.fireflyLanded || 0) > 0, { fireflyLanded: s.fireflyLanded, stillL: await page.evaluate(() => { const h = window.__nocturneCtx.hands.right; return { still: h.still, stillFor: +h.stillFor.toFixed(2), open: h.open, attraction: +h.attraction.toFixed(2), disp: +h.stillDisp.toFixed(3) }; }) });
+   await shot('fireflies.png');
+ 
++  // ---- hush: an open palm resting flat on the water, still, hushes a disc of water around it
++  {
++    await setHand('left', [-0.25, 1.25, -0.4], 0);
++    await setHand('right', [0.25, 1.25, -0.4], 0);
++    await frames(30);
++    const lvl = s.water;
++    // the hint plane and the drips show and hide on their own schedule: count draw calls without them (per view)
++    const draws = () => page.evaluate(() => {
++      const c = window.__nocturneCtx; const r = c.renderer;
++      const views = r.xr.isPresenting ? (r.xr.getCamera().cameras.length || 1) : 1;
++      let n = r.info.render.calls;
++      for (const name of ['hint', 'drips']) { const o = c.scene.getObjectByName(name); if (o && o.visible) n -= views; }
++      return n;
++    });
++    const disturb = () => page.evaluate(() => window.__nocturneCtx.water.disturb(0.19, -0.48, 0.15, 0.3));
++    const maxH = () => page.evaluate(() => window.__nocturne.simSnapshot().maxH);
++    const draws0 = await draws();
++    // control: the same push on open water
++    await disturb(); await frames(15);
++    const h0 = await maxH();
++    await frames(120);
++    // palm joint at lvl + 0.014 with its normal straight down, thumb tip 1.8 cm under, fingers open, perfectly still
++    await setHand('right', [0.2, lvl + 0.012, -0.45], 0, { pitchDeg: 0, rollDeg: 0, curl: 0.05 });
++    await frames(120);
++    const hs = await page.evaluate(() => { const c = window.__nocturneCtx; const h = c.hands.right; const k = c.hush.circles[1]; return { strength: +c.hush.strength.toFixed(3), r: +k.r.toFixed(3), active: k.active, count: c.hush.count, still: h.still, open: h.open, palmY: +h.palm.position.y.toFixed(3), normalY: +h.palm.normal.y.toFixed(2), submerged: h.submerged, calm: +c.water.calm.toFixed(2) }; });
++    let ev = await events();
++    const hushEv = ev.find((e) => e.type === 'hush' && e.detail?.hand === 'right');
++    step('hush-circle-forms', hs.strength > 0.8 && hs.r > 0.8 && hs.still === true && !!hushEv, { ...hs, event: hushEv || null, water: lvl });
++    await shot('hush.png');
++    const draws1 = await draws();
++    // the same push at the circle's centre now dies almost at once
++    await disturb(); await frames(15);
++    const h1 = await maxH();
++    step('hush-stills-the-water', h0 >= 0.04 && h1 < 0.4 * h0, { h0: +h0.toFixed(4), h1: +h1.toFixed(4) });
++    // lift the hand: the stillness dissolves (strength decays with tau 1.2 s; 'hushend' fires below 0.02, ~4.6 s from 0.92)
++    await setHand('right', [0.2, lvl + 0.3, -0.45], 0, { curl: 0.6 });
++    await frames(180);
++    ev = await events();
++    s = await stats();
++    step('hush-dissolves', s.hush < 0.1 && ev.some((e) => e.type === 'hushend'), { hush: +s.hush.toFixed(3), events: ev.filter((e) => e.type === 'hush' || e.type === 'hushend').slice(-3) });
++    step('hush-no-new-draw-calls', draws1 === draws0, { before: draws0, during: draws1 });
++    await setHand('right', [0.25, 1.25, -0.4], 0);
++    await frames(20);
++  }
++
++  // ---- the ribbon: an open hand carried slowly sideways, palm up, gathers a strand of fireflies behind it; stopping hands them over
++  {
++    await setHand('left', [-0.3, 1.25, -0.45], 0, { pitchDeg: 0, rollDeg: 0, curl: 0.6 });   // not open: attracts nothing
++    const up = { pitchDeg: 0, rollDeg: 180, curl: 0.02 };
++    const sweepFrom = (await events()).length;
++    // four legs between x 0.10 and 0.50 at 0.15 m/s (0.15/36 m per frame): 7.5 cm over any 0.5 s, so the hand is never "still"
++    let x = 0.10;
++    for (let leg = 0; leg < 4; leg++) {
++      const dir = leg & 1 ? -1 : 1;
++      for (let i = 0; i < 96; i++) { x += dir * 0.15 / 36; await setHand('right', [x, 1.30, -0.45], 0, up); await frame(); }
++    }
++    await frames(36);
++    s = await stats();
++    let ev = await events();
++    const since = ev.slice(sweepFrom);
++    const followed = since.some((e) => e.type === 'fireflyfollow' && e.detail?.hand === 'right');
++    const landedDuring = since.some((e) => e.type === 'fireflyland' && e.detail?.hand === 'right');
++    const rib = await page.evaluate(() => { const c = window.__nocturneCtx; const h = c.hands.right; return { speed: +h.palm.speed.toFixed(3), speedH: +h.palm.speedH.toFixed(3), normalY: +h.palm.normal.y.toFixed(2), open: h.open, still: h.still, disp: +h.stillDisp.toFixed(3) }; });
++    step('firefly-ribbon', s.fireflyFollowers[1] >= 3 && s.fireflyFollowArrived[1] >= 2 && followed && !landedDuring,
++      { followers: s.fireflyFollowers, arrived: s.fireflyFollowArrived, followed, landedDuring, hand: rib, follows: since.filter((e) => e.type === 'fireflyfollow').slice(0, 3) });
++    await shot('ribbon.png');
++    // hold still where it stopped: the strand gathers and lands (a fresh recruit from the cloud would need ~7 s)
++    const holdFrom = ev.length;
++    let handoff = false;
++    for (let i = 0; i < 120 && !handoff; i++) {
++      await frame();
++      if (i % 6 === 5) { ev = await events(); handoff = ev.slice(holdFrom).some((e) => e.type === 'fireflyland' && e.detail?.hand === 'right'); }
++    }
++    ev = await events();
++    handoff = ev.slice(holdFrom).some((e) => e.type === 'fireflyland' && e.detail?.hand === 'right');
++    s = await stats();
++    step('ribbon-handoff', handoff, { fireflyLanded: s.fireflyLanded, followers: s.fireflyFollowers, lands: ev.slice(holdFrom).filter((e) => e.type === 'fireflyland').slice(0, 3) });
++    await setHand('right', [0.25, 1.25, -0.4], 0, { curl: 0.6 });
++    await frames(20);
++  }
++
+   // ---- a palm stroke under water is not locomotion any more (reaching through the water must never move you)
+   {
+     const before = (await world()).rig;
