@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>NOCTURNE — a night on the water</title>
+<meta name="description" content="A hand-tracked WebXR experience for Meta Quest. Stand waist-deep in a bioluminescent lake under a real sky. No controllers, nothing to install." />
+<meta name="theme-color" content="#04070d" />
+<link rel="stylesheet" href="./assets/fonts/fonts.css" />
+<style>
+  :root {
+    --ink: #e9eef5;
+    --dim: #93a0b3;
+    --glow: #6ff3ff;
+    --amber: #ffb257;
+    --bg: #04070d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
+  body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  #landing {
+    position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 6vh 6vw; gap: 1.2rem;
+    background: radial-gradient(120% 90% at 50% 100%, rgba(20,60,80,0.35) 0%, rgba(4,7,13,0.0) 55%),
+                linear-gradient(180deg, rgba(4,7,13,0.55) 0%, rgba(4,7,13,0.85) 100%);
+    transition: opacity 900ms ease; z-index: 10;
+  }
+  #landing.hidden { opacity: 0; pointer-events: none; }
+  #landing h1 {
+    font-family: "Cormorant Garamond", "Times New Roman", serif; font-weight: 400;
+    font-size: clamp(3rem, 9vw, 7rem); letter-spacing: 0.32em; margin: 0; text-indent: 0.32em;
+    color: #f4f7fb; text-shadow: 0 0 40px rgba(111,243,255,0.25), 0 0 2px rgba(255,255,255,0.4);
+  }
+  #landing h2 {
+    font-family: "Cormorant Garamond", serif; font-style: italic; font-weight: 400;
+    font-size: clamp(1.2rem, 2.6vw, 1.7rem); margin: 0; color: var(--dim); letter-spacing: 0.04em;
+  }
+  #landing p { max-width: 38rem; line-height: 1.6; color: var(--dim); margin: 0.4rem 0 0; font-size: 0.98rem; }
+  #landing p b { color: var(--ink); font-weight: 500; }
+  .buttons { display: flex; gap: 0.9rem; flex-wrap: wrap; justify-content: center; margin-top: 1rem; }
+  button.btn {
+    appearance: none; border: 1px solid rgba(233,238,245,0.25); background: rgba(233,238,245,0.04); color: var(--ink);
+    font: 500 1rem "Inter", system-ui, sans-serif; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 0.95rem 1.8rem; border-radius: 999px; cursor: pointer; transition: all 200ms ease; min-width: 12rem;
+  }
+  button.btn:hover, button.btn:focus-visible { background: rgba(233,238,245,0.12); border-color: rgba(233,238,245,0.6); outline: none; }
+  button.btn.primary { border-color: rgba(111,243,255,0.7); box-shadow: 0 0 30px rgba(111,243,255,0.18), inset 0 0 20px rgba(111,243,255,0.06); }
+  button.btn.primary:hover { background: rgba(111,243,255,0.14); }
+  button.btn[disabled] { opacity: 0.45; cursor: default; }
+  #status { font-size: 0.85rem; color: var(--dim); min-height: 1.2em; letter-spacing: 0.02em; }
+  #bar { width: min(22rem, 70vw); height: 2px; background: rgba(233,238,245,0.12); border-radius: 2px; overflow: hidden; }
+  #bar i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--glow), #ffffff); transition: width 200ms ease; }
+  .fine { font-size: 0.78rem; color: #6d7a8c; max-width: 40rem; line-height: 1.55; }
+  .fine a { color: #9fb3c8; }
+  .fine kbd { font-family: inherit; border: 1px solid #3a4658; border-radius: 4px; padding: 0 0.35em; color: #c9d3df; }
+
+  #hud {
+    position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%); z-index: 5; pointer-events: none;
+    font-size: 0.8rem; color: #8b98ab; letter-spacing: 0.04em; background: rgba(4,7,13,0.55); padding: 0.5rem 0.9rem; border-radius: 999px;
+    opacity: 0; transition: opacity 600ms ease; white-space: nowrap;
+  }
+  #hud.show { opacity: 1; }
+  #hud kbd { border: 1px solid #3a4658; border-radius: 4px; padding: 0 0.35em; color: #c9d3df; font-family: inherit; }
+
+  #err { position: fixed; left: 1rem; right: 1rem; bottom: 1rem; z-index: 20; display: none; color: #ffb4b4; font: 0.85rem/1.4 ui-monospace, Menlo, monospace; background: rgba(60,10,10,0.8); padding: 0.8rem 1rem; border-radius: 8px; white-space: pre-wrap; }
+  @media (max-width: 600px) { #landing h1 { letter-spacing: 0.2em; text-indent: 0.2em; } }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="landing">
+  <h1>NOCTURNE</h1>
+  <h2>a night on the water</h2>
+  <p>
+    Stand waist-deep in a still lake, under the real Milky Way. The water lights up where your
+    hands move through it. Lanterns drift by; fireflies come to rest on your fingers; lotus buds
+    open when you touch them and sing. <b>No controllers.</b> Just your hands.
+  </p>
+  <div class="buttons">
+    <button class="btn primary" id="enter" disabled>Checking headset…</button>
+    <button class="btn" id="desktop">Explore on this screen</button>
+  </div>
+  <div id="bar"><i></i></div>
+  <div id="status">Loading the sky…</div>
+  <p class="fine">
+    On Meta Quest: put the controllers down and make sure <b>Hand Tracking</b> is on
+    (Settings → Movement Tracking). Open this page in the Quest Browser and press Enter VR.
+    Works standing or seated. Sound on. ·
+    <a href="./CREDITS.md">Credits &amp; licenses</a>
+  </p>
+</div>
+
+<div id="hud">drag to look · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> wade · move mouse for hand · click to pinch · hold <kbd>Shift</kbd> to dip your hand</div>
+<pre id="err"></pre>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

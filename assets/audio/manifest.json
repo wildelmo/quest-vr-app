@@ -1,0 +1,1502 @@
+[
+  {
+    "file": "wind_loop.ogg",
+    "kind": "loop",
+    "channels": 2,
+    "duration": 75.0,
+    "loop": true,
+    "gain": 0.35,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "title": "Wind (freesound #139337)",
+      "author": "felix.blume",
+      "license": "CC0 1.0",
+      "url": "https://freesound.org/people/felix.blume/sounds/139337/"
+    },
+    "analysis": {
+      "loopStartSec": 80.0,
+      "loopCrossfadeSec": 2.0,
+      "loopContinuity": {
+        "sampleJump": 0.0011681126164934082,
+        "typicalSampleStep": 0.0026230972283911073,
+        "jumpRatio": 0.44531807812929497,
+        "rmsEndDb": -31.818463611877466,
+        "rmsStartDb": -30.753180868878648,
+        "rmsMismatchDb": 1.0652827429988179
+      },
+      "loopStartSearch": {
+        "rmsMismatchDb": 0.985661060752399,
+        "logSpectralDistance": 0.31933506431488384,
+        "score": 4.179011703901237
+      }
+    },
+    "bytes": 1069301
+  },
+  {
+    "file": "stream_loop.ogg",
+    "kind": "loop",
+    "channels": 1,
+    "duration": 45.0,
+    "loop": true,
+    "gain": 0.3,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "title": "Stream (freesound #7138)",
+      "author": "mystiscool",
+      "license": "CC BY 3.0",
+      "url": "https://freesound.org/people/mystiscool/sounds/7138/"
+    },
+    "analysis": {
+      "loopStartSec": 48.0,
+      "loopCrossfadeSec": 2.0,
+      "loopContinuity": {
+        "sampleJump": 0.01782094048367304,
+        "typicalSampleStep": 0.014056170484793748,
+        "jumpRatio": 1.2678375310652426,
+        "rmsEndDb": -21.919370505265917,
+        "rmsStartDb": -23.34086383460101,
+        "rmsMismatchDb": 1.4214933293350924
+      },
+      "loopStartSearch": {
+        "rmsMismatchDb": 0.08259992641495373,
+        "logSpectralDistance": 0.29525130245133985,
+        "score": 3.0351129509283523
+      }
+    },
+    "bytes": 459600
+  },
+  {
+    "file": "water_loop_1.ogg",
+    "kind": "loop",
+    "channels": 1,
+    "duration": 1.695,
+    "loop": true,
+    "gain": 0.3,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "water_flowing (30 CC0 SFX loops)"
+    },
+    "analysis": {
+      "loopStartSec": 0.0,
+      "loopCrossfadeSec": 0.18832199546485262,
+      "loopContinuity": {
+        "sampleJump": 0.02728949250861748,
+        "typicalSampleStep": 0.09571115333370556,
+        "jumpRatio": 0.28512343188959605,
+        "rmsEndDb": -13.88503556927457,
+        "rmsStartDb": -14.986773181318235,
+        "rmsMismatchDb": 1.1017376120436637
+      }
+    },
+    "bytes": 18626
+  },
+  {
+    "file": "bubbles_loop.ogg",
+    "kind": "loop",
+    "channels": 1,
+    "duration": 4.157,
+    "loop": true,
+    "gain": 0.22,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "loop_bubbles_1 (40 CC0 water/splash/slime SFX)"
+    },
+    "analysis": {
+      "loopStartSec": 0.0,
+      "loopCrossfadeSec": 0.25,
+      "loopContinuity": {
+        "sampleJump": 0.0017208560552452058,
+        "typicalSampleStep": 0.001181837195754979,
+        "jumpRatio": 1.4560855432764508,
+        "rmsEndDb": -18.561181186606515,
+        "rmsStartDb": -20.277296983548645,
+        "rmsMismatchDb": 1.7161157969421303
+      }
+    },
+    "bytes": 43139
+  },
+  {
+    "file": "pad_bioluminescence.ogg",
+    "kind": "pad",
+    "channels": 2,
+    "duration": 5.18,
+    "loop": false,
+    "gain": 0.4,
+    "pitchHz": 714.17,
+    "midi": 77,
+    "note": "F5",
+    "cents": 38.5,
+    "key": "D# major",
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Bioluminescence - Watery Pad (2HTC Samples Vol 4 Addendum)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 714.17,
+        "midi": 77,
+        "note": "F5",
+        "cents": 38.5,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.051,
+        "acfHz": 63.45,
+        "strongestPartialHz": 700.08,
+        "partialsHz": [
+          700.1,
+          632.1,
+          615.6,
+          257.6,
+          624.1,
+          318.2
+        ],
+        "windowStartSec": 1.126
+      },
+      "key": {
+        "key": "D# major",
+        "keyCorrelation": 0.633,
+        "topPitchClasses": [
+          "D#",
+          "F",
+          "C"
+        ],
+        "chroma": [
+          0.107,
+          0.033,
+          0.055,
+          0.239,
+          0.082,
+          0.149,
+          0.062,
+          0.056,
+          0.059,
+          0.057,
+          0.055,
+          0.045
+        ]
+      }
+    },
+    "bytes": 72413
+  },
+  {
+    "file": "pad_northern_swell.ogg",
+    "kind": "pad",
+    "channels": 2,
+    "duration": 16.983,
+    "loop": false,
+    "gain": 0.4,
+    "pitchHz": 587.63,
+    "midi": 74,
+    "note": "D5",
+    "cents": 0.9,
+    "key": "G minor",
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Swimming in the Northern Lights - Swell Pads (2HTC Samples Vol 4)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 587.63,
+        "midi": 74,
+        "note": "D5",
+        "cents": 0.9,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.995,
+        "acfHz": 195.13,
+        "strongestPartialHz": 587.63,
+        "partialsHz": [
+          587.6,
+          1171.9,
+          466.8,
+          1156.8,
+          787.8,
+          1185.1
+        ],
+        "windowStartSec": 3.714
+      },
+      "key": {
+        "key": "G minor",
+        "keyCorrelation": 0.84,
+        "topPitchClasses": [
+          "D",
+          "G",
+          "A#"
+        ],
+        "chroma": [
+          0.011,
+          0.013,
+          0.232,
+          0.017,
+          0.025,
+          0.079,
+          0.024,
+          0.226,
+          0.047,
+          0.129,
+          0.174,
+          0.022
+        ]
+      }
+    },
+    "bytes": 298502
+  },
+  {
+    "file": "pad_northern_brilliant.ogg",
+    "kind": "pad",
+    "channels": 2,
+    "duration": 14.307,
+    "loop": false,
+    "gain": 0.4,
+    "pitchHz": 116.28,
+    "midi": 46,
+    "note": "A#2",
+    "cents": -3.8,
+    "key": "G minor",
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Swimming in the Northern Lights - Brilliant Lights (2HTC Samples Vol 4)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 116.28,
+        "midi": 46,
+        "note": "A#2",
+        "cents": -3.8,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.044,
+        "acfHz": 58.88,
+        "strongestPartialHz": 54.83,
+        "partialsHz": [
+          54.8,
+          116.3,
+          588.0,
+          780.3,
+          387.5,
+          396.9
+        ],
+        "windowStartSec": 12.491
+      },
+      "key": {
+        "key": "G minor",
+        "keyCorrelation": 0.831,
+        "topPitchClasses": [
+          "G",
+          "F",
+          "D"
+        ],
+        "chroma": [
+          0.068,
+          0.02,
+          0.152,
+          0.039,
+          0.025,
+          0.159,
+          0.019,
+          0.223,
+          0.031,
+          0.097,
+          0.131,
+          0.036
+        ]
+      }
+    },
+    "bytes": 230875
+  },
+  {
+    "file": "pad_seafoam_waves.ogg",
+    "kind": "pad",
+    "channels": 2,
+    "duration": 6.525,
+    "loop": false,
+    "gain": 0.4,
+    "pitchHz": 204.01,
+    "midi": 56,
+    "note": "G#3",
+    "cents": -30.6,
+    "key": "G# minor",
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Seafoam - Quiet Waves (2HTC Samples Vol 4 Addendum)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 204.01,
+        "midi": 56,
+        "note": "G#3",
+        "cents": -30.6,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.656,
+        "acfHz": 265.66,
+        "strongestPartialHz": 204.01,
+        "partialsHz": [
+          204.0,
+          822.2,
+          495.6,
+          1819.6,
+          979.5,
+          1732.8
+        ],
+        "windowStartSec": 3.994
+      },
+      "key": {
+        "key": "G# minor",
+        "keyCorrelation": 0.644,
+        "topPitchClasses": [
+          "G#",
+          "B",
+          "A"
+        ],
+        "chroma": [
+          0.056,
+          0.065,
+          0.062,
+          0.063,
+          0.094,
+          0.07,
+          0.07,
+          0.087,
+          0.12,
+          0.099,
+          0.098,
+          0.116
+        ]
+      }
+    },
+    "bytes": 114608
+  },
+  {
+    "file": "bowl_1.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 1.054,
+    "loop": false,
+    "gain": 0.6,
+    "pitchHz": 2427.32,
+    "midi": 99,
+    "note": "D#7",
+    "cents": -43.5,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Ceramic Bowl 1 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 2427.32,
+        "midi": 99,
+        "note": "D#7",
+        "cents": -43.5,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.09,
+        "acfHz": 302.05,
+        "strongestPartialHz": 2427.32,
+        "partialsHz": [
+          2427.3,
+          2692.2,
+          1473.8,
+          1870.6,
+          55.3,
+          2126.1
+        ],
+        "windowStartSec": 0.034
+      }
+    },
+    "bytes": 13510
+  },
+  {
+    "file": "bowl_2.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.735,
+    "loop": false,
+    "gain": 0.6,
+    "pitchHz": 1151.57,
+    "midi": 86,
+    "note": "D6",
+    "cents": -34.4,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Ceramic Bowl 2 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 1151.57,
+        "midi": 86,
+        "note": "D6",
+        "cents": -34.4,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.0,
+        "acfHz": 1225.0,
+        "strongestPartialHz": 1151.57,
+        "partialsHz": [
+          1151.6,
+          2455.5,
+          1207.5,
+          2445.6,
+          1177.9,
+          1250.6
+        ],
+        "windowStartSec": 0.065
+      }
+    },
+    "bytes": 10805
+  },
+  {
+    "file": "bowl_3.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 1.772,
+    "loop": false,
+    "gain": 0.6,
+    "pitchHz": 2447.95,
+    "midi": 99,
+    "note": "D#7",
+    "cents": -28.8,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Ceramic Bowl 3 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 2447.95,
+        "midi": 99,
+        "note": "D#7",
+        "cents": -28.8,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.0,
+        "acfHz": 144.12,
+        "strongestPartialHz": 2447.95,
+        "partialsHz": [
+          2447.9,
+          1151.6,
+          1140.6,
+          1504.1,
+          2355.6,
+          2899.6
+        ],
+        "windowStartSec": 0.779
+      }
+    },
+    "bytes": 19324
+  },
+  {
+    "file": "bowl_4.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 1.85,
+    "loop": false,
+    "gain": 0.6,
+    "pitchHz": 2360.83,
+    "midi": 98,
+    "note": "D7",
+    "cents": 8.5,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Ceramic Bowl 4 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 2360.83,
+        "midi": 98,
+        "note": "D7",
+        "cents": 8.5,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.036,
+        "acfHz": 2321.05,
+        "strongestPartialHz": 2360.83,
+        "partialsHz": [
+          2360.8,
+          99.9,
+          56.0,
+          1473.4,
+          131.2,
+          111.4
+        ],
+        "windowStartSec": 1.211
+      }
+    },
+    "bytes": 21727
+  },
+  {
+    "file": "bowl_5.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.904,
+    "loop": false,
+    "gain": 0.6,
+    "pitchHz": 115.27,
+    "midi": 46,
+    "note": "A#2",
+    "cents": -19.0,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Ceramic Bowl 5 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 115.27,
+        "midi": 46,
+        "note": "A#2",
+        "cents": -19.0,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.369,
+        "acfHz": 2756.25,
+        "strongestPartialHz": 55.86,
+        "partialsHz": [
+          55.9,
+          115.3,
+          125.4,
+          71.6,
+          81.9,
+          411.9
+        ],
+        "windowStartSec": 0.551
+      }
+    },
+    "bytes": 12641
+  },
+  {
+    "file": "bowl_6.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 2.367,
+    "loop": false,
+    "gain": 0.6,
+    "pitchHz": 497.37,
+    "midi": 71,
+    "note": "B4",
+    "cents": 12.2,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Ceramic Bowl 6 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 497.37,
+        "midi": 71,
+        "note": "B4",
+        "cents": 12.2,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 0.848,
+        "acfHz": 501.14,
+        "strongestPartialHz": 54.44,
+        "partialsHz": [
+          54.4,
+          77.7,
+          115.4,
+          41.3,
+          497.4,
+          510.8
+        ],
+        "windowStartSec": 1.605
+      }
+    },
+    "bytes": 30564
+  },
+  {
+    "file": "bowl_7.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.981,
+    "loop": false,
+    "gain": 0.6,
+    "pitchHz": 65.17,
+    "midi": 36,
+    "note": "C2",
+    "cents": -6.2,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Ceramic Bowl 7 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 65.17,
+        "midi": 36,
+        "note": "C2",
+        "cents": -6.2,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.459,
+        "acfHz": 367.5,
+        "strongestPartialHz": 120.89,
+        "partialsHz": [
+          120.9,
+          65.2,
+          327.2,
+          176.7,
+          40.2,
+          46.2
+        ],
+        "windowStartSec": 0.516
+      }
+    },
+    "bytes": 12392
+  },
+  {
+    "file": "glass_1.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 3.822,
+    "loop": false,
+    "gain": 0.5,
+    "pitchHz": 381.65,
+    "midi": 67,
+    "note": "G4",
+    "cents": -46.3,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Glass Glasses 1 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 381.65,
+        "midi": 67,
+        "note": "G4",
+        "cents": -46.3,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.586,
+        "acfHz": 188.46,
+        "strongestPartialHz": 937.62,
+        "partialsHz": [
+          937.6,
+          893.0,
+          949.5,
+          591.5,
+          1124.4,
+          830.9
+        ],
+        "windowStartSec": 3.211
+      }
+    },
+    "bytes": 37419
+  },
+  {
+    "file": "glass_2.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.365,
+    "loop": false,
+    "gain": 0.5,
+    "pitchHz": 2238.84,
+    "midi": 97,
+    "note": "C#7",
+    "cents": 16.6,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "glass_02 (100 CC0 SFX)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 2238.84,
+        "midi": 97,
+        "note": "C#7",
+        "cents": 16.6,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.067,
+        "acfHz": 1130.77,
+        "strongestPartialHz": 2278.83,
+        "partialsHz": [
+          2278.8,
+          2267.6,
+          2254.4,
+          2291.2,
+          2238.8,
+          3571.6
+        ],
+        "windowStartSec": 0.048
+      }
+    },
+    "bytes": 7076
+  },
+  {
+    "file": "bell_1.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 1.253,
+    "loop": false,
+    "gain": 0.5,
+    "pitchHz": 4708.29,
+    "midi": 110,
+    "note": "D8",
+    "cents": 3.6,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "bell_01 (100 CC0 SFX)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 4708.29,
+        "midi": 110,
+        "note": "D8",
+        "cents": 3.6,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.0,
+        "acfHz": 156.94,
+        "strongestPartialHz": 4708.29,
+        "partialsHz": [
+          4708.3,
+          4548.8,
+          1855.5,
+          4696.7,
+          4720.2,
+          1827.8
+        ],
+        "windowStartSec": 0.062
+      }
+    },
+    "bytes": 12723
+  },
+  {
+    "file": "bell_2.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.475,
+    "loop": false,
+    "gain": 0.5,
+    "pitchHz": 2896.87,
+    "midi": 102,
+    "note": "F#7",
+    "cents": -37.3,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "bell_02 (100 CC0 SFX)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 2896.87,
+        "midi": 102,
+        "note": "F#7",
+        "cents": -37.3,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.0,
+        "acfHz": 1470.0,
+        "strongestPartialHz": 2907.87,
+        "partialsHz": [
+          2907.9,
+          7297.6,
+          2959.0,
+          7310.6,
+          7322.2,
+          2896.9
+        ],
+        "windowStartSec": 0.037
+      }
+    },
+    "bytes": 7202
+  },
+  {
+    "file": "bell_3.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 1.379,
+    "loop": false,
+    "gain": 0.5,
+    "pitchHz": 4549.5,
+    "midi": 109,
+    "note": "C#8",
+    "cents": 44.2,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "bell_03 (100 CC0 SFX)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 4549.5,
+        "midi": 109,
+        "note": "C#8",
+        "cents": 44.2,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.0,
+        "acfHz": 4410.0,
+        "strongestPartialHz": 4549.5,
+        "partialsHz": [
+          4549.5,
+          4706.2,
+          1828.2,
+          4523.9,
+          1854.9,
+          4744.5
+        ],
+        "windowStartSec": 0.268
+      }
+    },
+    "bytes": 14925
+  },
+  {
+    "file": "gong_1.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 1.424,
+    "loop": false,
+    "gain": 0.45,
+    "pitchHz": 1009.31,
+    "midi": 83,
+    "note": "B5",
+    "cents": 37.4,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "gong_01 (100 CC0 SFX)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 1009.31,
+        "midi": 83,
+        "note": "B5",
+        "cents": 37.4,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.053,
+        "acfHz": 167.05,
+        "strongestPartialHz": 1009.31,
+        "partialsHz": [
+          1009.3,
+          811.8,
+          828.8,
+          1200.0,
+          1037.8,
+          1315.2
+        ],
+        "windowStartSec": 0.041
+      }
+    },
+    "bytes": 15368
+  },
+  {
+    "file": "gong_2.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 1.052,
+    "loop": false,
+    "gain": 0.45,
+    "pitchHz": 226.42,
+    "midi": 57,
+    "note": "A3",
+    "cents": 49.8,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "gong_02 (100 CC0 SFX)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 226.42,
+        "midi": 57,
+        "note": "A3",
+        "cents": 49.8,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.614,
+        "acfHz": 229.69,
+        "strongestPartialHz": 226.42,
+        "partialsHz": [
+          226.4,
+          263.1,
+          938.1,
+          456.5,
+          108.4,
+          447.3
+        ],
+        "windowStartSec": 0.088
+      }
+    },
+    "bytes": 12216
+  },
+  {
+    "file": "pluck_cello_c2.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 3.135,
+    "loop": false,
+    "gain": 0.55,
+    "pitchHz": 65.13,
+    "midi": 36,
+    "note": "C2",
+    "cents": -7.3,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "C2 - Pluck 1 (Novice Cello (Nov 2021))"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 65.13,
+        "midi": 36,
+        "note": "C2",
+        "cents": -7.3,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.582,
+        "acfHz": 65.62,
+        "strongestPartialHz": 197.16,
+        "partialsHz": [
+          197.2,
+          130.4,
+          261.4,
+          459.2,
+          65.1,
+          393.0
+        ],
+        "windowStartSec": 0.062
+      }
+    },
+    "bytes": 27521
+  },
+  {
+    "file": "pluck_cello_g2.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 6.195,
+    "loop": false,
+    "gain": 0.55,
+    "pitchHz": 97.73,
+    "midi": 43,
+    "note": "G2",
+    "cents": -4.8,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "G2 - Pluck 1 (Novice Cello (Nov 2021))"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 97.73,
+        "midi": 43,
+        "note": "G2",
+        "cents": -4.8,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.57,
+        "acfHz": 98.0,
+        "strongestPartialHz": 97.73,
+        "partialsHz": [
+          97.7,
+          293.1,
+          197.3,
+          392.1,
+          587.2,
+          489.9
+        ],
+        "windowStartSec": 0.093
+      }
+    },
+    "bytes": 48517
+  },
+  {
+    "file": "pluck_cello_d3.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 4.855,
+    "loop": false,
+    "gain": 0.55,
+    "pitchHz": 146.13,
+    "midi": 50,
+    "note": "D3",
+    "cents": -8.3,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "D3 - Pluck 1 (Novice Cello (Nov 2021))"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 146.13,
+        "midi": 50,
+        "note": "D3",
+        "cents": -8.3,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.21,
+        "acfHz": 146.51,
+        "strongestPartialHz": 293.27,
+        "partialsHz": [
+          293.3,
+          146.1,
+          439.9,
+          586.5,
+          94.4,
+          305.1
+        ],
+        "windowStartSec": 0.097
+      }
+    },
+    "bytes": 40398
+  },
+  {
+    "file": "pluck_cello_a3.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 5.975,
+    "loop": false,
+    "gain": 0.55,
+    "pitchHz": 220.2,
+    "midi": 57,
+    "note": "A3",
+    "cents": 1.5,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "A3 - Pluck 1 (Novice Cello (Nov 2021))"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 220.2,
+        "midi": 57,
+        "note": "A3",
+        "cents": 1.5,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.482,
+        "acfHz": 220.5,
+        "strongestPartialHz": 220.2,
+        "partialsHz": [
+          220.2,
+          440.6,
+          183.5,
+          91.7,
+          659.9,
+          193.6
+        ],
+        "windowStartSec": 0.04
+      }
+    },
+    "bytes": 49026
+  },
+  {
+    "file": "ting_1.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.669,
+    "loop": false,
+    "gain": 0.45,
+    "pitchHz": 1327.76,
+    "midi": 88,
+    "note": "E6",
+    "cents": 12.1,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Silverware Ting 1 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 1327.76,
+        "midi": 88,
+        "note": "E6",
+        "cents": 12.1,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.564,
+        "acfHz": 4900.0,
+        "strongestPartialHz": 6552.84,
+        "partialsHz": [
+          6552.8,
+          6961.8,
+          6533.7,
+          6796.8,
+          6572.5,
+          6990.9
+        ],
+        "windowStartSec": 0.026
+      }
+    },
+    "bytes": 9782
+  },
+  {
+    "file": "ting_2.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 1.034,
+    "loop": false,
+    "gain": 0.45,
+    "pitchHz": 4459.86,
+    "midi": 109,
+    "note": "C#8",
+    "cents": 9.7,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Silverware Ting 2 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 4459.86,
+        "midi": 109,
+        "note": "C#8",
+        "cents": 9.7,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.0,
+        "acfHz": 4410.0,
+        "strongestPartialHz": 4459.86,
+        "partialsHz": [
+          4459.9,
+          876.4,
+          7402.4,
+          232.5,
+          1607.0,
+          7384.3
+        ],
+        "windowStartSec": 0.028
+      }
+    },
+    "bytes": 12394
+  },
+  {
+    "file": "ting_3.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.633,
+    "loop": false,
+    "gain": 0.45,
+    "pitchHz": 4443.83,
+    "midi": 109,
+    "note": "C#8",
+    "cents": 3.5,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Silverware Ting 3 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 4443.83,
+        "midi": 109,
+        "note": "C#8",
+        "cents": 3.5,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.0,
+        "acfHz": 4410.0,
+        "strongestPartialHz": 4463.47,
+        "partialsHz": [
+          4463.5,
+          55.1,
+          240.0,
+          115.5,
+          198.5,
+          135.2
+        ],
+        "windowStartSec": 0.08
+      }
+    },
+    "bytes": 9464
+  },
+  {
+    "file": "ting_4.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.578,
+    "loop": false,
+    "gain": 0.45,
+    "pitchHz": 886.12,
+    "midi": 81,
+    "note": "A5",
+    "cents": 12.0,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Silverware Ting 4 (Retail Therapy Sample Pack)"
+    },
+    "analysis": {
+      "pitch": {
+        "pitchHz": 886.12,
+        "midi": 81,
+        "note": "A5",
+        "cents": 12.0,
+        "method": "harmonic-peak-scoring",
+        "harmonicScore": 1.52,
+        "acfHz": 295.97,
+        "strongestPartialHz": 4457.45,
+        "partialsHz": [
+          4457.5,
+          875.3,
+          886.1,
+          7398.6,
+          7016.3,
+          233.4
+        ],
+        "windowStartSec": 0.034
+      }
+    },
+    "bytes": 9049
+  },
+  {
+    "file": "splash_soft_1.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.386,
+    "loop": false,
+    "gain": 0.5,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "splash_06 (40 CC0 water/splash/slime SFX)"
+    },
+    "analysis": {
+      "gentleness": {
+        "file": "splash_06.ogg",
+        "crestDb": 21.89,
+        "attackSec": 0.172,
+        "duration": 0.386,
+        "rankCrest": 0,
+        "rankAttack": 2,
+        "rankSum": 2
+      }
+    },
+    "bytes": 9206
+  },
+  {
+    "file": "splash_soft_2.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.913,
+    "loop": false,
+    "gain": 0.5,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "splash_04 (40 CC0 water/splash/slime SFX)"
+    },
+    "analysis": {
+      "gentleness": {
+        "file": "splash_04.ogg",
+        "crestDb": 21.96,
+        "attackSec": 0.207,
+        "duration": 0.913,
+        "rankCrest": 1,
+        "rankAttack": 1,
+        "rankSum": 2
+      }
+    },
+    "bytes": 12250
+  },
+  {
+    "file": "splash_soft_3.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.699,
+    "loop": false,
+    "gain": 0.5,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "splash_13 (40 CC0 water/splash/slime SFX)"
+    },
+    "analysis": {
+      "gentleness": {
+        "file": "splash_13.ogg",
+        "crestDb": 25.11,
+        "attackSec": 0.2238,
+        "duration": 0.699,
+        "rankCrest": 5,
+        "rankAttack": 0,
+        "rankSum": 5
+      }
+    },
+    "bytes": 11297
+  },
+  {
+    "file": "splash_soft_4.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.585,
+    "loop": false,
+    "gain": 0.5,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "author": "unknown author, CC0 via lavenderdotpet/CC0-Public-Domain-Sounds (pack names match rubberduck's OpenGameArt CC0 packs; not verifiable offline)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds",
+      "title": "splash_08 (40 CC0 water/splash/slime SFX)"
+    },
+    "analysis": {
+      "gentleness": {
+        "file": "splash_08.ogg",
+        "crestDb": 23.07,
+        "attackSec": 0.1023,
+        "duration": 0.585,
+        "rankCrest": 3,
+        "rankAttack": 4,
+        "rankSum": 7
+      }
+    },
+    "bytes": 10013
+  },
+  {
+    "file": "whoosh_gentle.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.46,
+    "loop": false,
+    "gain": 0.4,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Gentle Swish (Micro Pack - Organic Wooshes)"
+    },
+    "bytes": 8156
+  },
+  {
+    "file": "whoosh_twirl_1.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.939,
+    "loop": false,
+    "gain": 0.4,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Twirl Smol 1 (Micro Pack - Organic Wooshes)"
+    },
+    "bytes": 12774
+  },
+  {
+    "file": "whoosh_twirl_2.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 0.951,
+    "loop": false,
+    "gain": 0.4,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Twirl Smol 2 (Micro Pack - Organic Wooshes)"
+    },
+    "bytes": 12819
+  },
+  {
+    "file": "plop_airy_1.ogg",
+    "kind": "oneshot",
+    "channels": 1,
+    "duration": 1.492,
+    "loop": false,
+    "gain": 0.45,
+    "pitchHz": null,
+    "midi": null,
+    "note": null,
+    "cents": null,
+    "key": null,
+    "source": {
+      "author": "Ben Burnes (Abstraction)",
+      "license": "CC0 1.0",
+      "url": "https://github.com/lavenderdotpet/CC0-Public-Domain-Sounds (packs by abstractionmusic.com)",
+      "title": "Plop - Airy 1 (Bottle Plops (Apr 2021))"
+    },
+    "bytes": 17318
+  }
+]

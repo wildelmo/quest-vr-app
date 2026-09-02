@@ -1,0 +1,12 @@
+// Module registry. Order matters: the wave simulation runs first (everything reads its texture),
+// water and sky next, then the things that live in the world, then hints and audio glue.
+import { wavesim } from './wavesim.js';
+import { water } from './water.js';
+import { sky } from './sky.js';
+import { aurora } from './aurora.js';
+import { plankton } from './plankton.js';
+import { hints } from './hints.js';
+import { shore } from './shore.js';
+import { mist } from './mist.js';
+
+export const WORLD_MODULES = [wavesim, water, sky, aurora, plankton, shore, mist, hints];

@@ -1,0 +1,3576 @@
+{
+  "count": 9096,
+  "stride": 4,
+  "fields": [
+    "ra_rad_J2000",
+    "dec_rad_J2000",
+    "vmag",
+    "bv"
+  ],
+  "dtype": "float32 little-endian",
+  "sortedBy": "vmag ascending",
+  "file": "stars.bin",
+  "source": {
+    "title": "Yale Bright Star Catalog, 5th revised ed. (Hoffleit & Warren 1991)",
+    "conversion": "JSON by Bretton Wade (brettonw/YaleBrightStarCatalog, MIT)",
+    "url": "http://tdc-www.harvard.edu/catalogs/bsc5.html"
+  },
+  "bvEstimatedFromColourTemperature": 310,
+  "bvNote": "stars without a catalog B-V get one inverted from the catalog colour temperature K (Ballesteros' formula); 0.6 if neither exists",
+  "galacticRotation": {
+    "epoch": "J2000",
+    "raNorthGalacticPoleDeg": 192.85948,
+    "decNorthGalacticPoleDeg": 27.12825,
+    "lNorthCelestialPoleDeg": 122.93192,
+    "equatorialToGalacticMatrix": [
+      [
+        -0.05487556,
+        -0.87343709,
+        -0.483835016
+      ],
+      [
+        0.494109428,
+        -0.44482963,
+        0.746982244
+      ],
+      [
+        -0.867666149,
+        -0.198076373,
+        0.455983776
+      ]
+    ],
+    "usage": "e = (cos(dec)cos(ra), cos(dec)sin(ra), sin(dec)); g = M * e; l = atan2(g.y, g.x); b = asin(g.z)",
+    "matrixDeterminant": 1.0
+  },
+  "validation": {
+    "nStars": 100,
+    "maxErrLongitudeDeg": 0.0474543263870109,
+    "maxErrLatitudeDeg": 0.029659405190300303,
+    "meanErrLongitudeDeg": 0.004327053315891875,
+    "meanErrLatitudeDeg": 0.0034566680855617478,
+    "note": "longitude error is scaled by cos(b); catalog GLON/GLAT are given to 0.01 deg"
+  },
+  "brightest10": [
+    {
+      "i": 0,
+      "name": "Sirius",
+      "vmag": -1.46,
+      "raDeg": 101.28708,
+      "decDeg": -16.71611,
+      "glon": 227.23,
+      "glat": -8.89,
+      "catalogGlon": 227.22,
+      "catalogGlat": -8.88,
+      "bv": 0.0
+    },
+    {
+      "i": 1,
+      "name": "Canopus",
+      "vmag": -0.72,
+      "raDeg": 95.98792,
+      "decDeg": -52.69583,
+      "glon": 261.212,
+      "glat": -25.292,
+      "catalogGlon": 261.21,
+      "catalogGlat": -25.29,
+      "bv": 0.15
+    },
+    {
+      "i": 2,
+      "name": "Arcturus",
+      "vmag": -0.04,
+      "raDeg": 213.91542,
+      "decDeg": 19.1825,
+      "glon": 15.05,
+      "glat": 69.111,
+      "catalogGlon": 15.14,
+      "catalogGlat": 69.11,
+      "bv": 1.23
+    },
+    {
+      "i": 3,
+      "name": "Rigil Kentaurus",
+      "vmag": -0.01,
+      "raDeg": 219.89958,
+      "decDeg": -60.83528,
+      "glon": 315.733,
+      "glat": -0.68,
+      "catalogGlon": 315.78,
+      "catalogGlat": -0.71,
+      "bv": 0.71
+    },
+    {
+      "i": 4,
+      "name": "Vega",
+      "vmag": 0.03,
+      "raDeg": 279.23458,
+      "decDeg": 38.78361,
+      "glon": 67.448,
+      "glat": 19.237,
+      "catalogGlon": 67.44,
+      "catalogGlat": 19.24,
+      "bv": 0.0
+    },
+    {
+      "i": 5,
+      "name": "Capella",
+      "vmag": 0.08,
+      "raDeg": 79.1725,
+      "decDeg": 45.99806,
+      "glon": 162.588,
+      "glat": 4.567,
+      "catalogGlon": 162.58,
+      "catalogGlat": 4.57,
+      "bv": 0.8
+    },
+    {
+      "i": 6,
+      "name": "Rigel",
+      "vmag": 0.12,
+      "raDeg": 78.63458,
+      "decDeg": -8.20167,
+      "glon": 209.241,
+      "glat": -25.245,
+      "catalogGlon": 209.24,
+      "catalogGlat": -25.25,
+      "bv": -0.03
+    },
+    {
+      "i": 7,
+      "name": "Procyon",
+      "vmag": 0.38,
+      "raDeg": 114.82542,
+      "decDeg": 5.225,
+      "glon": 213.702,
+      "glat": 13.019,
+      "catalogGlon": 213.69,
+      "catalogGlat": 13.03,
+      "bv": 0.42
+    },
+    {
+      "i": 8,
+      "name": "Achernar",
+      "vmag": 0.46,
+      "raDeg": 24.42875,
+      "decDeg": -57.23667,
+      "glon": 290.841,
+      "glat": -58.792,
+      "catalogGlon": 290.84,
+      "catalogGlat": -58.79,
+      "bv": -0.16
+    },
+    {
+      "i": 9,
+      "name": "Betelgeuse",
+      "vmag": 0.5,
+      "raDeg": 88.79292,
+      "decDeg": 7.40694,
+      "glon": 199.787,
+      "glat": -8.959,
+      "catalogGlon": 199.79,
+      "catalogGlat": -8.96,
+      "bv": 1.85
+    }
+  ],
+  "named": [
+    {
+      "i": 0,
+      "hr": 2491,
+      "name": "Sirius",
+      "bayer": "Alp CMa",
+      "greek": "α CMa",
+      "con": "CMa",
+      "vmag": -1.46,
+      "flamsteed": "9 CMa"
+    },
+    {
+      "i": 1,
+      "hr": 2326,
+      "name": "Canopus",
+      "bayer": "Alp Car",
+      "greek": "α Car",
+      "con": "Car",
+      "vmag": -0.72
+    },
+    {
+      "i": 2,
+      "hr": 5340,
+      "name": "Arcturus",
+      "bayer": "Alp Boo",
+      "greek": "α Boo",
+      "con": "Boo",
+      "vmag": -0.04,
+      "flamsteed": "16 Boo"
+    },
+    {
+      "i": 3,
+      "hr": 5459,
+      "name": "Rigil Kentaurus",
+      "bayer": "Alp1 Cen",
+      "greek": "α¹ Cen",
+      "con": "Cen",
+      "vmag": -0.01
+    },
+    {
+      "i": 4,
+      "hr": 7001,
+      "name": "Vega",
+      "bayer": "Alp Lyr",
+      "greek": "α Lyr",
+      "con": "Lyr",
+      "vmag": 0.03,
+      "flamsteed": "3 Lyr"
+    },
+    {
+      "i": 5,
+      "hr": 1708,
+      "name": "Capella",
+      "bayer": "Alp Aur",
+      "greek": "α Aur",
+      "con": "Aur",
+      "vmag": 0.08,
+      "flamsteed": "13 Aur"
+    },
+    {
+      "i": 6,
+      "hr": 1713,
+      "name": "Rigel",
+      "bayer": "Bet Ori",
+      "greek": "β Ori",
+      "con": "Ori",
+      "vmag": 0.12,
+      "flamsteed": "19 Ori"
+    },
+    {
+      "i": 7,
+      "hr": 2943,
+      "name": "Procyon",
+      "bayer": "Alp CMi",
+      "greek": "α CMi",
+      "con": "CMi",
+      "vmag": 0.38,
+      "flamsteed": "10 CMi"
+    },
+    {
+      "i": 8,
+      "hr": 472,
+      "name": "Achernar",
+      "bayer": "Alp Eri",
+      "greek": "α Eri",
+      "con": "Eri",
+      "vmag": 0.46
+    },
+    {
+      "i": 9,
+      "hr": 2061,
+      "name": "Betelgeuse",
+      "bayer": "Alp Ori",
+      "greek": "α Ori",
+      "con": "Ori",
+      "vmag": 0.5,
+      "flamsteed": "58 Ori"
+    },
+    {
+      "i": 10,
+      "hr": 5267,
+      "name": "Hadar",
+      "bayer": "Bet Cen",
+      "greek": "β Cen",
+      "con": "Cen",
+      "vmag": 0.61
+    },
+    {
+      "i": 11,
+      "hr": 7557,
+      "name": "Altair",
+      "bayer": "Alp Aql",
+      "greek": "α Aql",
+      "con": "Aql",
+      "vmag": 0.77,
+      "flamsteed": "53 Aql"
+    },
+    {
+      "i": 12,
+      "hr": 1457,
+      "name": "Aldebaran",
+      "bayer": "Alp Tau",
+      "greek": "α Tau",
+      "con": "Tau",
+      "vmag": 0.85,
+      "flamsteed": "87 Tau"
+    },
+    {
+      "i": 13,
+      "hr": 6134,
+      "name": "Antares",
+      "bayer": "Alp Sco",
+      "greek": "α Sco",
+      "con": "Sco",
+      "vmag": 0.96,
+      "flamsteed": "21 Sco"
+    },
+    {
+      "i": 14,
+      "hr": 5056,
+      "name": "Spica",
+      "bayer": "Alp Vir",
+      "greek": "α Vir",
+      "con": "Vir",
+      "vmag": 0.98,
+      "flamsteed": "67 Vir"
+    },
+    {
+      "i": 15,
+      "hr": 2990,
+      "name": "Pollux",
+      "bayer": "Bet Gem",
+      "greek": "β Gem",
+      "con": "Gem",
+      "vmag": 1.14,
+      "flamsteed": "78 Gem"
+    },
+    {
+      "i": 16,
+      "hr": 8728,
+      "name": "Fomalhaut",
+      "bayer": "Alp PsA",
+      "greek": "α PsA",
+      "con": "PsA",
+      "vmag": 1.16,
+      "flamsteed": "24 PsA"
+    },
+    {
+      "i": 17,
+      "hr": 4853,
+      "name": "Mimosa",
+      "bayer": "Bet Cru",
+      "greek": "β Cru",
+      "con": "Cru",
+      "vmag": 1.25
+    },
+    {
+      "i": 18,
+      "hr": 7924,
+      "name": "Deneb",
+      "bayer": "Alp Cyg",
+      "greek": "α Cyg",
+      "con": "Cyg",
+      "vmag": 1.25,
+      "flamsteed": "50 Cyg"
+    },
+    {
+      "i": 19,
+      "hr": 4730,
+      "name": "Acrux",
+      "bayer": "Alp1 Cru",
+      "greek": "α¹ Cru",
+      "con": "Cru",
+      "vmag": 1.33
+    },
+    {
+      "i": 20,
+      "hr": 5460,
+      "name": "",
+      "bayer": "Alp2 Cen",
+      "greek": "α² Cen",
+      "con": "Cen",
+      "vmag": 1.33
+    },
+    {
+      "i": 21,
+      "hr": 3982,
+      "name": "Regulus",
+      "bayer": "Alp Leo",
+      "greek": "α Leo",
+      "con": "Leo",
+      "vmag": 1.35,
+      "flamsteed": "32 Leo"
+    },
+    {
+      "i": 22,
+      "hr": 2618,
+      "name": "Adhara",
+      "bayer": "Eps CMa",
+      "greek": "ε CMa",
+      "con": "CMa",
+      "vmag": 1.5,
+      "flamsteed": "21 CMa"
+    },
+    {
+      "i": 23,
+      "hr": 4763,
+      "name": "Gacrux",
+      "bayer": "Gam Cru",
+      "greek": "γ Cru",
+      "con": "Cru",
+      "vmag": 1.63
+    },
+    {
+      "i": 24,
+      "hr": 6527,
+      "name": "Shaula",
+      "bayer": "Lam Sco",
+      "greek": "λ Sco",
+      "con": "Sco",
+      "vmag": 1.63,
+      "flamsteed": "35 Sco"
+    },
+    {
+      "i": 25,
+      "hr": 1790,
+      "name": "Bellatrix",
+      "bayer": "Gam Ori",
+      "greek": "γ Ori",
+      "con": "Ori",
+      "vmag": 1.64,
+      "flamsteed": "24 Ori"
+    },
+    {
+      "i": 26,
+      "hr": 1791,
+      "name": "Elnath",
+      "bayer": "Bet Tau",
+      "greek": "β Tau",
+      "con": "Tau",
+      "vmag": 1.65,
+      "flamsteed": "112 Tau"
+    },
+    {
+      "i": 27,
+      "hr": 3685,
+      "name": "Miaplacidus",
+      "bayer": "Bet Car",
+      "greek": "β Car",
+      "con": "Car",
+      "vmag": 1.68
+    },
+    {
+      "i": 28,
+      "hr": 1903,
+      "name": "Alnilam",
+      "bayer": "Eps Ori",
+      "greek": "ε Ori",
+      "con": "Ori",
+      "vmag": 1.7,
+      "flamsteed": "46 Ori"
+    },
+    {
+      "i": 29,
+      "hr": 4731,
+      "name": "",
+      "bayer": "Alp2 Cru",
+      "greek": "α² Cru",
+      "con": "Cru",
+      "vmag": 1.73
+    },
+    {
+      "i": 30,
+      "hr": 8425,
+      "name": "Alnair",
+      "bayer": "Alp Gru",
+      "greek": "α Gru",
+      "con": "Gru",
+      "vmag": 1.74
+    },
+    {
+      "i": 31,
+      "hr": 4905,
+      "name": "Alioth",
+      "bayer": "Eps UMa",
+      "greek": "ε UMa",
+      "con": "UMa",
+      "vmag": 1.77,
+      "flamsteed": "77 UMa"
+    },
+    {
+      "i": 32,
+      "hr": 3207,
+      "name": "",
+      "bayer": "Gam2 Vel",
+      "greek": "γ² Vel",
+      "con": "Vel",
+      "vmag": 1.78
+    },
+    {
+      "i": 33,
+      "hr": 1017,
+      "name": "Mirfak",
+      "bayer": "Alp Per",
+      "greek": "α Per",
+      "con": "Per",
+      "vmag": 1.79,
+      "flamsteed": "33 Per"
+    },
+    {
+      "i": 34,
+      "hr": 4301,
+      "name": "Dubhe",
+      "bayer": "Alp UMa",
+      "greek": "α UMa",
+      "con": "UMa",
+      "vmag": 1.79,
+      "flamsteed": "50 UMa"
+    },
+    {
+      "i": 35,
+      "hr": 2693,
+      "name": "Wezen",
+      "bayer": "Del CMa",
+      "greek": "δ CMa",
+      "con": "CMa",
+      "vmag": 1.84,
+      "flamsteed": "25 CMa"
+    },
+    {
+      "i": 36,
+      "hr": 6879,
+      "name": "Kaus Australis",
+      "bayer": "Eps Sgr",
+      "greek": "ε Sgr",
+      "con": "Sgr",
+      "vmag": 1.85,
+      "flamsteed": "20 Sgr"
+    },
+    {
+      "i": 37,
+      "hr": 3307,
+      "name": "Avior",
+      "bayer": "Eps Car",
+      "greek": "ε Car",
+      "con": "Car",
+      "vmag": 1.86
+    },
+    {
+      "i": 38,
+      "hr": 5191,
+      "name": "Alkaid",
+      "bayer": "Eta UMa",
+      "greek": "η UMa",
+      "con": "UMa",
+      "vmag": 1.86,
+      "flamsteed": "85 UMa"
+    },
+    {
+      "i": 39,
+      "hr": 6553,
+      "name": "Sargas",
+      "bayer": "The Sco",
+      "greek": "θ Sco",
+      "con": "Sco",
+      "vmag": 1.87
+    },
+    {
+      "i": 40,
+      "hr": 2088,
+      "name": "Menkalinan",
+      "bayer": "Bet Aur",
+      "greek": "β Aur",
+      "con": "Aur",
+      "vmag": 1.9,
+      "flamsteed": "34 Aur"
+    },
+    {
+      "i": 41,
+      "hr": 6217,
+      "name": "Atria",
+      "bayer": "Alp TrA",
+      "greek": "α TrA",
+      "con": "TrA",
+      "vmag": 1.92
+    },
+    {
+      "i": 42,
+      "hr": 2421,
+      "name": "Alhena",
+      "bayer": "Gam Gem",
+      "greek": "γ Gem",
+      "con": "Gem",
+      "vmag": 1.93,
+      "flamsteed": "24 Gem"
+    },
+    {
+      "i": 43,
+      "hr": 7790,
+      "name": "Peacock",
+      "bayer": "Alp Pav",
+      "greek": "α Pav",
+      "con": "Pav",
+      "vmag": 1.94
+    },
+    {
+      "i": 44,
+      "hr": 3485,
+      "name": "",
+      "bayer": "Del Vel",
+      "greek": "δ Vel",
+      "con": "Vel",
+      "vmag": 1.96
+    },
+    {
+      "i": 45,
+      "hr": 2294,
+      "name": "Mirzam",
+      "bayer": "Bet CMa",
+      "greek": "β CMa",
+      "con": "CMa",
+      "vmag": 1.98,
+      "flamsteed": "2 CMa"
+    },
+    {
+      "i": 46,
+      "hr": 2891,
+      "name": "Castor",
+      "bayer": "Alp Gem",
+      "greek": "α Gem",
+      "con": "Gem",
+      "vmag": 1.98,
+      "flamsteed": "66 Gem"
+    },
+    {
+      "i": 47,
+      "hr": 3748,
+      "name": "Alphard",
+      "bayer": "Alp Hya",
+      "greek": "α Hya",
+      "con": "Hya",
+      "vmag": 1.98,
+      "flamsteed": "30 Hya"
+    },
+    {
+      "i": 48,
+      "hr": 617,
+      "name": "Hamal",
+      "bayer": "Alp Ari",
+      "greek": "α Ari",
+      "con": "Ari",
+      "vmag": 2.0,
+      "flamsteed": "13 Ari"
+    },
+    {
+      "i": 49,
+      "hr": 5958,
+      "name": "",
+      "bayer": "",
+      "greek": "",
+      "con": "",
+      "vmag": 2.0
+    },
+    {
+      "i": 50,
+      "hr": 424,
+      "name": "Polaris",
+      "bayer": "Alp UMi",
+      "greek": "α UMi",
+      "con": "UMi",
+      "vmag": 2.02,
+      "flamsteed": "1 UMi"
+    },
+    {
+      "i": 51,
+      "hr": 7121,
+      "name": "Nunki",
+      "bayer": "Sig Sgr",
+      "greek": "σ Sgr",
+      "con": "Sgr",
+      "vmag": 2.02,
+      "flamsteed": "34 Sgr"
+    },
+    {
+      "i": 52,
+      "hr": 188,
+      "name": "Diphda",
+      "bayer": "Bet Cet",
+      "greek": "β Cet",
+      "con": "Cet",
+      "vmag": 2.04,
+      "flamsteed": "16 Cet"
+    },
+    {
+      "i": 53,
+      "hr": 1948,
+      "name": "Alnitak",
+      "bayer": "Zet Ori",
+      "greek": "ζ Ori",
+      "con": "Ori",
+      "vmag": 2.05,
+      "flamsteed": "50 Ori"
+    },
+    {
+      "i": 54,
+      "hr": 15,
+      "name": "Alpheratz",
+      "bayer": "Alp And",
+      "greek": "α And",
+      "con": "And",
+      "vmag": 2.06,
+      "flamsteed": "21 And"
+    },
+    {
+      "i": 55,
+      "hr": 337,
+      "name": "Mirach",
+      "bayer": "Bet And",
+      "greek": "β And",
+      "con": "And",
+      "vmag": 2.06,
+      "flamsteed": "43 And"
+    },
+    {
+      "i": 56,
+      "hr": 2004,
+      "name": "Saiph",
+      "bayer": "Kap Ori",
+      "greek": "κ Ori",
+      "con": "Ori",
+      "vmag": 2.06,
+      "flamsteed": "53 Ori"
+    },
+    {
+      "i": 57,
+      "hr": 5288,
+      "name": "Menkent",
+      "bayer": "The Cen",
+      "greek": "θ Cen",
+      "con": "Cen",
+      "vmag": 2.06,
+      "flamsteed": "5 Cen"
+    },
+    {
+      "i": 58,
+      "hr": 5563,
+      "name": "Kochab",
+      "bayer": "Bet UMi",
+      "greek": "β UMi",
+      "con": "UMi",
+      "vmag": 2.08,
+      "flamsteed": "7 UMi"
+    },
+    {
+      "i": 59,
+      "hr": 6556,
+      "name": "Rasalhague",
+      "bayer": "Alp Oph",
+      "greek": "α Oph",
+      "con": "Oph",
+      "vmag": 2.08,
+      "flamsteed": "55 Oph"
+    },
+    {
+      "i": 61,
+      "hr": 936,
+      "name": "Algol",
+      "bayer": "Bet Per",
+      "greek": "β Per",
+      "con": "Per",
+      "vmag": 2.12,
+      "flamsteed": "26 Per"
+    },
+    {
+      "i": 62,
+      "hr": 4534,
+      "name": "Denebola",
+      "bayer": "Bet Leo",
+      "greek": "β Leo",
+      "con": "Leo",
+      "vmag": 2.14,
+      "flamsteed": "94 Leo"
+    },
+    {
+      "i": 64,
+      "hr": 7796,
+      "name": "Sadr",
+      "bayer": "Gam Cyg",
+      "greek": "γ Cyg",
+      "con": "Cyg",
+      "vmag": 2.2,
+      "flamsteed": "37 Cyg"
+    },
+    {
+      "i": 65,
+      "hr": 3634,
+      "name": "Suhail",
+      "bayer": "Lam Vel",
+      "greek": "λ Vel",
+      "con": "Vel",
+      "vmag": 2.21
+    },
+    {
+      "i": 66,
+      "hr": 168,
+      "name": "Schedar",
+      "bayer": "Alp Cas",
+      "greek": "α Cas",
+      "con": "Cas",
+      "vmag": 2.23,
+      "flamsteed": "18 Cas"
+    },
+    {
+      "i": 67,
+      "hr": 1852,
+      "name": "Mintaka",
+      "bayer": "Del Ori",
+      "greek": "δ Ori",
+      "con": "Ori",
+      "vmag": 2.23,
+      "flamsteed": "34 Ori"
+    },
+    {
+      "i": 68,
+      "hr": 5793,
+      "name": "Alphecca",
+      "bayer": "Alp CrB",
+      "greek": "α CrB",
+      "con": "CrB",
+      "vmag": 2.23,
+      "flamsteed": "5 CrB"
+    },
+    {
+      "i": 69,
+      "hr": 6705,
+      "name": "Eltanin",
+      "bayer": "Gam Dra",
+      "greek": "γ Dra",
+      "con": "Dra",
+      "vmag": 2.23,
+      "flamsteed": "33 Dra"
+    },
+    {
+      "i": 70,
+      "hr": 3165,
+      "name": "Naos",
+      "bayer": "Zet Pup",
+      "greek": "ζ Pup",
+      "con": "Pup",
+      "vmag": 2.25
+    },
+    {
+      "i": 71,
+      "hr": 3699,
+      "name": "Aspidiske",
+      "bayer": "Iot Car",
+      "greek": "ι Car",
+      "con": "Car",
+      "vmag": 2.25
+    },
+    {
+      "i": 72,
+      "hr": 603,
+      "name": "Almach",
+      "bayer": "Gam1 And",
+      "greek": "γ¹ And",
+      "con": "And",
+      "vmag": 2.26,
+      "flamsteed": "57 And"
+    },
+    {
+      "i": 73,
+      "hr": 21,
+      "name": "Caph",
+      "bayer": "Bet Cas",
+      "greek": "β Cas",
+      "con": "Cas",
+      "vmag": 2.27,
+      "flamsteed": "11 Cas"
+    },
+    {
+      "i": 74,
+      "hr": 5054,
+      "name": "Mizar",
+      "bayer": "Zet UMa",
+      "greek": "ζ UMa",
+      "con": "UMa",
+      "vmag": 2.27,
+      "flamsteed": "79 UMa"
+    },
+    {
+      "i": 79,
+      "hr": 5953,
+      "name": "Dschubba",
+      "bayer": "Del Sco",
+      "greek": "δ Sco",
+      "con": "Sco",
+      "vmag": 2.32,
+      "flamsteed": "7 Sco"
+    },
+    {
+      "i": 80,
+      "hr": 4295,
+      "name": "Merak",
+      "bayer": "Bet UMa",
+      "greek": "β UMa",
+      "con": "UMa",
+      "vmag": 2.37,
+      "flamsteed": "48 UMa"
+    },
+    {
+      "i": 81,
+      "hr": 99,
+      "name": "Ankaa",
+      "bayer": "Alp Phe",
+      "greek": "α Phe",
+      "con": "Phe",
+      "vmag": 2.39
+    },
+    {
+      "i": 82,
+      "hr": 8308,
+      "name": "Enif",
+      "bayer": "Eps Peg",
+      "greek": "ε Peg",
+      "con": "Peg",
+      "vmag": 2.39,
+      "flamsteed": "8 Peg"
+    },
+    {
+      "i": 83,
+      "hr": 6580,
+      "name": "Girtab",
+      "bayer": "Kap Sco",
+      "greek": "κ Sco",
+      "con": "Sco",
+      "vmag": 2.41
+    },
+    {
+      "i": 84,
+      "hr": 8775,
+      "name": "Scheat",
+      "bayer": "Bet Peg",
+      "greek": "β Peg",
+      "con": "Peg",
+      "vmag": 2.42,
+      "flamsteed": "53 Peg"
+    },
+    {
+      "i": 85,
+      "hr": 6378,
+      "name": "Sabik",
+      "bayer": "Eta Oph",
+      "greek": "η Oph",
+      "con": "Oph",
+      "vmag": 2.43,
+      "flamsteed": "35 Oph"
+    },
+    {
+      "i": 86,
+      "hr": 4554,
+      "name": "Phecda",
+      "bayer": "Gam UMa",
+      "greek": "γ UMa",
+      "con": "UMa",
+      "vmag": 2.44,
+      "flamsteed": "64 UMa"
+    },
+    {
+      "i": 87,
+      "hr": 8162,
+      "name": "Alderamin",
+      "bayer": "Alp Cep",
+      "greek": "α Cep",
+      "con": "Cep",
+      "vmag": 2.44,
+      "flamsteed": "5 Cep"
+    },
+    {
+      "i": 88,
+      "hr": 2827,
+      "name": "Aludra",
+      "bayer": "Eta CMa",
+      "greek": "η CMa",
+      "con": "CMa",
+      "vmag": 2.45,
+      "flamsteed": "31 CMa"
+    },
+    {
+      "i": 90,
+      "hr": 264,
+      "name": "Navi",
+      "bayer": "Gam Cas",
+      "greek": "γ Cas",
+      "con": "Cas",
+      "vmag": 2.47,
+      "flamsteed": "27 Cas"
+    },
+    {
+      "i": 91,
+      "hr": 8781,
+      "name": "Markab",
+      "bayer": "Alp Peg",
+      "greek": "α Peg",
+      "con": "Peg",
+      "vmag": 2.49,
+      "flamsteed": "54 Peg"
+    },
+    {
+      "i": 93,
+      "hr": 911,
+      "name": "Menkar",
+      "bayer": "Alp Cet",
+      "greek": "α Cet",
+      "con": "Cet",
+      "vmag": 2.53,
+      "flamsteed": "92 Cet"
+    },
+    {
+      "i": 95,
+      "hr": 4357,
+      "name": "Zosma",
+      "bayer": "Del Leo",
+      "greek": "δ Leo",
+      "con": "Leo",
+      "vmag": 2.56,
+      "flamsteed": "68 Leo"
+    },
+    {
+      "i": 97,
+      "hr": 1865,
+      "name": "Arneb",
+      "bayer": "Alp Lep",
+      "greek": "α Lep",
+      "con": "Lep",
+      "vmag": 2.58,
+      "flamsteed": "11 Lep"
+    },
+    {
+      "i": 98,
+      "hr": 4662,
+      "name": "Gienah",
+      "bayer": "Gam Crv",
+      "greek": "γ Crv",
+      "con": "Crv",
+      "vmag": 2.59,
+      "flamsteed": "4 Crv"
+    },
+    {
+      "i": 100,
+      "hr": 7194,
+      "name": "Ascella",
+      "bayer": "Zet Sgr",
+      "greek": "ζ Sgr",
+      "con": "Sgr",
+      "vmag": 2.6,
+      "flamsteed": "38 Sgr"
+    },
+    {
+      "i": 101,
+      "hr": 4057,
+      "name": "Algieba",
+      "bayer": "Gam1 Leo",
+      "greek": "γ¹ Leo",
+      "con": "Leo",
+      "vmag": 2.61,
+      "flamsteed": "41 Leo"
+    },
+    {
+      "i": 102,
+      "hr": 5685,
+      "name": "Zubeneschamali",
+      "bayer": "Bet Lib",
+      "greek": "β Lib",
+      "con": "Lib",
+      "vmag": 2.61,
+      "flamsteed": "27 Lib"
+    },
+    {
+      "i": 103,
+      "hr": 2095,
+      "name": "Mahasim",
+      "bayer": "The Aur",
+      "greek": "θ Aur",
+      "con": "Aur",
+      "vmag": 2.62,
+      "flamsteed": "37 Aur"
+    },
+    {
+      "i": 104,
+      "hr": 5984,
+      "name": "Acrab",
+      "bayer": "Bet1 Sco",
+      "greek": "β¹ Sco",
+      "con": "Sco",
+      "vmag": 2.62,
+      "flamsteed": "8 Sco"
+    },
+    {
+      "i": 105,
+      "hr": 553,
+      "name": "Sheratan",
+      "bayer": "Bet Ari",
+      "greek": "β Ari",
+      "con": "Ari",
+      "vmag": 2.64,
+      "flamsteed": "6 Ari"
+    },
+    {
+      "i": 106,
+      "hr": 1956,
+      "name": "Phact",
+      "bayer": "Alp Col",
+      "greek": "α Col",
+      "con": "Col",
+      "vmag": 2.64
+    },
+    {
+      "i": 107,
+      "hr": 4786,
+      "name": "Kraz",
+      "bayer": "Bet Crv",
+      "greek": "β Crv",
+      "con": "Crv",
+      "vmag": 2.65,
+      "flamsteed": "9 Crv"
+    },
+    {
+      "i": 108,
+      "hr": 5854,
+      "name": "Unukalhai",
+      "bayer": "Alp Ser",
+      "greek": "α Ser",
+      "con": "Ser",
+      "vmag": 2.65,
+      "flamsteed": "24 Ser"
+    },
+    {
+      "i": 109,
+      "hr": 403,
+      "name": "Ruchbah",
+      "bayer": "Del Cas",
+      "greek": "δ Cas",
+      "con": "Cas",
+      "vmag": 2.68,
+      "flamsteed": "37 Cas"
+    },
+    {
+      "i": 110,
+      "hr": 5235,
+      "name": "Muphrid",
+      "bayer": "Eta Boo",
+      "greek": "η Boo",
+      "con": "Boo",
+      "vmag": 2.68,
+      "flamsteed": "8 Boo"
+    },
+    {
+      "i": 112,
+      "hr": 1577,
+      "name": "Kabdhilinan",
+      "bayer": "Iot Aur",
+      "greek": "ι Aur",
+      "con": "Aur",
+      "vmag": 2.69,
+      "flamsteed": "3 Aur"
+    },
+    {
+      "i": 115,
+      "hr": 6508,
+      "name": "Lesath",
+      "bayer": "Ups Sco",
+      "greek": "υ Sco",
+      "con": "Sco",
+      "vmag": 2.69,
+      "flamsteed": "34 Sco"
+    },
+    {
+      "i": 117,
+      "hr": 5506,
+      "name": "Izar",
+      "bayer": "Eps Boo",
+      "greek": "ε Boo",
+      "con": "Boo",
+      "vmag": 2.7,
+      "flamsteed": "36 Boo"
+    },
+    {
+      "i": 118,
+      "hr": 6859,
+      "name": "Kaus Media",
+      "bayer": "Del Sgr",
+      "greek": "δ Sgr",
+      "con": "Sgr",
+      "vmag": 2.7,
+      "flamsteed": "19 Sgr"
+    },
+    {
+      "i": 119,
+      "hr": 7525,
+      "name": "Tarazed",
+      "bayer": "Gam Aql",
+      "greek": "γ Aql",
+      "con": "Aql",
+      "vmag": 2.72,
+      "flamsteed": "50 Aql"
+    },
+    {
+      "i": 120,
+      "hr": 6056,
+      "name": "Yed Prior",
+      "bayer": "Del Oph",
+      "greek": "δ Oph",
+      "con": "Oph",
+      "vmag": 2.74,
+      "flamsteed": "1 Oph"
+    },
+    {
+      "i": 123,
+      "hr": 5531,
+      "name": "Zubenelgenubi",
+      "bayer": "Alp2 Lib",
+      "greek": "α² Lib",
+      "con": "Lib",
+      "vmag": 2.75,
+      "flamsteed": "9 Lib"
+    },
+    {
+      "i": 125,
+      "hr": 1899,
+      "name": "Nair Al Saif",
+      "bayer": "Iot Ori",
+      "greek": "ι Ori",
+      "con": "Ori",
+      "vmag": 2.77,
+      "flamsteed": "44 Ori"
+    },
+    {
+      "i": 126,
+      "hr": 6148,
+      "name": "Kornephoros",
+      "bayer": "Bet Her",
+      "greek": "β Her",
+      "con": "Her",
+      "vmag": 2.77,
+      "flamsteed": "27 Her"
+    },
+    {
+      "i": 127,
+      "hr": 6603,
+      "name": "Cebalrai",
+      "bayer": "Bet Oph",
+      "greek": "β Oph",
+      "con": "Oph",
+      "vmag": 2.77,
+      "flamsteed": "60 Oph"
+    },
+    {
+      "i": 129,
+      "hr": 1666,
+      "name": "Cursa",
+      "bayer": "Bet Eri",
+      "greek": "β Eri",
+      "con": "Eri",
+      "vmag": 2.79,
+      "flamsteed": "67 Eri"
+    },
+    {
+      "i": 130,
+      "hr": 6536,
+      "name": "Rastaban",
+      "bayer": "Bet Dra",
+      "greek": "β Dra",
+      "con": "Dra",
+      "vmag": 2.79,
+      "flamsteed": "23 Dra"
+    },
+    {
+      "i": 133,
+      "hr": 3185,
+      "name": "Tureis",
+      "bayer": "Rho Pup",
+      "greek": "ρ Pup",
+      "con": "Pup",
+      "vmag": 2.81,
+      "flamsteed": "15 Pup"
+    },
+    {
+      "i": 135,
+      "hr": 6913,
+      "name": "Kaus Borealis",
+      "bayer": "Lam Sgr",
+      "greek": "λ Sgr",
+      "con": "Sgr",
+      "vmag": 2.81,
+      "flamsteed": "22 Sgr"
+    },
+    {
+      "i": 136,
+      "hr": 6165,
+      "name": "Alniyat",
+      "bayer": "Tau Sco",
+      "greek": "τ Sco",
+      "con": "Sco",
+      "vmag": 2.82,
+      "flamsteed": "23 Sco"
+    },
+    {
+      "i": 137,
+      "hr": 39,
+      "name": "Algenib",
+      "bayer": "Gam Peg",
+      "greek": "γ Peg",
+      "con": "Peg",
+      "vmag": 2.83,
+      "flamsteed": "88 Peg"
+    },
+    {
+      "i": 138,
+      "hr": 4932,
+      "name": "Vindemiatrix",
+      "bayer": "Eps Vir",
+      "greek": "ε Vir",
+      "con": "Vir",
+      "vmag": 2.83,
+      "flamsteed": "47 Vir"
+    },
+    {
+      "i": 139,
+      "hr": 1829,
+      "name": "Nihal",
+      "bayer": "Bet Lep",
+      "greek": "β Lep",
+      "con": "Lep",
+      "vmag": 2.84,
+      "flamsteed": "9 Lep"
+    },
+    {
+      "i": 141,
+      "hr": 5897,
+      "name": "Betria",
+      "bayer": "Bet TrA",
+      "greek": "β TrA",
+      "con": "TrA",
+      "vmag": 2.85
+    },
+    {
+      "i": 143,
+      "hr": 591,
+      "name": "Head of Hydrus",
+      "bayer": "Alp Hyi",
+      "greek": "α Hyi",
+      "con": "Hyi",
+      "vmag": 2.86
+    },
+    {
+      "i": 145,
+      "hr": 1165,
+      "name": "Alcyone",
+      "bayer": "Eta Tau",
+      "greek": "η Tau",
+      "con": "Tau",
+      "vmag": 2.87,
+      "flamsteed": "25 Tau"
+    },
+    {
+      "i": 146,
+      "hr": 7528,
+      "name": "Al Fawaris",
+      "bayer": "Del Cyg",
+      "greek": "δ Cyg",
+      "con": "Cyg",
+      "vmag": 2.87,
+      "flamsteed": "18 Cyg"
+    },
+    {
+      "i": 147,
+      "hr": 8322,
+      "name": "Deneb Algedi",
+      "bayer": "Del Cap",
+      "greek": "δ Cap",
+      "con": "Cap",
+      "vmag": 2.87,
+      "flamsteed": "49 Cap"
+    },
+    {
+      "i": 148,
+      "hr": 2286,
+      "name": "Tejat Posterior",
+      "bayer": "Mu Gem",
+      "greek": "μ Gem",
+      "con": "Gem",
+      "vmag": 2.88,
+      "flamsteed": "13 Gem"
+    },
+    {
+      "i": 149,
+      "hr": 2890,
+      "name": "Castor",
+      "bayer": "Alp Gem",
+      "greek": "α Gem",
+      "con": "Gem",
+      "vmag": 2.88,
+      "flamsteed": "66 Gem"
+    },
+    {
+      "i": 151,
+      "hr": 5671,
+      "name": "Gatria",
+      "bayer": "Gam TrA",
+      "greek": "γ TrA",
+      "con": "TrA",
+      "vmag": 2.89
+    },
+    {
+      "i": 153,
+      "hr": 6084,
+      "name": "Al Niyat",
+      "bayer": "Sig Sco",
+      "greek": "σ Sco",
+      "con": "Sco",
+      "vmag": 2.89,
+      "flamsteed": "20 Sco"
+    },
+    {
+      "i": 154,
+      "hr": 7264,
+      "name": "Albaldah",
+      "bayer": "Pi Sgr",
+      "greek": "π Sgr",
+      "con": "Sgr",
+      "vmag": 2.89,
+      "flamsteed": "41 Sgr"
+    },
+    {
+      "i": 155,
+      "hr": 2845,
+      "name": "Gomeisa",
+      "bayer": "Bet CMi",
+      "greek": "β CMi",
+      "con": "CMi",
+      "vmag": 2.9,
+      "flamsteed": "3 CMi"
+    },
+    {
+      "i": 156,
+      "hr": 4915,
+      "name": "Chara",
+      "bayer": "Alp2 CVn",
+      "greek": "α² CVn",
+      "con": "CVn",
+      "vmag": 2.9,
+      "flamsteed": "12 CVn"
+    },
+    {
+      "i": 157,
+      "hr": 8232,
+      "name": "Sadalsuud",
+      "bayer": "Bet Aqr",
+      "greek": "β Aqr",
+      "con": "Aqr",
+      "vmag": 2.91,
+      "flamsteed": "22 Aqr"
+    },
+    {
+      "i": 160,
+      "hr": 8650,
+      "name": "Matar",
+      "bayer": "Eta Peg",
+      "greek": "η Peg",
+      "con": "Peg",
+      "vmag": 2.94,
+      "flamsteed": "44 Peg"
+    },
+    {
+      "i": 161,
+      "hr": 1231,
+      "name": "Zaurak",
+      "bayer": "Gam Eri",
+      "greek": "γ Eri",
+      "con": "Eri",
+      "vmag": 2.95,
+      "flamsteed": "34 Eri"
+    },
+    {
+      "i": 162,
+      "hr": 4757,
+      "name": "Algorab",
+      "bayer": "Del Crv",
+      "greek": "δ Crv",
+      "con": "Crv",
+      "vmag": 2.95,
+      "flamsteed": "7 Crv"
+    },
+    {
+      "i": 164,
+      "hr": 8414,
+      "name": "Sadalmelik",
+      "bayer": "Alp Aqr",
+      "greek": "α Aqr",
+      "con": "Aqr",
+      "vmag": 2.96,
+      "flamsteed": "34 Aqr"
+    },
+    {
+      "i": 165,
+      "hr": 2473,
+      "name": "Mebsuta",
+      "bayer": "Eps Gem",
+      "greek": "ε Gem",
+      "con": "Gem",
+      "vmag": 2.98,
+      "flamsteed": "27 Gem"
+    },
+    {
+      "i": 166,
+      "hr": 3873,
+      "name": "Ras Elased Australis",
+      "bayer": "Eps Leo",
+      "greek": "ε Leo",
+      "con": "Leo",
+      "vmag": 2.98,
+      "flamsteed": "17 Leo"
+    },
+    {
+      "i": 167,
+      "hr": 1605,
+      "name": "Haldus",
+      "bayer": "Eps Aur",
+      "greek": "ε Aur",
+      "con": "Aur",
+      "vmag": 2.99,
+      "flamsteed": "7 Aur"
+    },
+    {
+      "i": 168,
+      "hr": 6746,
+      "name": "Alnasl",
+      "bayer": "Gam2 Sgr",
+      "greek": "γ² Sgr",
+      "con": "Sgr",
+      "vmag": 2.99,
+      "flamsteed": "10 Sgr"
+    },
+    {
+      "i": 169,
+      "hr": 7235,
+      "name": "Deneb el Okab",
+      "bayer": "Zet Aql",
+      "greek": "ζ Aql",
+      "con": "Aql",
+      "vmag": 2.99,
+      "flamsteed": "17 Aql"
+    },
+    {
+      "i": 171,
+      "hr": 1910,
+      "name": "Tien Kwan",
+      "bayer": "Zet Tau",
+      "greek": "ζ Tau",
+      "con": "Tau",
+      "vmag": 3.0,
+      "flamsteed": "123 Tau"
+    },
+    {
+      "i": 172,
+      "hr": 4630,
+      "name": "Minkar",
+      "bayer": "Eps Crv",
+      "greek": "ε Crv",
+      "con": "Crv",
+      "vmag": 3.0,
+      "flamsteed": "2 Crv"
+    },
+    {
+      "i": 177,
+      "hr": 8353,
+      "name": "Aldhanab",
+      "bayer": "Gam Gru",
+      "greek": "γ Gru",
+      "con": "Gru",
+      "vmag": 3.01
+    },
+    {
+      "i": 178,
+      "hr": 2282,
+      "name": "Furud",
+      "bayer": "Zet CMa",
+      "greek": "ζ CMa",
+      "con": "CMa",
+      "vmag": 3.02,
+      "flamsteed": "1 CMa"
+    },
+    {
+      "i": 180,
+      "hr": 5435,
+      "name": "Seginus",
+      "bayer": "Gam Boo",
+      "greek": "γ Boo",
+      "con": "Boo",
+      "vmag": 3.03,
+      "flamsteed": "27 Boo"
+    },
+    {
+      "i": 182,
+      "hr": 681,
+      "name": "Mira",
+      "bayer": "Omi Cet",
+      "greek": "ο Cet",
+      "con": "Cet",
+      "vmag": 3.04,
+      "flamsteed": "68 Cet"
+    },
+    {
+      "i": 184,
+      "hr": 4069,
+      "name": "Tania Australis",
+      "bayer": "Mu UMa",
+      "greek": "μ UMa",
+      "con": "UMa",
+      "vmag": 3.05,
+      "flamsteed": "34 UMa"
+    },
+    {
+      "i": 186,
+      "hr": 5735,
+      "name": "Pherkad",
+      "bayer": "Gam UMi",
+      "greek": "γ UMi",
+      "con": "UMi",
+      "vmag": 3.05,
+      "flamsteed": "13 UMi"
+    },
+    {
+      "i": 187,
+      "hr": 7310,
+      "name": "Altais",
+      "bayer": "Del Dra",
+      "greek": "δ Dra",
+      "con": "Dra",
+      "vmag": 3.07,
+      "flamsteed": "57 Dra"
+    },
+    {
+      "i": 189,
+      "hr": 7417,
+      "name": "Albireo",
+      "bayer": "Bet1 Cyg",
+      "greek": "β¹ Cyg",
+      "con": "Cyg",
+      "vmag": 3.08,
+      "flamsteed": "6 Cyg"
+    },
+    {
+      "i": 190,
+      "hr": 7776,
+      "name": "Dabih",
+      "bayer": "Bet Cap",
+      "greek": "β Cap",
+      "con": "Cap",
+      "vmag": 3.08,
+      "flamsteed": "9 Cap"
+    },
+    {
+      "i": 191,
+      "hr": 3547,
+      "name": "Hydrobius",
+      "bayer": "Zet Hya",
+      "greek": "ζ Hya",
+      "con": "Hya",
+      "vmag": 3.11,
+      "flamsteed": "16 Hya"
+    },
+    {
+      "i": 195,
+      "hr": 2040,
+      "name": "Wazn",
+      "bayer": "Bet Col",
+      "greek": "β Col",
+      "con": "Col",
+      "vmag": 3.12
+    },
+    {
+      "i": 201,
+      "hr": 3569,
+      "name": "Talitha",
+      "bayer": "Iot UMa",
+      "greek": "ι UMa",
+      "con": "UMa",
+      "vmag": 3.14,
+      "flamsteed": "9 UMa"
+    },
+    {
+      "i": 202,
+      "hr": 6410,
+      "name": "Sarin",
+      "bayer": "Del Her",
+      "greek": "δ Her",
+      "con": "Her",
+      "vmag": 3.14,
+      "flamsteed": "65 Her"
+    },
+    {
+      "i": 204,
+      "hr": 1641,
+      "name": "Hoedus II",
+      "bayer": "Eta Aur",
+      "greek": "η Aur",
+      "con": "Aur",
+      "vmag": 3.17,
+      "flamsteed": "10 Aur"
+    },
+    {
+      "i": 206,
+      "hr": 3775,
+      "name": "Sarir",
+      "bayer": "The UMa",
+      "greek": "θ UMa",
+      "con": "UMa",
+      "vmag": 3.17,
+      "flamsteed": "25 UMa"
+    },
+    {
+      "i": 207,
+      "hr": 6396,
+      "name": "Aldhibain",
+      "bayer": "Zet Dra",
+      "greek": "ζ Dra",
+      "con": "Dra",
+      "vmag": 3.17,
+      "flamsteed": "22 Dra"
+    },
+    {
+      "i": 209,
+      "hr": 1543,
+      "name": "Tabit",
+      "bayer": "Pi3 Ori",
+      "greek": "π³ Ori",
+      "con": "Ori",
+      "vmag": 3.19,
+      "flamsteed": "1 Ori"
+    },
+    {
+      "i": 215,
+      "hr": 8974,
+      "name": "Errai",
+      "bayer": "Gam Cep",
+      "greek": "γ Cep",
+      "con": "Cep",
+      "vmag": 3.21,
+      "flamsteed": "35 Cep"
+    },
+    {
+      "i": 218,
+      "hr": 8238,
+      "name": "Alfirk",
+      "bayer": "Bet Cep",
+      "greek": "β Cep",
+      "con": "Cep",
+      "vmag": 3.23,
+      "flamsteed": "8 Cep"
+    },
+    {
+      "i": 219,
+      "hr": 897,
+      "name": "Acamar",
+      "bayer": "The1 Eri",
+      "greek": "θ¹ Eri",
+      "con": "Eri",
+      "vmag": 3.24
+    },
+    {
+      "i": 221,
+      "hr": 6075,
+      "name": "Yed Posterior",
+      "bayer": "Eps Oph",
+      "greek": "ε Oph",
+      "con": "Oph",
+      "vmag": 3.24,
+      "flamsteed": "2 Oph"
+    },
+    {
+      "i": 222,
+      "hr": 7178,
+      "name": "Sulafat",
+      "bayer": "Gam Lyr",
+      "greek": "γ Lyr",
+      "con": "Lyr",
+      "vmag": 3.24,
+      "flamsteed": "14 Lyr"
+    },
+    {
+      "i": 230,
+      "hr": 8709,
+      "name": "Skat",
+      "bayer": "Del Aqr",
+      "greek": "δ Aqr",
+      "con": "Aqr",
+      "vmag": 3.27,
+      "flamsteed": "76 Aqr"
+    },
+    {
+      "i": 231,
+      "hr": 2216,
+      "name": "Propus",
+      "bayer": "Eta Gem",
+      "greek": "η Gem",
+      "con": "Gem",
+      "vmag": 3.28,
+      "flamsteed": "7 Gem"
+    },
+    {
+      "i": 232,
+      "hr": 5603,
+      "name": "Brachium",
+      "bayer": "Sig Lib",
+      "greek": "σ Lib",
+      "con": "Lib",
+      "vmag": 3.29,
+      "flamsteed": "20 Lib"
+    },
+    {
+      "i": 233,
+      "hr": 5744,
+      "name": "Edasich",
+      "bayer": "Iot Dra",
+      "greek": "ι Dra",
+      "con": "Dra",
+      "vmag": 3.29,
+      "flamsteed": "12 Dra"
+    },
+    {
+      "i": 236,
+      "hr": 4660,
+      "name": "Megrez",
+      "bayer": "Del UMa",
+      "greek": "δ UMa",
+      "con": "UMa",
+      "vmag": 3.31,
+      "flamsteed": "69 UMa"
+    },
+    {
+      "i": 241,
+      "hr": 3045,
+      "name": "Azmidiske",
+      "bayer": "Xi Pup",
+      "greek": "ξ Pup",
+      "con": "Pup",
+      "vmag": 3.34,
+      "flamsteed": "7 Pup"
+    },
+    {
+      "i": 242,
+      "hr": 4359,
+      "name": "Chertan",
+      "bayer": "The Leo",
+      "greek": "θ Leo",
+      "con": "Leo",
+      "vmag": 3.34,
+      "flamsteed": "70 Leo"
+    },
+    {
+      "i": 244,
+      "hr": 6698,
+      "name": "Sinistra",
+      "bayer": "Nu Oph",
+      "greek": "ν Oph",
+      "con": "Oph",
+      "vmag": 3.34,
+      "flamsteed": "64 Oph"
+    },
+    {
+      "i": 248,
+      "hr": 2484,
+      "name": "Alzir",
+      "bayer": "Xi Gem",
+      "greek": "ξ Gem",
+      "con": "Gem",
+      "vmag": 3.36,
+      "flamsteed": "31 Gem"
+    },
+    {
+      "i": 249,
+      "hr": 3323,
+      "name": "Muscida",
+      "bayer": "Omi UMa",
+      "greek": "ο UMa",
+      "con": "UMa",
+      "vmag": 3.36,
+      "flamsteed": "1 UMa"
+    },
+    {
+      "i": 251,
+      "hr": 5107,
+      "name": "Heze",
+      "bayer": "Zet Vir",
+      "greek": "ζ Vir",
+      "con": "Vir",
+      "vmag": 3.37,
+      "flamsteed": "79 Vir"
+    },
+    {
+      "i": 253,
+      "hr": 542,
+      "name": "Segin",
+      "bayer": "Eps Cas",
+      "greek": "ε Cas",
+      "con": "Cas",
+      "vmag": 3.38,
+      "flamsteed": "45 Cas"
+    },
+    {
+      "i": 255,
+      "hr": 4910,
+      "name": "Auva",
+      "bayer": "Del Vir",
+      "greek": "δ Vir",
+      "con": "Vir",
+      "vmag": 3.38,
+      "flamsteed": "43 Vir"
+    },
+    {
+      "i": 256,
+      "hr": 921,
+      "name": "Gorgonea Tertia",
+      "bayer": "Rho Per",
+      "greek": "ρ Per",
+      "con": "Per",
+      "vmag": 3.39,
+      "flamsteed": "25 Per"
+    },
+    {
+      "i": 259,
+      "hr": 8634,
+      "name": "Homam",
+      "bayer": "Zet Peg",
+      "greek": "ζ Peg",
+      "con": "Peg",
+      "vmag": 3.4,
+      "flamsteed": "42 Peg"
+    },
+    {
+      "i": 261,
+      "hr": 544,
+      "name": "Mothallah",
+      "bayer": "Alp Tri",
+      "greek": "α Tri",
+      "con": "Tri",
+      "vmag": 3.41,
+      "flamsteed": "2 Tri"
+    },
+    {
+      "i": 268,
+      "hr": 219,
+      "name": "Achird",
+      "bayer": "Eta Cas",
+      "greek": "η Cas",
+      "con": "Cas",
+      "vmag": 3.44,
+      "flamsteed": "24 Cas"
+    },
+    {
+      "i": 270,
+      "hr": 4031,
+      "name": "Adhafera",
+      "bayer": "Zet Leo",
+      "greek": "ζ Leo",
+      "con": "Leo",
+      "vmag": 3.44,
+      "flamsteed": "36 Leo"
+    },
+    {
+      "i": 271,
+      "hr": 7236,
+      "name": "Al Thalimain",
+      "bayer": "Lam Aql",
+      "greek": "λ Aql",
+      "con": "Aql",
+      "vmag": 3.44,
+      "flamsteed": "16 Aql"
+    },
+    {
+      "i": 272,
+      "hr": 334,
+      "name": "Dheneb",
+      "bayer": "Eta Cet",
+      "greek": "η Cet",
+      "con": "Cet",
+      "vmag": 3.45,
+      "flamsteed": "31 Cet"
+    },
+    {
+      "i": 273,
+      "hr": 4033,
+      "name": "Tania Borealis",
+      "bayer": "Lam UMa",
+      "greek": "λ UMa",
+      "con": "UMa",
+      "vmag": 3.45,
+      "flamsteed": "33 UMa"
+    },
+    {
+      "i": 274,
+      "hr": 7106,
+      "name": "Sheliak",
+      "bayer": "Bet Lyr",
+      "greek": "β Lyr",
+      "con": "Lyr",
+      "vmag": 3.45,
+      "flamsteed": "10 Lyr"
+    },
+    {
+      "i": 275,
+      "hr": 804,
+      "name": "Kaffaljidhma",
+      "bayer": "Gam Cet",
+      "greek": "γ Cet",
+      "con": "Cet",
+      "vmag": 3.47,
+      "flamsteed": "86 Cet"
+    },
+    {
+      "i": 281,
+      "hr": 4377,
+      "name": "Alula Borealis",
+      "bayer": "Nu UMa",
+      "greek": "ν UMa",
+      "con": "UMa",
+      "vmag": 3.48,
+      "flamsteed": "54 UMa"
+    },
+    {
+      "i": 282,
+      "hr": 6406,
+      "name": "Rasalgethi",
+      "bayer": "Alp1 Her",
+      "greek": "α¹ Her",
+      "con": "Her",
+      "vmag": 3.48,
+      "flamsteed": "64 Her"
+    },
+    {
+      "i": 283,
+      "hr": 8684,
+      "name": "Sadalbari",
+      "bayer": "Mu Peg",
+      "greek": "μ Peg",
+      "con": "Peg",
+      "vmag": 3.48,
+      "flamsteed": "48 Peg"
+    },
+    {
+      "i": 286,
+      "hr": 5602,
+      "name": "Nekkar",
+      "bayer": "Bet Boo",
+      "greek": "β Boo",
+      "con": "Boo",
+      "vmag": 3.5,
+      "flamsteed": "42 Boo"
+    },
+    {
+      "i": 289,
+      "hr": 3249,
+      "name": "Altarf",
+      "bayer": "Bet Cnc",
+      "greek": "β Cnc",
+      "con": "Cnc",
+      "vmag": 3.52,
+      "flamsteed": "17 Cnc"
+    },
+    {
+      "i": 290,
+      "hr": 3852,
+      "name": "Subra",
+      "bayer": "Omi Leo",
+      "greek": "ο Leo",
+      "con": "Leo",
+      "vmag": 3.52,
+      "flamsteed": "14 Leo"
+    },
+    {
+      "i": 293,
+      "hr": 1409,
+      "name": "Ain",
+      "bayer": "Eps Tau",
+      "greek": "ε Tau",
+      "con": "Tau",
+      "vmag": 3.53,
+      "flamsteed": "74 Tau"
+    },
+    {
+      "i": 294,
+      "hr": 2777,
+      "name": "Wasat",
+      "bayer": "Del Gem",
+      "greek": "δ Gem",
+      "con": "Gem",
+      "vmag": 3.53,
+      "flamsteed": "55 Gem"
+    },
+    {
+      "i": 297,
+      "hr": 8450,
+      "name": "Biham",
+      "bayer": "The Peg",
+      "greek": "θ Peg",
+      "con": "Peg",
+      "vmag": 3.53,
+      "flamsteed": "26 Peg"
+    },
+    {
+      "i": 298,
+      "hr": 1136,
+      "name": "Rana",
+      "bayer": "Del Eri",
+      "greek": "δ Eri",
+      "con": "Eri",
+      "vmag": 3.54,
+      "flamsteed": "23 Eri"
+    },
+    {
+      "i": 299,
+      "hr": 1879,
+      "name": "Meissa",
+      "bayer": "Lam Ori",
+      "greek": "λ Ori",
+      "con": "Ori",
+      "vmag": 3.54,
+      "flamsteed": "39 Ori"
+    },
+    {
+      "i": 305,
+      "hr": 74,
+      "name": "Deneb Kaitos Schemali",
+      "bayer": "Iot Cet",
+      "greek": "ι Cet",
+      "con": "Cet",
+      "vmag": 3.56,
+      "flamsteed": "8 Cet"
+    },
+    {
+      "i": 311,
+      "hr": 464,
+      "name": "Nembus",
+      "bayer": "",
+      "greek": "",
+      "con": "And",
+      "vmag": 3.57,
+      "flamsteed": "51 And"
+    },
+    {
+      "i": 315,
+      "hr": 7754,
+      "name": "Algedi",
+      "bayer": "Alp2 Cap",
+      "greek": "α² Cap",
+      "con": "Cap",
+      "vmag": 3.57,
+      "flamsteed": "6 Cap"
+    },
+    {
+      "i": 325,
+      "hr": 3594,
+      "name": "Talitha Australis",
+      "bayer": "Kap UMa",
+      "greek": "κ UMa",
+      "con": "UMa",
+      "vmag": 3.6,
+      "flamsteed": "12 UMa"
+    },
+    {
+      "i": 329,
+      "hr": 4540,
+      "name": "Zavijava",
+      "bayer": "Bet Vir",
+      "greek": "β Vir",
+      "con": "Vir",
+      "vmag": 3.61,
+      "flamsteed": "5 Vir"
+    },
+    {
+      "i": 330,
+      "hr": 437,
+      "name": "Kullat Nunu",
+      "bayer": "Eta Psc",
+      "greek": "η Psc",
+      "con": "Psc",
+      "vmag": 3.62,
+      "flamsteed": "99 Psc"
+    },
+    {
+      "i": 338,
+      "hr": 1178,
+      "name": "Atlas",
+      "bayer": "",
+      "greek": "",
+      "con": "Tau",
+      "vmag": 3.63,
+      "flamsteed": "27 Tau"
+    },
+    {
+      "i": 339,
+      "hr": 7882,
+      "name": "Rotanev",
+      "bayer": "Bet Del",
+      "greek": "β Del",
+      "con": "Del",
+      "vmag": 3.63,
+      "flamsteed": "6 Del"
+    },
+    {
+      "i": 341,
+      "hr": 1346,
+      "name": "Hyadum I",
+      "bayer": "Gam Tau",
+      "greek": "γ Tau",
+      "con": "Tau",
+      "vmag": 3.65,
+      "flamsteed": "54 Tau"
+    },
+    {
+      "i": 342,
+      "hr": 4825,
+      "name": "Porrima",
+      "bayer": "Gam Vir",
+      "greek": "γ Vir",
+      "con": "Vir",
+      "vmag": 3.65,
+      "flamsteed": "29 Vir"
+    },
+    {
+      "i": 343,
+      "hr": 5291,
+      "name": "Thuban",
+      "bayer": "Alp Dra",
+      "greek": "α Dra",
+      "con": "Dra",
+      "vmag": 3.65,
+      "flamsteed": "11 Dra"
+    },
+    {
+      "i": 350,
+      "hr": 5867,
+      "name": "Chow",
+      "bayer": "Bet Ser",
+      "greek": "β Ser",
+      "con": "Ser",
+      "vmag": 3.67,
+      "flamsteed": "28 Ser"
+    },
+    {
+      "i": 352,
+      "hr": 4826,
+      "name": "Porrima",
+      "bayer": "Gam Vir",
+      "greek": "γ Vir",
+      "con": "Vir",
+      "vmag": 3.68,
+      "flamsteed": "29 Vir"
+    },
+    {
+      "i": 353,
+      "hr": 5747,
+      "name": "Nusakan",
+      "bayer": "Bet CrB",
+      "greek": "β CrB",
+      "con": "CrB",
+      "vmag": 3.68,
+      "flamsteed": "3 CrB"
+    },
+    {
+      "i": 354,
+      "hr": 8278,
+      "name": "Nashira",
+      "bayer": "Gam Cap",
+      "greek": "γ Cap",
+      "con": "Cap",
+      "vmag": 3.68,
+      "flamsteed": "40 Cap"
+    },
+    {
+      "i": 360,
+      "hr": 1142,
+      "name": "Electra",
+      "bayer": "",
+      "greek": "",
+      "con": "Tau",
+      "vmag": 3.7,
+      "flamsteed": "17 Tau"
+    },
+    {
+      "i": 363,
+      "hr": 4518,
+      "name": "Al Kaphrah",
+      "bayer": "Chi UMa",
+      "greek": "χ UMa",
+      "con": "UMa",
+      "vmag": 3.71,
+      "flamsteed": "63 UMa"
+    },
+    {
+      "i": 365,
+      "hr": 7602,
+      "name": "Alshain",
+      "bayer": "Bet Aql",
+      "greek": "β Aql",
+      "con": "Aql",
+      "vmag": 3.71,
+      "flamsteed": "60 Aql"
+    },
+    {
+      "i": 371,
+      "hr": 539,
+      "name": "Baten Kaitos",
+      "bayer": "Zet Cet",
+      "greek": "ζ Cet",
+      "con": "Cet",
+      "vmag": 3.73,
+      "flamsteed": "55 Cet"
+    },
+    {
+      "i": 372,
+      "hr": 1084,
+      "name": "Ran",
+      "bayer": "Eps Eri",
+      "greek": "ε Eri",
+      "con": "Eri",
+      "vmag": 3.73,
+      "flamsteed": "18 Eri"
+    },
+    {
+      "i": 378,
+      "hr": 1612,
+      "name": "Haedus",
+      "bayer": "Zet Aur",
+      "greek": "ζ Aur",
+      "con": "Aur",
+      "vmag": 3.75,
+      "flamsteed": "8 Aur"
+    },
+    {
+      "i": 382,
+      "hr": 6688,
+      "name": "Grumium",
+      "bayer": "Xi Dra",
+      "greek": "ξ Dra",
+      "con": "Dra",
+      "vmag": 3.75,
+      "flamsteed": "32 Dra"
+    },
+    {
+      "i": 384,
+      "hr": 834,
+      "name": "Miram",
+      "bayer": "Eta Per",
+      "greek": "η Per",
+      "con": "Per",
+      "vmag": 3.76,
+      "flamsteed": "15 Per"
+    },
+    {
+      "i": 385,
+      "hr": 1373,
+      "name": "Hyadum II",
+      "bayer": "Del1 Tau",
+      "greek": "δ¹ Tau",
+      "con": "Tau",
+      "vmag": 3.76,
+      "flamsteed": "61 Tau"
+    },
+    {
+      "i": 394,
+      "hr": 7906,
+      "name": "Sualocin",
+      "bayer": "Alp Del",
+      "greek": "α Del",
+      "con": "Del",
+      "vmag": 3.77,
+      "flamsteed": "9 Del"
+    },
+    {
+      "i": 395,
+      "hr": 7950,
+      "name": "Albali",
+      "bayer": "Eps Aqr",
+      "greek": "ε Aqr",
+      "con": "Aqr",
+      "vmag": 3.77,
+      "flamsteed": "2 Aqr"
+    },
+    {
+      "i": 399,
+      "hr": 2650,
+      "name": "Mekbuda",
+      "bayer": "Zet Gem",
+      "greek": "ζ Gem",
+      "con": "Gem",
+      "vmag": 3.79,
+      "flamsteed": "43 Gem"
+    },
+    {
+      "i": 403,
+      "hr": 941,
+      "name": "Misam",
+      "bayer": "Kap Per",
+      "greek": "κ Per",
+      "con": "Per",
+      "vmag": 3.8,
+      "flamsteed": "27 Per"
+    },
+    {
+      "i": 412,
+      "hr": 1464,
+      "name": "Theemin",
+      "bayer": "Ups2 Eri",
+      "greek": "υ² Eri",
+      "con": "Eri",
+      "vmag": 3.82,
+      "flamsteed": "52 Eri"
+    },
+    {
+      "i": 415,
+      "hr": 6149,
+      "name": "Marfik",
+      "bayer": "Lam Oph",
+      "greek": "λ Oph",
+      "con": "Oph",
+      "vmag": 3.82,
+      "flamsteed": "10 Oph"
+    },
+    {
+      "i": 418,
+      "hr": 1131,
+      "name": "Atik",
+      "bayer": "Omi Per",
+      "greek": "ο Per",
+      "con": "Per",
+      "vmag": 3.83,
+      "flamsteed": "38 Per"
+    },
+    {
+      "i": 419,
+      "hr": 4247,
+      "name": "Praecipua",
+      "bayer": "",
+      "greek": "",
+      "con": "LMi",
+      "vmag": 3.83,
+      "flamsteed": "46 LMi"
+    },
+    {
+      "i": 423,
+      "hr": 7582,
+      "name": "Tyl",
+      "bayer": "Eps Dra",
+      "greek": "ε Dra",
+      "con": "Dra",
+      "vmag": 3.83,
+      "flamsteed": "63 Dra"
+    },
+    {
+      "i": 428,
+      "hr": 4434,
+      "name": "Gianfar",
+      "bayer": "Lam Dra",
+      "greek": "λ Dra",
+      "con": "Dra",
+      "vmag": 3.84,
+      "flamsteed": "1 Dra"
+    },
+    {
+      "i": 431,
+      "hr": 8518,
+      "name": "Sadachbia",
+      "bayer": "Gam Aqr",
+      "greek": "γ Aqr",
+      "con": "Aqr",
+      "vmag": 3.84,
+      "flamsteed": "48 Aqr"
+    },
+    {
+      "i": 446,
+      "hr": 963,
+      "name": "Fornacis",
+      "bayer": "Alp For",
+      "greek": "α For",
+      "con": "For",
+      "vmag": 3.87
+    },
+    {
+      "i": 447,
+      "hr": 1149,
+      "name": "Maia",
+      "bayer": "",
+      "greek": "",
+      "con": "Tau",
+      "vmag": 3.87,
+      "flamsteed": "20 Tau"
+    },
+    {
+      "i": 448,
+      "hr": 1481,
+      "name": "Sceptrum",
+      "bayer": "",
+      "greek": "",
+      "con": "Eri",
+      "vmag": 3.87,
+      "flamsteed": "53 Eri"
+    },
+    {
+      "i": 457,
+      "hr": 3905,
+      "name": "Rasalas",
+      "bayer": "Mu Leo",
+      "greek": "μ Leo",
+      "con": "Leo",
+      "vmag": 3.88,
+      "flamsteed": "24 Leo"
+    },
+    {
+      "i": 459,
+      "hr": 5487,
+      "name": "Rijl al Awwa",
+      "bayer": "Mu Vir",
+      "greek": "μ Vir",
+      "con": "Vir",
+      "vmag": 3.88,
+      "flamsteed": "107 Vir"
+    },
+    {
+      "i": 461,
+      "hr": 874,
+      "name": "Azha",
+      "bayer": "Eta Eri",
+      "greek": "η Eri",
+      "con": "Eri",
+      "vmag": 3.89,
+      "flamsteed": "3 Eri"
+    },
+    {
+      "i": 463,
+      "hr": 4689,
+      "name": "Zaniah",
+      "bayer": "Eta Vir",
+      "greek": "η Vir",
+      "con": "Vir",
+      "vmag": 3.89,
+      "flamsteed": "15 Vir"
+    },
+    {
+      "i": 475,
+      "hr": 5787,
+      "name": "Zuben-el-Akrab",
+      "bayer": "Gam Lib",
+      "greek": "γ Lib",
+      "con": "Lib",
+      "vmag": 3.91,
+      "flamsteed": "38 Lib"
+    },
+    {
+      "i": 478,
+      "hr": 8131,
+      "name": "Kitalpha",
+      "bayer": "Alp Equ",
+      "greek": "α Equ",
+      "con": "Equ",
+      "vmag": 3.92,
+      "flamsteed": "8 Equ"
+    },
+    {
+      "i": 483,
+      "hr": 3461,
+      "name": "Asellus Australis",
+      "bayer": "Del Cnc",
+      "greek": "δ Cnc",
+      "con": "Cnc",
+      "vmag": 3.94,
+      "flamsteed": "47 Cnc"
+    },
+    {
+      "i": 490,
+      "hr": 5055,
+      "name": "Mizar",
+      "bayer": "Zet UMa",
+      "greek": "ζ UMa",
+      "con": "UMa",
+      "vmag": 3.95,
+      "flamsteed": "79 UMa"
+    },
+    {
+      "i": 505,
+      "hr": 7348,
+      "name": "Rukbat",
+      "bayer": "Alp Sgr",
+      "greek": "α Sgr",
+      "con": "Sgr",
+      "vmag": 3.97
+    },
+    {
+      "i": 520,
+      "hr": 5062,
+      "name": "Alcor",
+      "bayer": "",
+      "greek": "",
+      "con": "UMa",
+      "vmag": 4.01,
+      "flamsteed": "80 UMa"
+    },
+    {
+      "i": 522,
+      "hr": 6027,
+      "name": "Jabbah",
+      "bayer": "Nu Sco",
+      "greek": "ν Sco",
+      "con": "Sco",
+      "vmag": 4.01,
+      "flamsteed": "14 Sco"
+    },
+    {
+      "i": 524,
+      "hr": 7337,
+      "name": "Arkab Prior",
+      "bayer": "Bet1 Sgr",
+      "greek": "β¹ Sgr",
+      "con": "Sgr",
+      "vmag": 4.01
+    },
+    {
+      "i": 530,
+      "hr": 4623,
+      "name": "Alchiba",
+      "bayer": "Alp Crv",
+      "greek": "α Crv",
+      "con": "Crv",
+      "vmag": 4.02,
+      "flamsteed": "1 Crv"
+    },
+    {
+      "i": 540,
+      "hr": 7852,
+      "name": "Deneb Dulfim",
+      "bayer": "Eps Del",
+      "greek": "ε Del",
+      "con": "Del",
+      "vmag": 4.03,
+      "flamsteed": "2 Del"
+    },
+    {
+      "i": 541,
+      "hr": 1228,
+      "name": "Menkib",
+      "bayer": "Xi Per",
+      "greek": "ξ Per",
+      "con": "Per",
+      "vmag": 4.04,
+      "flamsteed": "46 Per"
+    },
+    {
+      "i": 543,
+      "hr": 1298,
+      "name": "Beid",
+      "bayer": "Omi1 Eri",
+      "greek": "ο¹ Eri",
+      "con": "Eri",
+      "vmag": 4.04,
+      "flamsteed": "38 Eri"
+    },
+    {
+      "i": 549,
+      "hr": 5404,
+      "name": "Asellus Primus",
+      "bayer": "The Boo",
+      "greek": "θ Boo",
+      "con": "Boo",
+      "vmag": 4.05,
+      "flamsteed": "23 Boo"
+    },
+    {
+      "i": 566,
+      "hr": 4287,
+      "name": "Alkes",
+      "bayer": "Alp Crt",
+      "greek": "α Crt",
+      "con": "Crt",
+      "vmag": 4.08,
+      "flamsteed": "7 Crt"
+    },
+    {
+      "i": 568,
+      "hr": 5338,
+      "name": "Syrma",
+      "bayer": "Iot Vir",
+      "greek": "ι Vir",
+      "con": "Vir",
+      "vmag": 4.08,
+      "flamsteed": "99 Vir"
+    },
+    {
+      "i": 570,
+      "hr": 8316,
+      "name": "Garnet Star",
+      "bayer": "Mu Cep",
+      "greek": "μ Cep",
+      "con": "Cep",
+      "vmag": 4.08
+    },
+    {
+      "i": 584,
+      "hr": 7254,
+      "name": "Alfecca Meridiana",
+      "bayer": "Alp CrA",
+      "greek": "α CrA",
+      "con": "CrA",
+      "vmag": 4.11
+    },
+    {
+      "i": 590,
+      "hr": 2657,
+      "name": "Muliphein",
+      "bayer": "Gam CMa",
+      "greek": "γ CMa",
+      "con": "CMa",
+      "vmag": 4.12,
+      "flamsteed": "23 CMa"
+    },
+    {
+      "i": 615,
+      "hr": 8499,
+      "name": "Ancha",
+      "bayer": "The Aqr",
+      "greek": "θ Aqr",
+      "con": "Aqr",
+      "vmag": 4.16,
+      "flamsteed": "43 Aqr"
+    },
+    {
+      "i": 619,
+      "hr": 1156,
+      "name": "Merope",
+      "bayer": "",
+      "greek": "",
+      "con": "Tau",
+      "vmag": 4.18,
+      "flamsteed": "23 Tau"
+    },
+    {
+      "i": 631,
+      "hr": 1949,
+      "name": "Alnitak",
+      "bayer": "Zet Ori",
+      "greek": "ζ Ori",
+      "con": "Ori",
+      "vmag": 4.21,
+      "flamsteed": "50 Ori"
+    },
+    {
+      "i": 656,
+      "hr": 7747,
+      "name": "Al Giedi",
+      "bayer": "Alp1 Cap",
+      "greek": "α¹ Cap",
+      "con": "Cap",
+      "vmag": 4.24,
+      "flamsteed": "5 Cap"
+    },
+    {
+      "i": 664,
+      "hr": 3275,
+      "name": "Alsciaukat",
+      "bayer": "",
+      "greek": "",
+      "con": "Lyn",
+      "vmag": 4.25,
+      "flamsteed": "31 Lyn"
+    },
+    {
+      "i": 665,
+      "hr": 3572,
+      "name": "Acubens",
+      "bayer": "Alp Cnc",
+      "greek": "α Cnc",
+      "con": "Cnc",
+      "vmag": 4.25,
+      "flamsteed": "65 Cnc"
+    },
+    {
+      "i": 668,
+      "hr": 510,
+      "name": "Torcularis Septentrionalis",
+      "bayer": "Omi Psc",
+      "greek": "ο Psc",
+      "con": "Psc",
+      "vmag": 4.26,
+      "flamsteed": "110 Psc"
+    },
+    {
+      "i": 671,
+      "hr": 4785,
+      "name": "Chara",
+      "bayer": "Bet CVn",
+      "greek": "β CVn",
+      "con": "CVn",
+      "vmag": 4.26,
+      "flamsteed": "8 CVn"
+    },
+    {
+      "i": 707,
+      "hr": 7343,
+      "name": "Arkab Posterior",
+      "bayer": "Bet2 Sgr",
+      "greek": "β² Sgr",
+      "con": "Sgr",
+      "vmag": 4.29
+    },
+    {
+      "i": 709,
+      "hr": 8417,
+      "name": "Kurhah",
+      "bayer": "Xi Cep",
+      "greek": "ξ Cep",
+      "con": "Cep",
+      "vmag": 4.29,
+      "flamsteed": "17 Cep"
+    },
+    {
+      "i": 713,
+      "hr": 1145,
+      "name": "Taygeta",
+      "bayer": "",
+      "greek": "",
+      "con": "Tau",
+      "vmag": 4.3,
+      "flamsteed": "19 Tau"
+    },
+    {
+      "i": 719,
+      "hr": 3773,
+      "name": "Alterf",
+      "bayer": "Lam Leo",
+      "greek": "λ Leo",
+      "con": "Leo",
+      "vmag": 4.31,
+      "flamsteed": "4 Leo"
+    },
+    {
+      "i": 721,
+      "hr": 5733,
+      "name": "Alkalurops",
+      "bayer": "Mu1 Boo",
+      "greek": "μ¹ Boo",
+      "con": "Boo",
+      "vmag": 4.31,
+      "flamsteed": "51 Boo"
+    },
+    {
+      "i": 731,
+      "hr": 343,
+      "name": "Marfark",
+      "bayer": "The Cas",
+      "greek": "θ Cas",
+      "con": "Cas",
+      "vmag": 4.33,
+      "flamsteed": "33 Cas"
+    },
+    {
+      "i": 732,
+      "hr": 596,
+      "name": "Alrescha",
+      "bayer": "Alp Psc",
+      "greek": "α Psc",
+      "con": "Psc",
+      "vmag": 4.33,
+      "flamsteed": "113 Psc"
+    },
+    {
+      "i": 749,
+      "hr": 951,
+      "name": "Botein",
+      "bayer": "Del Ari",
+      "greek": "δ Ari",
+      "con": "Ari",
+      "vmag": 4.35,
+      "flamsteed": "57 Ari"
+    },
+    {
+      "i": 769,
+      "hr": 6789,
+      "name": "Yildun",
+      "bayer": "Del UMi",
+      "greek": "δ UMi",
+      "con": "UMi",
+      "vmag": 4.36,
+      "flamsteed": "23 UMi"
+    },
+    {
+      "i": 774,
+      "hr": 7447,
+      "name": "Al Thalimain",
+      "bayer": "Iot Aql",
+      "greek": "ι Aql",
+      "con": "Aql",
+      "vmag": 4.36,
+      "flamsteed": "41 Aql"
+    },
+    {
+      "i": 782,
+      "hr": 7479,
+      "name": "Sham",
+      "bayer": "Alp Sge",
+      "greek": "α Sge",
+      "con": "Sge",
+      "vmag": 4.37,
+      "flamsteed": "5 Sge"
+    },
+    {
+      "i": 794,
+      "hr": 7298,
+      "name": "Aladfar",
+      "bayer": "Eta Lyr",
+      "greek": "η Lyr",
+      "con": "Lyr",
+      "vmag": 4.39,
+      "flamsteed": "20 Lyr"
+    },
+    {
+      "i": 810,
+      "hr": 4375,
+      "name": "Alula Australis",
+      "bayer": "Xi UMa",
+      "greek": "ξ UMa",
+      "con": "UMa",
+      "vmag": 4.41,
+      "flamsteed": "53 UMa"
+    },
+    {
+      "i": 812,
+      "hr": 6526,
+      "name": "Maasym",
+      "bayer": "Lam Her",
+      "greek": "λ Her",
+      "con": "Her",
+      "vmag": 4.41,
+      "flamsteed": "76 Her"
+    },
+    {
+      "i": 827,
+      "hr": 1325,
+      "name": "Keid",
+      "bayer": "Omi2 Eri",
+      "greek": "ο² Eri",
+      "con": "Eri",
+      "vmag": 4.43,
+      "flamsteed": "40 Eri"
+    },
+    {
+      "i": 840,
+      "hr": 3418,
+      "name": "Minchir",
+      "bayer": "Sig Hya",
+      "greek": "σ Hya",
+      "con": "Hya",
+      "vmag": 4.44,
+      "flamsteed": "5 Hya"
+    },
+    {
+      "i": 842,
+      "hr": 7405,
+      "name": "Lucida Anseris",
+      "bayer": "Alp Vul",
+      "greek": "α Vul",
+      "con": "Vul",
+      "vmag": 4.44,
+      "flamsteed": "6 Vul"
+    },
+    {
+      "i": 857,
+      "hr": 3731,
+      "name": "Al Minliar al Asad",
+      "bayer": "Kap Leo",
+      "greek": "κ Leo",
+      "con": "Leo",
+      "vmag": 4.46,
+      "flamsteed": "1 Leo"
+    },
+    {
+      "i": 893,
+      "hr": 2948,
+      "name": "Markab",
+      "bayer": "",
+      "greek": "",
+      "con": "",
+      "vmag": 4.5
+    },
+    {
+      "i": 937,
+      "hr": 8773,
+      "name": "Fum al Samakah",
+      "bayer": "Bet Psc",
+      "greek": "β Psc",
+      "con": "Psc",
+      "vmag": 4.53,
+      "flamsteed": "4 Psc"
+    },
+    {
+      "i": 971,
+      "hr": 6117,
+      "name": "Kajam",
+      "bayer": "Ome Her",
+      "greek": "ω Her",
+      "con": "Her",
+      "vmag": 4.57,
+      "flamsteed": "24 Her"
+    },
+    {
+      "i": 981,
+      "hr": 6636,
+      "name": "Dsiban",
+      "bayer": "Psi1 Dra",
+      "greek": "ψ¹ Dra",
+      "con": "Dra",
+      "vmag": 4.58,
+      "flamsteed": "31 Dra"
+    },
+    {
+      "i": 1009,
+      "hr": 8880,
+      "name": "Salm",
+      "bayer": "Tau Peg",
+      "greek": "τ Peg",
+      "con": "Peg",
+      "vmag": 4.6,
+      "flamsteed": "62 Peg"
+    },
+    {
+      "i": 1018,
+      "hr": 1855,
+      "name": "Thabit",
+      "bayer": "Ups Ori",
+      "greek": "υ Ori",
+      "con": "Ori",
+      "vmag": 4.62,
+      "flamsteed": "36 Ori"
+    },
+    {
+      "i": 1028,
+      "hr": 7141,
+      "name": "Alya",
+      "bayer": "The1 Ser",
+      "greek": "θ¹ Ser",
+      "con": "Ser",
+      "vmag": 4.62,
+      "flamsteed": "63 Ser"
+    },
+    {
+      "i": 1075,
+      "hr": 3449,
+      "name": "Asellus Borealis",
+      "bayer": "Gam Cnc",
+      "greek": "γ Cnc",
+      "con": "Cnc",
+      "vmag": 4.66,
+      "flamsteed": "43 Cnc"
+    },
+    {
+      "i": 1093,
+      "hr": 8301,
+      "name": "Azelfafage",
+      "bayer": "Pi1 Cyg",
+      "greek": "π¹ Cyg",
+      "con": "Cyg",
+      "vmag": 4.67,
+      "flamsteed": "80 Cyg"
+    },
+    {
+      "i": 1100,
+      "hr": 7462,
+      "name": "Alsafi",
+      "bayer": "Sig Dra",
+      "greek": "σ Dra",
+      "con": "Dra",
+      "vmag": 4.68,
+      "flamsteed": "61 Dra"
+    },
+    {
+      "i": 1102,
+      "hr": 8260,
+      "name": "Kastra",
+      "bayer": "Eps Cap",
+      "greek": "ε Cap",
+      "con": "Cap",
+      "vmag": 4.68,
+      "flamsteed": "39 Cap"
+    },
+    {
+      "i": 1115,
+      "hr": 8264,
+      "name": "Bunda",
+      "bayer": "Xi Aqr",
+      "greek": "ξ Aqr",
+      "con": "Aqr",
+      "vmag": 4.69,
+      "flamsteed": "23 Aqr"
+    },
+    {
+      "i": 1128,
+      "hr": 7597,
+      "name": "Terebellum",
+      "bayer": "Ome Sgr",
+      "greek": "ω Sgr",
+      "con": "Sgr",
+      "vmag": 4.7,
+      "flamsteed": "58 Sgr"
+    },
+    {
+      "i": 1141,
+      "hr": 7595,
+      "name": "Libertas",
+      "bayer": "Xi Aql",
+      "greek": "ξ Aql",
+      "con": "Aql",
+      "vmag": 4.71,
+      "flamsteed": "59 Aql"
+    },
+    {
+      "i": 1182,
+      "hr": 546,
+      "name": "Mesarthim",
+      "bayer": "Gam2 Ari",
+      "greek": "γ² Ari",
+      "con": "Ari",
+      "vmag": 4.75,
+      "flamsteed": "5 Ari"
+    },
+    {
+      "i": 1185,
+      "hr": 850,
+      "name": "Angetenar",
+      "bayer": "Tau2 Eri",
+      "greek": "τ² Eri",
+      "con": "Eri",
+      "vmag": 4.75,
+      "flamsteed": "2 Eri"
+    },
+    {
+      "i": 1190,
+      "hr": 5350,
+      "name": "Asellus Secundus",
+      "bayer": "Iot Boo",
+      "greek": "ι Boo",
+      "con": "Boo",
+      "vmag": 4.75,
+      "flamsteed": "21 Boo"
+    },
+    {
+      "i": 1207,
+      "hr": 7773,
+      "name": "Alshat",
+      "bayer": "Nu Cap",
+      "greek": "ν Cap",
+      "con": "Cap",
+      "vmag": 4.76,
+      "flamsteed": "8 Cap"
+    },
+    {
+      "i": 1218,
+      "hr": 5978,
+      "name": "Graffias",
+      "bayer": "Xi Sco",
+      "greek": "ξ Sco",
+      "con": "Sco",
+      "vmag": 4.77
+    },
+    {
+      "i": 1254,
+      "hr": 984,
+      "name": "Zibal",
+      "bayer": "Zet Eri",
+      "greek": "ζ Eri",
+      "con": "Eri",
+      "vmag": 4.8,
+      "flamsteed": "13 Eri"
+    },
+    {
+      "i": 1305,
+      "hr": 6945,
+      "name": "Fafnir",
+      "bayer": "",
+      "greek": "",
+      "con": "Dra",
+      "vmag": 4.82,
+      "flamsteed": "42 Dra"
+    },
+    {
+      "i": 1313,
+      "hr": 545,
+      "name": "Mesarthim",
+      "bayer": "Gam1 Ari",
+      "greek": "γ¹ Ari",
+      "con": "Ari",
+      "vmag": 4.83,
+      "flamsteed": "5 Ari"
+    },
+    {
+      "i": 1348,
+      "hr": 8060,
+      "name": "Armus",
+      "bayer": "Eta Cap",
+      "greek": "η Cap",
+      "con": "Cap",
+      "vmag": 4.84,
+      "flamsteed": "22 Cap"
+    },
+    {
+      "i": 1385,
+      "hr": 4374,
+      "name": "Alula Australis",
+      "bayer": "Xi UMa",
+      "greek": "ξ UMa",
+      "con": "UMa",
+      "vmag": 4.87,
+      "flamsteed": "53 UMa"
+    },
+    {
+      "i": 1388,
+      "hr": 6555,
+      "name": "Kuma",
+      "bayer": "Nu2 Dra",
+      "greek": "ν² Dra",
+      "con": "Dra",
+      "vmag": 4.87,
+      "flamsteed": "25 Dra"
+    },
+    {
+      "i": 1394,
+      "hr": 390,
+      "name": "Adhil",
+      "bayer": "Xi And",
+      "greek": "ξ And",
+      "con": "And",
+      "vmag": 4.88,
+      "flamsteed": "46 And"
+    },
+    {
+      "i": 1463,
+      "hr": 5586,
+      "name": "Zuben-el-Akribi",
+      "bayer": "Del Lib",
+      "greek": "δ Lib",
+      "con": "Lib",
+      "vmag": 4.92,
+      "flamsteed": "19 Lib"
+    },
+    {
+      "i": 1620,
+      "hr": 6008,
+      "name": "Marfik",
+      "bayer": "Kap Her",
+      "greek": "κ Her",
+      "con": "Her",
+      "vmag": 5.0,
+      "flamsteed": "7 Her"
+    },
+    {
+      "i": 1652,
+      "hr": 2177,
+      "name": "Al Kurud",
+      "bayer": "The Col",
+      "greek": "θ Col",
+      "con": "Col",
+      "vmag": 5.02
+    },
+    {
+      "i": 1691,
+      "hr": 8610,
+      "name": "Situla",
+      "bayer": "Kap Aqr",
+      "greek": "κ Aqr",
+      "con": "Aqr",
+      "vmag": 5.03,
+      "flamsteed": "63 Aqr"
+    },
+    {
+      "i": 1722,
+      "hr": 4277,
+      "name": "Chalawan",
+      "bayer": "",
+      "greek": "",
+      "con": "UMa",
+      "vmag": 5.05,
+      "flamsteed": "47 UMa"
+    },
+    {
+      "i": 1763,
+      "hr": 5977,
+      "name": "Graffias",
+      "bayer": "Xi Sco",
+      "greek": "ξ Sco",
+      "con": "Sco",
+      "vmag": 5.07
+    },
+    {
+      "i": 1796,
+      "hr": 1180,
+      "name": "Pleione",
+      "bayer": "",
+      "greek": "",
+      "con": "Tau",
+      "vmag": 5.09,
+      "flamsteed": "28 Tau"
+    },
+    {
+      "i": 1870,
+      "hr": 5505,
+      "name": "Izar",
+      "bayer": "Eps Boo",
+      "greek": "ε Boo",
+      "con": "Boo",
+      "vmag": 5.12,
+      "flamsteed": "36 Boo"
+    },
+    {
+      "i": 1877,
+      "hr": 6903,
+      "name": "Alathfar",
+      "bayer": "Mu Lyr",
+      "greek": "μ Lyr",
+      "con": "Lyr",
+      "vmag": 5.12,
+      "flamsteed": "2 Lyr"
+    },
+    {
+      "i": 1948,
+      "hr": 6585,
+      "name": "Cervantes",
+      "bayer": "Mu Ara",
+      "greek": "μ Ara",
+      "con": "Ara",
+      "vmag": 5.15
+    },
+    {
+      "i": 1976,
+      "hr": 321,
+      "name": "Marfak",
+      "bayer": "Mu Cas",
+      "greek": "μ Cas",
+      "con": "Cas",
+      "vmag": 5.17,
+      "flamsteed": "30 Cas"
+    },
+    {
+      "i": 2096,
+      "hr": 4968,
+      "name": "Diadem",
+      "bayer": "Alp Com",
+      "greek": "α Com",
+      "con": "Com",
+      "vmag": 5.22,
+      "flamsteed": "42 Com"
+    },
+    {
+      "i": 2097,
+      "hr": 4969,
+      "name": "Diadem",
+      "bayer": "Alp Com",
+      "greek": "α Com",
+      "con": "Com",
+      "vmag": 5.22,
+      "flamsteed": "42 Com"
+    },
+    {
+      "i": 2106,
+      "hr": 8930,
+      "name": "Veritate",
+      "bayer": "",
+      "greek": "",
+      "con": "And",
+      "vmag": 5.22,
+      "flamsteed": "14 And"
+    },
+    {
+      "i": 2109,
+      "hr": 595,
+      "name": "Alrescha",
+      "bayer": "Alp Psc",
+      "greek": "α Psc",
+      "con": "Psc",
+      "vmag": 5.23,
+      "flamsteed": "113 Psc"
+    },
+    {
+      "i": 2193,
+      "hr": 7814,
+      "name": "Okul",
+      "bayer": "Pi Cap",
+      "greek": "π Cap",
+      "con": "Cap",
+      "vmag": 5.25,
+      "flamsteed": "10 Cap"
+    },
+    {
+      "i": 2680,
+      "hr": 7851,
+      "name": "Ruchba",
+      "bayer": "Ome2 Cyg",
+      "greek": "ω² Cyg",
+      "con": "Cyg",
+      "vmag": 5.44,
+      "flamsteed": "46 Cyg"
+    },
+    {
+      "i": 2719,
+      "hr": 1140,
+      "name": "Celaeno",
+      "bayer": "",
+      "greek": "",
+      "con": "Tau",
+      "vmag": 5.46,
+      "flamsteed": "16 Tau"
+    },
+    {
+      "i": 2781,
+      "hr": 7228,
+      "name": "Polaris Australis",
+      "bayer": "Sig Oct",
+      "greek": "σ Oct",
+      "con": "Oct",
+      "vmag": 5.47
+    },
+    {
+      "i": 2819,
+      "hr": 8030,
+      "name": "Musica",
+      "bayer": "",
+      "greek": "",
+      "con": "Del",
+      "vmag": 5.48,
+      "flamsteed": "18 Del"
+    },
+    {
+      "i": 2844,
+      "hr": 8729,
+      "name": "Helvetios",
+      "bayer": "",
+      "greek": "",
+      "con": "Peg",
+      "vmag": 5.49,
+      "flamsteed": "51 Peg"
+    },
+    {
+      "i": 2886,
+      "hr": 8591,
+      "name": "Al Kalb al Rai",
+      "bayer": "Rho2 Cep",
+      "greek": "ρ² Cep",
+      "con": "Cep",
+      "vmag": 5.5,
+      "flamsteed": "29 Cep"
+    },
+    {
+      "i": 3261,
+      "hr": 1880,
+      "name": "Meissa",
+      "bayer": "Lam Ori",
+      "greek": "λ Ori",
+      "con": "Ori",
+      "vmag": 5.61,
+      "flamsteed": "39 Ori"
+    },
+    {
+      "i": 3324,
+      "hr": 3208,
+      "name": "Tegmine",
+      "bayer": "Zet1 Cnc",
+      "greek": "ζ¹ Cnc",
+      "con": "Cnc",
+      "vmag": 5.63,
+      "flamsteed": "16 Cnc"
+    },
+    {
+      "i": 3777,
+      "hr": 5533,
+      "name": "Merga",
+      "bayer": "",
+      "greek": "",
+      "con": "Boo",
+      "vmag": 5.74,
+      "flamsteed": "38 Boo"
+    },
+    {
+      "i": 3855,
+      "hr": 1151,
+      "name": "Asterope",
+      "bayer": "",
+      "greek": "",
+      "con": "Tau",
+      "vmag": 5.76,
+      "flamsteed": "21 Tau"
+    },
+    {
+      "i": 4082,
+      "hr": 4609,
+      "name": "Tonatiuh",
+      "bayer": "",
+      "greek": "",
+      "con": "",
+      "vmag": 5.8
+    },
+    {
+      "i": 4089,
+      "hr": 6370,
+      "name": "Arrakis",
+      "bayer": "Mu Dra",
+      "greek": "μ Dra",
+      "con": "Dra",
+      "vmag": 5.8,
+      "flamsteed": "21 Dra"
+    },
+    {
+      "i": 4210,
+      "hr": 6369,
+      "name": "Arrakis",
+      "bayer": "Mu Dra",
+      "greek": "μ Dra",
+      "con": "Dra",
+      "vmag": 5.83,
+      "flamsteed": "21 Dra"
+    },
+    {
+      "i": 5158,
+      "hr": 3209,
+      "name": "Tegmine",
+      "bayer": "Zet1 Cnc",
+      "greek": "ζ¹ Cnc",
+      "con": "Cnc",
+      "vmag": 6.02,
+      "flamsteed": "16 Cnc"
+    },
+    {
+      "i": 6978,
+      "hr": 6026,
+      "name": "Jabbah",
+      "bayer": "Nu Sco",
+      "greek": "ν Sco",
+      "con": "Sco",
+      "vmag": 6.3,
+      "flamsteed": "14 Sco"
+    },
+    {
+      "i": 7901,
+      "hr": 4764,
+      "name": "Gacrux",
+      "bayer": "Gam Cru",
+      "greek": "γ Cru",
+      "con": "Cru",
+      "vmag": 6.42
+    },
+    {
+      "i": 7929,
+      "hr": 1152,
+      "name": "Sterope",
+      "bayer": "",
+      "greek": "",
+      "con": "Tau",
+      "vmag": 6.43,
+      "flamsteed": "22 Tau"
+    },
+    {
+      "i": 9018,
+      "hr": 1851,
+      "name": "Mintaka",
+      "bayer": "Del Ori",
+      "greek": "δ Ori",
+      "con": "Ori",
+      "vmag": 6.85,
+      "flamsteed": "34 Ori"
+    }
+  ],
+  "caveats": [
+    "HR 5958 (T CrB, recurrent nova) is listed at its outburst magnitude V=2.0; it is ~V 10 in quiescence."
+  ]
+}

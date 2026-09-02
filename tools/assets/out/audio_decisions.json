@@ -1,0 +1,173 @@
+{
+  "water_loop_1": {
+    "candidates": {
+      "water_flowing.ogg": {
+        "rmsMismatchDb": 0.5084077766500954,
+        "logSpectralDistance": 0.3389699040600249,
+        "score": 3.8981068172503446
+      },
+      "loop_water_03.ogg": {
+        "rmsMismatchDb": 4.712527367325578,
+        "logSpectralDistance": 0.3162019961454132,
+        "score": 7.87454732877971
+      }
+    },
+    "picked": "water_flowing.ogg"
+  },
+  "bubbles_loop": {
+    "candidates": {
+      "loop_bubbles_1.ogg": {
+        "rmsMismatchDb": 0.07082043104050939,
+        "logSpectralDistance": 0.5842423001632083,
+        "score": 5.9132434326725924
+      },
+      "loop_bubbles_02.ogg": {
+        "rmsMismatchDb": 3.2224020497939314,
+        "logSpectralDistance": 0.387894130514294,
+        "score": 7.101343354936871
+      }
+    },
+    "picked": "loop_bubbles_1.ogg"
+  },
+  "splash_soft": {
+    "method": "rank-sum of crest factor (peak/RMS dB, ascending) and attack time (onset(-20 dB) -> 90% of peak, descending), ties by crest",
+    "table": [
+      {
+        "file": "splash_06.ogg",
+        "crestDb": 21.89,
+        "attackSec": 0.172,
+        "duration": 0.386,
+        "rankCrest": 0,
+        "rankAttack": 2,
+        "rankSum": 2
+      },
+      {
+        "file": "splash_04.ogg",
+        "crestDb": 21.96,
+        "attackSec": 0.207,
+        "duration": 0.913,
+        "rankCrest": 1,
+        "rankAttack": 1,
+        "rankSum": 2
+      },
+      {
+        "file": "splash_13.ogg",
+        "crestDb": 25.11,
+        "attackSec": 0.2238,
+        "duration": 0.699,
+        "rankCrest": 5,
+        "rankAttack": 0,
+        "rankSum": 5
+      },
+      {
+        "file": "splash_08.ogg",
+        "crestDb": 23.07,
+        "attackSec": 0.1023,
+        "duration": 0.585,
+        "rankCrest": 3,
+        "rankAttack": 4,
+        "rankSum": 7
+      },
+      {
+        "file": "splash_15.ogg",
+        "crestDb": 25.68,
+        "attackSec": 0.0245,
+        "duration": 0.392,
+        "rankCrest": 6,
+        "rankAttack": 6,
+        "rankSum": 12
+      },
+      {
+        "file": "splash_09.ogg",
+        "crestDb": 22.28,
+        "attackSec": 0.001,
+        "duration": 0.222,
+        "rankCrest": 2,
+        "rankAttack": 13,
+        "rankSum": 15
+      },
+      {
+        "file": "splash_11.ogg",
+        "crestDb": 27.18,
+        "attackSec": 0.0516,
+        "duration": 1.085,
+        "rankCrest": 10,
+        "rankAttack": 5,
+        "rankSum": 15
+      },
+      {
+        "file": "splash_14.ogg",
+        "crestDb": 26.06,
+        "attackSec": 0.0079,
+        "duration": 0.455,
+        "rankCrest": 7,
+        "rankAttack": 10,
+        "rankSum": 17
+      },
+      {
+        "file": "splash_01.ogg",
+        "crestDb": 33.07,
+        "attackSec": 0.1026,
+        "duration": 1.202,
+        "rankCrest": 14,
+        "rankAttack": 3,
+        "rankSum": 17
+      },
+      {
+        "file": "splash_10.ogg",
+        "crestDb": 23.39,
+        "attackSec": 0.001,
+        "duration": 0.268,
+        "rankCrest": 4,
+        "rankAttack": 14,
+        "rankSum": 18
+      },
+      {
+        "file": "splash_07.ogg",
+        "crestDb": 26.65,
+        "attackSec": 0.0121,
+        "duration": 1.236,
+        "rankCrest": 9,
+        "rankAttack": 9,
+        "rankSum": 18
+      },
+      {
+        "file": "splash_02.ogg",
+        "crestDb": 26.38,
+        "attackSec": 0.0071,
+        "duration": 0.665,
+        "rankCrest": 8,
+        "rankAttack": 11,
+        "rankSum": 19
+      },
+      {
+        "file": "splash_12.ogg",
+        "crestDb": 30.3,
+        "attackSec": 0.0143,
+        "duration": 0.658,
+        "rankCrest": 12,
+        "rankAttack": 8,
+        "rankSum": 20
+      },
+      {
+        "file": "splash_05.ogg",
+        "crestDb": 30.96,
+        "attackSec": 0.0231,
+        "duration": 1.008,
+        "rankCrest": 13,
+        "rankAttack": 7,
+        "rankSum": 20
+      },
+      {
+        "file": "splash_03.ogg",
+        "crestDb": 28.96,
+        "attackSec": 0.0033,
+        "duration": 0.56,
+        "rankCrest": 11,
+        "rankAttack": 12,
+        "rankSum": 23
+      }
+    ]
+  },
+  "outside_wav": "bb - Fans and Drones (Jul 2021)/Outside.wav rejected: 53 s stereo recording whose spectrum is a stationary 72 Hz hum with 51% of the energy below 200 Hz and only 2% above 2 kHz (no insects, leaves or water); it reads as distant machinery/traffic rumble, not nature."
+}
